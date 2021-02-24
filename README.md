@@ -6,7 +6,7 @@ An Eth2 validator installation wizard
 * Simple
 * Minimal
 * Mostly automated
-* For Ubuntu 20.04 using Lighthouse
+* For Ubuntu 20.04 using Lighthouse and Geth
 * No prerequisite needed
 * Interruptible and resumable
 * Launched using a simple command line that bootstraps everything
