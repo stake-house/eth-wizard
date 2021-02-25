@@ -17,6 +17,13 @@ The eth2-validator-wizard is not ready to be used in the real world yet. It is s
 * Launched using a simple command line that bootstraps everything
 * Self-updating to the latest version on launch
 
+## Support
+
+If you have any question or if you need additional support, make sure to get in touch with the ethstaker community on:
+
+* Discord: [discord.gg/e84CFep](https://www.reddit.com/r/ethstaker/)
+* Reddit: [reddit.com/r/ethstaker](https://discord.gg/e84CFep)
+
 ## Credits
 
 Based on [Somer Esat's guide](https://someresat.medium.com/guide-to-staking-on-ethereum-2-0-ubuntu-lighthouse-41de20513b12).
