@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 from eth2validatorwizard.constants import *
 
@@ -33,7 +34,9 @@ def run():
         # User asked to quit
         quit()
 
-    install_geth(selected_network)
+    if not install_geth(selected_network):
+        # User asked to quit
+        quit()
 
     # Install Geth
     # Start Geth
@@ -120,7 +123,8 @@ Here is an overview of the different steps required to become an active
 validator on an Ethereum 2.0 network.
 
 * Consolidate 32 ETH for each active validator you want (You can have
-an almost unlimited amount of active validators using a single computer)
+an almost unlimited amount of active validators using a single computer
+and this setup)
 * Install an Eth1 client and let it synchronize
 * Install an Eth2 beacon node and let it synchronize
 * Generate your validator(s) keys
@@ -149,7 +153,7 @@ others are mostly for testing and they do not use anything of real value.
 
 For which network would you like to perform this installation?
 
-* Press the tab key to switch between the controls
+* Press the tab key to switch between the controls below
 '''
         ),
         values=[
@@ -165,4 +169,52 @@ For which network would you like to perform this installation?
 def install_geth(network):
     # Install geth for the selected network
 
-    pass
+    result = button_dialog(
+        title='Geth installation',
+        text=(
+'''
+This next step will install Geth, an Eth1 client.
+
+It uses the official Ethereum Personal Package Archive (PPA) meaning that
+it gets integrated with the normal updates for Ubuntu and its related
+tools like APT.
+
+Once the installation is completed, it will create a systemd service that
+will automatically start Geth on reboot or if it crashes.
+'''     ),
+        buttons=[
+            ('Install', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+
+    # Install Geth from PPA
+    subprocess.run([
+        'add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
+    subprocess.run([
+        'apt', 'update'])
+    subprocess.run([
+        'apt', 'install', 'geth'])
+    
+    # Setup Geth user and directory
+    subprocess.run([
+        'useradd', '--no-create-home', '--shell', '/bin/false', 'goeth'])
+    subprocess.run([
+        'mkdir', '-p', '/var/lib/goethereum'])
+    subprocess.run([
+        'chown', '-R', 'goeth:goeth', '/var/lib/goethereum'])
+    
+    # Setup Geth systemd service
+    with open('/etc/systemd/system/geth.service', 'w') as service_file:
+        service_file.write(GETH_SERVICE_DEFINITION[network])
+    subprocess.run([
+        'systemctl', 'daemon-reload'])
+    subprocess.run([
+        'systemctl', 'start', 'geth'])
+    subprocess.run([
+        'systemctl', 'enable', 'geth'])
+
+    
