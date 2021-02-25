@@ -1,5 +1,5 @@
 # eth2-validator-wizard
-An Eth2 validator installation wizard meant to guide anyone through the different steps to become a fully functional validator on the Eth2 network. It will install and configure all the software needed to become a validator.
+An Eth2 validator installation wizard meant to guide anyone through the different steps to become a fully functional validator on the Ethereum 2.0 network. It will install and configure all the software needed to become a validator.
 
 ## Disclaimer
 
@@ -12,7 +12,7 @@ The eth2-validator-wizard is not ready to be used in the real world yet. It is s
 * Mostly automated
 * For Ubuntu 20.04 using Lighthouse and Geth
 * No prerequisite needed
-* Internally simple to read and modify
+* Internally simple to read, understand and modify
 * Interruptible and resumable
 * Launched using a simple command line that bootstraps everything
 * Self-updating to the latest version on launch
