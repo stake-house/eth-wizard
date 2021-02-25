@@ -1,6 +1,8 @@
 import os
 
-from prompt_toolkit.shortcuts import button_dialog
+from eth2validatorwizard.constants import *
+
+from prompt_toolkit.shortcuts import button_dialog, radiolist_dialog
 
 def run():
     # Main entry point for the wizard.
@@ -22,9 +24,16 @@ def run():
         # User asked to quit
         quit()
 
-    # Select network
-
     # TODO: Check for open ports
+    # TODO: Check for disk size
+    # TODO: Check for disk speed
+
+    selected_network = select_network()
+    if not selected_network:
+        # User asked to quit
+        quit()
+
+    install_geth(selected_network)
 
     # Install Geth
     # Start Geth
@@ -44,7 +53,7 @@ def run():
 
     # TODO: Monitor
 
-    print('Ended normally')
+    print('Ended normally with network', selected_network)
 
 def show_welcome():
     # Show a welcome message about this wizard
@@ -64,7 +73,7 @@ to get in touch with the ethstaker community on:
 
 * Discord: discord.gg/e84CFep
 * Reddit: reddit.com/r/ethstaker
-'''),
+'''     ),
         buttons=[
             ('Start', True),
             ('Quit', False)
@@ -94,7 +103,7 @@ The Eth2 Validator Wizard needs to have super user permissions in order
 to proceed.
 
 A simple way to give the wizard these permissions is to start it with sudo.
-'''),
+'''     ),
         buttons=[
             ('Quit', False)
         ]
@@ -118,7 +127,7 @@ an almost unlimited amount of active validators using a single computer)
 * Install an Eth2 validator client and import your key(s)
 * Perform the 32 ETH deposit for each validator
 * Wait for your validator(s) to become active (can take a few hours/days)
-'''),
+'''     ),
         buttons=[
             ('Keep going', True),
             ('Quit', False)
@@ -126,3 +135,34 @@ an almost unlimited amount of active validators using a single computer)
     ).run()
 
     return result
+
+def select_network():
+    # Prompt for the selection on which network to perform the installation
+
+    result = radiolist_dialog(
+        title='Network selection',
+        text=(
+'''
+This wizard supports installing and configuring software for various
+Ethereum 2.0 networks. Mainnet is the main network with real value. The
+others are mostly for testing and they do not use anything of real value.
+
+For which network would you like to perform this installation?
+
+* Press the tab key to switch between the controls
+'''
+        ),
+        values=[
+            (NETWORK_MAINNET, "Mainnet"),
+            (NETWORK_PYRMONT, "Pyrmont")
+        ],
+        ok_text='Use this',
+        cancel_text='Quit'
+    ).run()
+
+    return result
+
+def install_geth(network):
+    # Install geth for the selected network
+
+    pass
