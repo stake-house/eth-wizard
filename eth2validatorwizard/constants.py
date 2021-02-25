@@ -73,7 +73,7 @@ WantedBy=multi-user.target
     NETWORK_PYRMONT: (
 '''
 [Unit]
-Description=Lighthouse Eth2 Client Beacon Node (Mainnet)
+Description=Lighthouse Eth2 Client Beacon Node (Pyrmont)
 Wants=network-online.target
 After=network-online.target
 

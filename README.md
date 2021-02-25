@@ -17,6 +17,19 @@ The eth2-validator-wizard is not ready to be used in the real world yet. It is s
 * Launched using a simple command line that bootstraps everything
 * Self-updating to the latest version on launch
 
+## How to use
+
+This procedure is going to evolve over time (it's going to get much easier to launch), but you can use something like this to test and start the wizard:
+
+```
+sudo apt update
+sudo apt install python3-pip
+git clone https://github.com/remyroy/eth2-validator-wizard.git
+cd eth2-validator-wizard
+sudo pip3 install -r requirements.txt
+sudo python3 -m eth2validatorwizard
+```
+
 ## Support
 
 If you have any question or if you need additional support, make sure to get in touch with the ethstaker community on:

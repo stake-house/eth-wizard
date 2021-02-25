@@ -37,9 +37,9 @@ def run():
         # User asked to quit
         quit()
 
-    '''if not install_geth(selected_network):
+    if not install_geth(selected_network):
         # User asked to quit
-        quit()'''
+        quit()
 
     # TODO: Verify proper Geth installation and syncing
 
