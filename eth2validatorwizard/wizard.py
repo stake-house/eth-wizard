@@ -31,6 +31,7 @@ def run():
     # TODO: Check for open ports
     # TODO: Check for disk size
     # TODO: Check for disk speed
+    # TODO: Check for internet speed
 
     selected_network = select_network()
     if not selected_network:
