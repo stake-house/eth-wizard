@@ -35,6 +35,7 @@ def run():
     # TODO: Check for disk size
     # TODO: Check for disk speed
     # TODO: Check for internet speed
+    # TODO: Check time synchronization and configure it if needed
 
     selected_network = select_network()
     if not selected_network:
@@ -58,6 +59,8 @@ def run():
         # User asked to quit or error
         quit()
     
+    
+
     # Import keystore files for Validator
     # Install Lighthouse Validator
     # Start & Enable Lighthouse Validator
