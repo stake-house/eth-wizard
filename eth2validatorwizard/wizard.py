@@ -1,6 +1,8 @@
 import os
 import subprocess
 import httpx
+import hashlib
+import shutil
 
 from pathlib import Path
 
@@ -39,18 +41,22 @@ def run():
         quit()
 
     if not install_geth(selected_network):
-        # User asked to quit
+        # User asked to quit or error
         quit()
 
     # TODO: Verify proper Geth installation and syncing
 
     if not install_lighthouse(selected_network):
-        # User asked to quit
+        # User asked to quit or error
         quit()
 
     # TODO: Verify proper Lighthouse beacon node installation and syncing
 
-    # Generate Keys
+    generated_keys = generate_keys(selected_network)
+    if not generated_keys:
+        # User asked to quit or error
+        quit()
+    
     # Import keystore files for Validator
     # Install Lighthouse Validator
     # Start & Enable Lighthouse Validator
@@ -353,3 +359,151 @@ even with good hardware and good internet.
         'systemctl', 'enable', 'lighthousebeacon'])
     
     return True
+
+def generate_keys(network):
+    # Generate validator keys for the selected network
+
+    result = button_dialog(
+        title='Generating keys',
+        text=(
+'''
+This next step will generate the keys needed to be a validator.
+
+It will download the official eth2.0-deposit-cli binary from GitHub,
+verify its SHA256 checksum, extract it and start it.
+
+The eth2.0-deposit-cli tool is executed in an interactive way where you
+have to answer a few questions. It will help you create a mnemonic from
+which all your keys will be derived from. The mnemonic is the ultimate key.
+It is VERY IMPORTANT to securely and privately store your mnemonic. It can
+be used to recreate your validator keys and eventually withdraw your funds.
+
+When asked how many validators you wish to run, remember that you will have
+to do a 32 ETH deposit for each validator.
+'''     ),
+        buttons=[
+            ('Generate', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+    
+    # Getting latest eth2.0-deposit-cli release files
+    eth2_cli_gh_release_url = GITHUB_REST_API_URL + ETH2_DEPOSIT_CLI_LATEST_RELEASE
+    headers = {'Accept': GITHUB_API_VERSION}
+    response = httpx.get(eth2_cli_gh_release_url, headers=headers)
+
+    if response.status_code != 200:
+        # TODO: Better handling for network response issue
+        return False
+    
+    release_json = response.json()
+
+    if 'assets' not in release_json:
+        # TODO: Better handling on unexpected response structure
+        return False
+    
+    binary_asset = None
+    checksum_asset = None
+
+    for asset in release_json['assets']:
+        if 'name' not in asset:
+            continue
+        if 'browser_download_url' not in asset:
+            continue
+    
+        file_name = asset['name']
+        file_url = asset['browser_download_url']
+
+        if file_name.endswith('linux-amd64.tar.gz'):
+            binary_asset = {
+                'file_name': file_name,
+                'file_url': file_url
+            }
+        elif file_name.endswith('linux-amd64.sha256'):
+            checksum_asset = {
+                'file_name': file_name,
+                'file_url': file_url
+            }
+
+    if binary_asset is None or checksum_asset is None:
+        # TODO: Better handling of missing asset in latest release
+        return False
+    
+    # Downloading latest eth2.0-deposit-cli release files
+    download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
+    download_path.mkdir(parents=True, exist_ok=True)
+
+    binary_path = Path(download_path, binary_asset['file_name'])
+    binary_hash = hashlib.sha256()
+
+    with open(str(binary_path), 'wb') as binary_file:
+        with httpx.stream('GET', binary_asset['file_url']) as http_stream:
+            for data in http_stream.iter_bytes():
+                binary_file.write(data)
+                binary_hash.update(data)
+
+    binary_hexdigest = binary_hash.hexdigest()
+
+    checksum_path = Path(download_path, checksum_asset['file_name'])
+
+    with open(str(checksum_path), 'wb') as signature_file:
+        with httpx.stream('GET', checksum_asset['file_url']) as http_stream:
+            for data in http_stream.iter_bytes():
+                signature_file.write(data)
+
+    # Verify SHA256 signature
+    with open(str(checksum_path), 'r') as signature_file:
+        if binary_hexdigest != signature_file.read(1024).strip():
+            # SHA256 checksum failed
+            # TODO: Better handling of failed SHA256 checksum
+            return False
+    
+    # Extracting the eth2.0-deposit-cli binary archive
+    eth2_deposit_cli_path = Path(Path.home(), 'eth2validatorwizard', 'eth2depositcli')
+    eth2_deposit_cli_path.mkdir(parents=True, exist_ok=True)
+    subprocess.run([
+        'tar', 'xvf', str(binary_path), '--strip-components', '2', '--directory',
+        eth2_deposit_cli_path])
+    
+    # Remove download leftovers
+    binary_path.unlink()
+    checksum_path.unlink()
+
+    # Clean potential leftover keys
+    validator_keys_path = Path(eth2_deposit_cli_path, 'validator_keys')
+    if validator_keys_path.exists():
+        if validator_keys_path.is_dir():
+            shutil.rmtree(str(validator_keys_path))
+        elif validator_keys_path.is_file():
+            validator_keys_path.unlink()
+    
+    # Launch eth2.0-deposit-cli
+    eth2_deposit_cli_binary = Path(eth2_deposit_cli_path, 'deposit')
+    subprocess.run([
+        str(eth2_deposit_cli_binary), 'new-mnemonic', '--chain', network],
+        cwd=eth2_deposit_cli_path)
+
+    # Verify the generated keys
+    deposit_data_path = None
+    keystore_paths = []
+
+    with os.scandir(validator_keys_path) as dir_it:
+        for entry in dir_it:
+            if not entry.name.startswith('.') and entry.is_file():
+                if entry.name.startswith('deposit_data'):
+                    deposit_data_path = entry.path
+                elif entry.name.startswith('keystore'):
+                    keystore_paths.append(entry.path)
+    
+    if deposit_data_path is None or len(keystore_paths) == 0:
+        # No key generated
+        # TODO: Better handling of no key(s) generated
+        return False
+
+    return {
+        'deposit_data_path': deposit_data_path,
+        'keystore_paths': keystore_paths
+    }

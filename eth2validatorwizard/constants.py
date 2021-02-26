@@ -4,6 +4,8 @@ GITHUB_API_VERSION = 'application/vnd.github.v3+json'
 LIGHTHOUSE_LATEST_RELEASE = '/repos/sigp/lighthouse/releases/latest'
 LIGHTHOUSE_PRIME_PGP_KEY_ID = '15E66D941F697E28F49381F426416DC3F30674B0'
 
+ETH2_DEPOSIT_CLI_LATEST_RELEASE = '/repos/ethereum/eth2.0-deposit-cli/releases/latest'
+
 NETWORK_MAINNET = 'mainnet'
 NETWORK_PYRMONT = 'pyrmont'
 
