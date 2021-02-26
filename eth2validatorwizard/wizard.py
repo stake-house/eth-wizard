@@ -67,6 +67,7 @@ def run():
     # TODO: Monitor
 
     print('Ended normally with network', selected_network)
+    print('Generated keys are', generated_keys)
 
 def show_welcome():
     # Show a welcome message about this wizard
