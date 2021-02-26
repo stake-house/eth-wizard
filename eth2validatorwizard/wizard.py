@@ -693,6 +693,6 @@ Your validator public key(s) are:
 {newline.join(public_keys)}
 
 Make sure to check the beaconcha.in website for more details about your
-validators:
+validator(s):
 {beaconcha_in_url}
 ''' )
