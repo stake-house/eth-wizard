@@ -14,6 +14,11 @@ LAUNCHPAD_URLS = {
     NETWORK_PYRMONT: 'https://pyrmont.launchpad.ethereum.org/'
 }
 
+BEACONCHA_IN_URLS = {
+    NETWORK_MAINNET: 'https://beaconcha.in/',
+    NETWORK_PYRMONT: 'https://pyrmont.beaconcha.in/'
+}
+
 GETH_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (
 '''

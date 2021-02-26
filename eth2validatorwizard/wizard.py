@@ -5,6 +5,7 @@ import hashlib
 import shutil
 import time
 import stat
+import json
 
 from pathlib import Path
 
@@ -72,10 +73,9 @@ def run():
 
     # TODO: Monitoring setup
 
-    # TODO: Explain what's next including wait time
+    show_whats_next(selected_network, generated_keys)
 
-    print('Ended normally with network', selected_network)
-    print('Generated keys are', generated_keys)
+    show_public_keys(selected_network, generated_keys)
 
 def show_welcome():
     # Show a welcome message about this wizard
@@ -524,7 +524,7 @@ to do a 32 ETH deposit for each validator.
     
     if deposit_data_path is None or len(keystore_paths) == 0:
         # No key generated
-        # TODO: Better handling of no key(s) generated
+        # TODO: Better handling of no keys generated
         return False
 
     return {
@@ -544,7 +544,7 @@ This next step will import your keystore(s) to be used with the Lighthouse
 validator client and it will configure the Lighthouse validator client.
 
 During the importation process, you will be asked to enter the password
-you typed during the key(s) generation step. It is not your mnemonic.
+you typed during the keys generation step. It is not your mnemonic.
 
 It will create a systemd service that will automatically start the
 Lighthouse validator client on reboot or if it crashes. The validator
@@ -603,6 +603,8 @@ def initiate_deposit(network, keys):
     shutil.copyfile(keys['deposit_data_path'], str(deposit_file_copy_path))
     os.chmod(str(deposit_file_copy_path), stat.S_IROTH)
 
+    # TODO: Create an alternative way to easily obtain the deposit file with a simple HTTP server
+
     result = button_dialog(
         title='Deposit on the launch pad',
         text=(
@@ -632,3 +634,61 @@ When you are done with the deposit, click the 'I'm done' button below.
 
     if not result:
         return result
+
+def show_whats_next(network, keys):
+    # Show what's next including wait time
+
+    beaconcha_in_url = BEACONCHA_IN_URLS[network]
+
+    button_dialog(
+        title='Installation completed',
+        text=(
+f'''
+You just completed all the steps needed to become an active validator on
+the {network.capitalize()} Ethereum 2.0 network. You created {len(keys['keystore_paths'])} validator(s)
+that will soon be activated.
+
+You can monitor your activation period and all the details about your
+validator(s) on the beaconcha.in website at the following URL:
+
+{beaconcha_in_url}
+
+If you have any question or if you need additional support, make sure
+to get in touch with the ethstaker community on:
+
+* Discord: discord.gg/e84CFep
+* Reddit: reddit.com/r/ethstaker
+'''     ),
+        buttons=[
+            ('Quit', False)
+        ]
+    ).run()
+
+def show_public_keys(network, keys):
+    beaconcha_in_url = BEACONCHA_IN_URLS[network]
+
+    public_keys = []
+
+    with open(keys['deposit_data_path'], 'r') as deposit_data_file:
+        deposit_data = json.loads(deposit_data_file.read(204800))
+        
+        for validator_data in deposit_data:
+            if 'pubkey' not in validator_data:
+                continue
+            public_key = validator_data['pubkey']
+            public_keys.append('0x' + public_key)
+
+    print(
+f'''
+Eth2 Validator Wizard completed!
+
+Network: {network.capitalize()}
+Number of validator(s): {len(keys['keystore_paths'])}
+
+Your validator public key(s) are:
+{public_keys.join('\n')}
+
+Make sure to check the beaconcha.in website for more details about your
+validators:
+{beaconcha_in_url}
+''' )
