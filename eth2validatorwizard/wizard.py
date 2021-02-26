@@ -678,6 +678,8 @@ def show_public_keys(network, keys):
             public_key = validator_data['pubkey']
             public_keys.append('0x' + public_key)
 
+    newline = '\n'
+
     print(
 f'''
 Eth2 Validator Wizard completed!
@@ -686,7 +688,7 @@ Network: {network.capitalize()}
 Number of validator(s): {len(keys['keystore_paths'])}
 
 Your validator public key(s) are:
-{public_keys.join('\n')}
+{public_keys.join(newline)}
 
 Make sure to check the beaconcha.in website for more details about your
 validators:
