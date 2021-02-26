@@ -328,6 +328,10 @@ even with good hardware and good internet.
     subprocess.run([
         'tar', 'xvf', str(binary_path), '--directory', '/usr/local/bin'])
     
+    # Remove download leftovers
+    binary_path.unlink()
+    signature_path.unlink()
+
     # Setup Lighthouse beacon node user and directory
     subprocess.run([
         'useradd', '--no-create-home', '--shell', '/bin/false', 'lighthousebeacon'])
