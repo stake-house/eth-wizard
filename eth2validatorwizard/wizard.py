@@ -68,6 +68,7 @@ def run():
     # Deposit via launchpad
 
     # TODO: Monitor
+    # TODO: Explain what's next including wait time
 
     print('Ended normally with network', selected_network)
     print('Generated keys are', generated_keys)
