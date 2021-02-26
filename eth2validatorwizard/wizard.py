@@ -3,6 +3,7 @@ import subprocess
 import httpx
 import hashlib
 import shutil
+import time
 
 from pathlib import Path
 
@@ -322,8 +323,23 @@ even with good hardware and good internet.
                 signature_file.write(data)
 
     # Verify PGP signature
-    subprocess.run([
-        'gpg', '--keyserver', 'pool.sks-keyservers.net', '--recv-keys', LIGHTHOUSE_PRIME_PGP_KEY_ID])
+    command_line = ['gpg', '--keyserver', 'pool.sks-keyservers.net', '--recv-keys',
+        LIGHTHOUSE_PRIME_PGP_KEY_ID]
+    process_result = subprocess.run(command_line)
+    if process_result.returncode != 0:
+        # GPG failed to download Sigma Prime's PGP key, let's wait and retry a few times
+        retry_count = 0
+        while process_result.returncode != 0 and retry_count < 5:
+            retry_count = retry_count + 1
+            print('GPG failed to download the PGP key. We will wait 10 seconds and try again.')
+            time.sleep(10)
+            process_result = subprocess.run(command_line)
+    
+    if process_result.returncode != 0:
+        # We failed to download Sigma Prime's PGP key after a few retries
+        # TODO: Better handling of failed PGP key download
+        return False
+    
     process_result = subprocess.run([
         'gpg', '--verify', str(signature_path)])
     if process_result.returncode != 0:
