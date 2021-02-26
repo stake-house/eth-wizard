@@ -630,10 +630,12 @@ When you are done with the deposit, click the 'I'm done' button below.
         ]
     ).run()
 
-    # TODO: Verify that the deposit was done correctly using beaconcha.in API
-
     if not result:
         return result
+
+    # TODO: Verify that the deposit was done correctly using beaconcha.in API
+    
+    return True
 
 def show_whats_next(network, keys):
     # Show what's next including wait time
