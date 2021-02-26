@@ -4,6 +4,7 @@ import httpx
 import hashlib
 import shutil
 import time
+import stat
 
 from pathlib import Path
 
@@ -65,7 +66,9 @@ def run():
 
     # TODO: Verify proper Lighthouse validator client installation and the connection with the beacon node
 
-    # Deposit via launchpad
+    if not initiate_deposit(selected_network, generated_keys):
+        # User asked to quit or error
+        quit()
 
     # TODO: Monitoring setup
 
@@ -589,3 +592,43 @@ ready to start validating once your validator(s) get activated.
         'systemctl', 'enable', 'lighthousevalidator'])
 
     return True
+
+def initiate_deposit(network, keys):
+    # Initiate and explain the deposit on launchpad
+
+    launchpad_url = LAUNCHPAD_URLS[network]
+
+    # Create an easily accessible copy of the deposit file
+    deposit_file_copy_path = Path('/tmp', 'deposit_data.json')
+    shutil.copyfile(keys['deposit_data_path'], str(deposit_file_copy_path))
+    os.chmod(str(deposit_file_copy_path), stat.S_IROTH)
+
+    result = button_dialog(
+        title='Deposit on the launch pad',
+        text=(
+f'''
+This next step is to perform the 32 ETH deposit(s) on the launch pad. In
+order to do this deposit, you will need your deposit file which was created
+during the key generation step. A copy of your deposit file can be found in
+
+{deposit_file_copy_path}
+
+On the Eth2 Launch Pad website, you will be asked a few questions and it
+will explain some of the risks and mitigation strategies. Make sure to read
+everything carefully and make sure you understand it all. When you are
+ready, go to the following URL in your browser:
+
+{launchpad_url}
+
+When you are done with the deposit, click the 'I'm done' button below.
+'''     ),
+        buttons=[
+            ('I\'m done', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    # TODO: Verify that the deposit was done correctly using beaconcha.in API
+
+    if not result:
+        return result
