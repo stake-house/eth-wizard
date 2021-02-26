@@ -63,10 +63,7 @@ def run():
         # User asked to quit or error
         quit()
 
-    # Import keystore files for Validator
-    # Install Lighthouse Validator
-    # Start & Enable Lighthouse Validator
-    # Check for good connection between Lighthouse Validator and Lighthouse Beacon
+    # TODO: Verify proper Lighthouse validator client installation and the connection with the beacon node
 
     # Deposit via launchpad
 
