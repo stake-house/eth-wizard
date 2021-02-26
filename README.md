@@ -19,7 +19,7 @@ The eth2-validator-wizard is not ready to be used in the real world yet. It is s
 
 ## How to use
 
-This procedure is going to evolve over time (it's going to get much easier to launch), but you can use something like this to test and start the wizard:
+This procedure is going to evolve over time (it's going to get much easier to launch), but you can use something like this in a terminal to test and start the wizard:
 
 ```
 sudo apt update
