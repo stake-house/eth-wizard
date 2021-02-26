@@ -91,3 +91,42 @@ ExecStart=/usr/local/bin/lighthouse bn --network pyrmont --datadir /var/lib/ligh
 WantedBy=multi-user.target
 ''')
 }
+
+LIGHTHOUSE_VC_SERVICE_DEFINITION = {
+    NETWORK_MAINNET: (
+'''
+[Unit]
+Description=Lighthouse Eth2 Client Validator Client (Mainnet)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=lighthousevalidator
+Group=lighthousevalidator
+Type=simple
+Restart=always
+RestartSec=5
+ExecStart=/usr/local/bin/lighthouse vc --network mainnet --datadir /var/lib/lighthouse --metrics
+
+[Install]
+WantedBy=multi-user.target
+'''),
+    NETWORK_PYRMONT: (
+'''
+[Unit]
+Description=Lighthouse Eth2 Client Validator Client (Pyrmont)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=lighthousevalidator
+Group=lighthousevalidator
+Type=simple
+Restart=always
+RestartSec=5
+ExecStart=/usr/local/bin/lighthouse vc --network pyrmont --datadir /var/lib/lighthouse --metrics
+
+[Install]
+WantedBy=multi-user.target
+''')
+}

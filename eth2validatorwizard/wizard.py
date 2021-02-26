@@ -59,7 +59,9 @@ def run():
         # User asked to quit or error
         quit()
     
-    
+    if not install_lighthouse_validator(selected_network, generated_keys):
+        # User asked to quit or error
+        quit()
 
     # Import keystore files for Validator
     # Install Lighthouse Validator
@@ -524,6 +526,65 @@ to do a 32 ETH deposit for each validator.
         return False
 
     return {
+        'validator_keys_path': str(validator_keys_path),
         'deposit_data_path': deposit_data_path,
         'keystore_paths': keystore_paths
     }
+
+def install_lighthouse_validator(network, keys):
+    # Import keystore(s) and configure the Lighthouse validator client
+
+    result = button_dialog(
+        title='Lighthouse validator client',
+        text=(
+'''
+This next step will import your keystore(s) to be used with the Lighthouse
+validator client and it will configure the Lighthouse validator client.
+
+During the importation process, you will be asked to enter the password
+you typed during the key(s) generation step. It is not your mnemonic.
+
+It will create a systemd service that will automatically start the
+Lighthouse validator client on reboot or if it crashes.
+'''     ),
+        buttons=[
+            ('Configure', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+    
+    # Setup Lighthouse validator client user and directory
+    subprocess.run([
+        'useradd', '--no-create-home', '--shell', '/bin/false', 'lighthousevalidator'])
+    subprocess.run([
+        'mkdir', '-p', '/var/lib/lighthouse/validators'])
+    subprocess.run([
+        'chown', '-R', 'lighthousevalidator:lighthousevalidator', '/var/lib/lighthouse/validators'])
+    subprocess.run([
+        'chmod', '700', '/var/lib/lighthouse/validators'])
+    
+    # Import keystore(s)
+    subprocess.run([
+        '/usr/local/bin/lighthouse', '--network', network, 'account', 'validator', 'import',
+        '--directory', keys['validator_keys_path'], '--datadir', '/var/lib/lighthouse'])
+
+    # TODO: Check for correct keystore(s) import
+
+    # Make sure validators directory is owned by the right user/group
+    subprocess.run([
+        'chown', '-R', 'lighthousevalidator:lighthousevalidator', '/var/lib/lighthouse/validators'])
+
+    # Setup Lighthouse validator client systemd service
+    with open('/etc/systemd/system/lighthousevalidator.service', 'w') as service_file:
+        service_file.write(LIGHTHOUSE_VC_SERVICE_DEFINITION[network])
+    subprocess.run([
+        'systemctl', 'daemon-reload'])
+    subprocess.run([
+        'systemctl', 'start', 'lighthousevalidator'])
+    subprocess.run([
+        'systemctl', 'enable', 'lighthousevalidator'])
+
+    return True
