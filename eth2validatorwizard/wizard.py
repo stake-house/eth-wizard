@@ -690,7 +690,7 @@ Network: {network.capitalize()}
 Number of validator(s): {len(keys['keystore_paths'])}
 
 Your validator public key(s) are:
-{public_keys.join(newline)}
+{newline.join(public_keys)}
 
 Make sure to check the beaconcha.in website for more details about your
 validators:
