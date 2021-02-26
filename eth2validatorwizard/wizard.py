@@ -67,7 +67,8 @@ def run():
 
     # Deposit via launchpad
 
-    # TODO: Monitor
+    # TODO: Monitoring setup
+
     # TODO: Explain what's next including wait time
 
     print('Ended normally with network', selected_network)
@@ -543,7 +544,9 @@ During the importation process, you will be asked to enter the password
 you typed during the key(s) generation step. It is not your mnemonic.
 
 It will create a systemd service that will automatically start the
-Lighthouse validator client on reboot or if it crashes.
+Lighthouse validator client on reboot or if it crashes. The validator
+client will be started, it will connect to your beacon node and it will be
+ready to start validating once your validator(s) get activated.
 '''     ),
         buttons=[
             ('Configure', True),
