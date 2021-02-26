@@ -622,7 +622,7 @@ ready, go to the following URL in your browser:
 
 {launchpad_url}
 
-When you are done with the deposit, click the 'I'm done' button below.
+When you are done with the deposit, click the "I'm done" button below.
 '''     ),
         buttons=[
             ('I\'m done', True),
