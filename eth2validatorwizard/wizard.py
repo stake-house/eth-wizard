@@ -705,6 +705,11 @@ When you are done with the deposit(s), click the "I'm done" button below.
             # TODO: Better handling of unability to get validator(s) deposits from beaconcha.in
             print('Unability to get validator(s) deposits from beaconcha.in')
             return False
+    
+    # Check if all the deposit(s) were done for each validator
+    if len(validator_deposits) < len(public_keys):
+        # TODO: Better handling if missing deposits
+        pass
 
     # Clean up deposit data file
     deposit_file_copy_path.unlink()
@@ -731,14 +736,17 @@ def get_bc_validator_deposits(network, public_keys):
     if (
         'status' not in response_json or
         response_json['status'] != 'OK' or
-        'data' not in response_json or
-        type(response_json['data']) is not list
+        'data' not in response_json
         ):
         # TODO: Better handling for response data or structure issue
         print(f'Unexpected response data or structure from {bc_api_query_url}: {response_json}')
         return False
     
     validator_deposits = response_json['data']
+    # beaconcha.in API does not return a list for a single validator so
+    # we make it a list for ease of use
+    if type(validator_deposits) is not list:
+        validator_deposits = [validator_deposits]
 
     return validator_deposits
 
