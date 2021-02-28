@@ -552,7 +552,8 @@ This next step will import your keystore(s) to be used with the Lighthouse
 validator client and it will configure the Lighthouse validator client.
 
 During the importation process, you will be asked to enter the password
-you typed during the keys generation step. It is not your mnemonic.
+you typed during the keys generation step. It is not your mnemonic. Do not
+omit typing your password during this importation process.
 
 It will create a systemd service that will automatically start the
 Lighthouse validator client on reboot or if it crashes. The validator
