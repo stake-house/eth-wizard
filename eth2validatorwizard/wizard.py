@@ -516,16 +516,21 @@ to do a 32 ETH deposit for each validator.
 
     with os.scandir(validator_keys_path) as dir_it:
         for entry in dir_it:
-            if not entry.name.startswith('.') and entry.is_file():
-                if entry.name.startswith('deposit_data'):
-                    deposit_data_path = entry.path
-                elif entry.name.startswith('keystore'):
-                    keystore_paths.append(entry.path)
+            if entry.name.startswith('.') or not entry.is_file():
+                continue
+
+            if entry.name.startswith('deposit_data'):
+                deposit_data_path = entry.path
+            elif entry.name.startswith('keystore'):
+                keystore_paths.append(entry.path)
     
     if deposit_data_path is None or len(keystore_paths) == 0:
         # No key generated
         # TODO: Better handling of no keys generated
         return False
+
+    # Clean up eth2.0-deposit-cli tool
+    eth2_deposit_cli_binary.unlink()
 
     return {
         'validator_keys_path': str(validator_keys_path),
@@ -576,6 +581,8 @@ ready to start validating once your validator(s) get activated.
         '--directory', keys['validator_keys_path'], '--datadir', '/var/lib/lighthouse'])
 
     # TODO: Check for correct keystore(s) import
+
+    # TODO: Clean up generated keys
 
     # Make sure validators directory is owned by the right user/group
     subprocess.run([
@@ -634,6 +641,8 @@ When you are done with the deposit, click the "I'm done" button below.
         return result
 
     # TODO: Verify that the deposit was done correctly using beaconcha.in API
+
+    # TODO: Clean up deposit data file
     
     return True
 
