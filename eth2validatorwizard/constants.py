@@ -10,14 +10,16 @@ NETWORK_MAINNET = 'mainnet'
 NETWORK_PYRMONT = 'pyrmont'
 
 LAUNCHPAD_URLS = {
-    NETWORK_MAINNET: 'https://launchpad.ethereum.org/',
-    NETWORK_PYRMONT: 'https://pyrmont.launchpad.ethereum.org/'
+    NETWORK_MAINNET: 'https://launchpad.ethereum.org',
+    NETWORK_PYRMONT: 'https://pyrmont.launchpad.ethereum.org'
 }
 
 BEACONCHA_IN_URLS = {
-    NETWORK_MAINNET: 'https://beaconcha.in/',
-    NETWORK_PYRMONT: 'https://pyrmont.beaconcha.in/'
+    NETWORK_MAINNET: 'https://beaconcha.in',
+    NETWORK_PYRMONT: 'https://pyrmont.beaconcha.in'
 }
+
+BEACONCHA_VALIDATOR_API_URL = '/api/v1/validator/{indexOrPubkey}'
 
 GETH_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (

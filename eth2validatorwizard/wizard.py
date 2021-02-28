@@ -67,15 +67,16 @@ def run():
 
     # TODO: Verify proper Lighthouse validator client installation and the connection with the beacon node
 
-    if not initiate_deposit(selected_network, generated_keys):
+    public_keys = initiate_deposit(selected_network, generated_keys)
+    if not public_keys:
         # User asked to quit or error
         quit()
 
     # TODO: Monitoring setup
 
-    show_whats_next(selected_network, generated_keys)
+    show_whats_next(selected_network, generated_keys, public_keys)
 
-    show_public_keys(selected_network, generated_keys)
+    show_public_keys(selected_network, generated_keys, public_keys)
 
 def show_welcome():
     # Show a welcome message about this wizard
@@ -582,7 +583,9 @@ ready to start validating once your validator(s) get activated.
 
     # TODO: Check for correct keystore(s) import
 
-    # TODO: Clean up generated keys
+    # Clean up generated keys
+    for keystore_path in keys['keystore_paths']:
+        os.unlink(keystore_path)
 
     # Make sure validators directory is owned by the right user/group
     subprocess.run([
@@ -629,7 +632,7 @@ ready, go to the following URL in your browser:
 
 {launchpad_url}
 
-When you are done with the deposit, click the "I'm done" button below.
+When you are done with the deposit(s), click the "I'm done" button below.
 '''     ),
         buttons=[
             ('I\'m done', True),
@@ -640,13 +643,96 @@ When you are done with the deposit, click the "I'm done" button below.
     if not result:
         return result
 
-    # TODO: Verify that the deposit was done correctly using beaconcha.in API
+    public_keys = []
 
-    # TODO: Clean up deposit data file
+    with open(keys['deposit_data_path'], 'r') as deposit_data_file:
+        deposit_data = json.loads(deposit_data_file.read(204800))
+        
+        for validator_data in deposit_data:
+            if 'pubkey' not in validator_data:
+                continue
+            public_key = validator_data['pubkey']
+            public_keys.append('0x' + public_key)
     
-    return True
+    if len(public_keys) == 0:
+        # TODO: Better handling of no public keys in deposit data file
+        return False
 
-def show_whats_next(network, keys):
+    # Verify that the deposit was done correctly using beaconcha.in API
+    bc_validators = get_bc_validator_details(network, public_keys)
+
+    if not bc_validators:
+        # TODO: Better handling of unability to get validator(s) details from beaconcha.in
+        return False
+
+    while len(bc_validators) == 0:
+        # beaconcha.in does not see any validator with the public keys we generated
+
+        result = button_dialog(
+            title='No deposit found',
+            text=(
+f'''
+No deposit has been found on the beaconcha.in website for the validator
+keys that you generated. In order to become an active validator, you need
+to do a 32 ETH deposit for each validator you created. In order to do this
+deposit, you will need your deposit file which was created during the key
+generation step. A copy of your deposit file can be found in
+
+{deposit_file_copy_path}
+
+To perform the deposit(s), go to the following URL in your browser:
+
+{launchpad_url}
+
+When you are done with the deposit(s), click the "I'm done" button below.
+'''     ),
+            buttons=[
+                ('I\'m done', True),
+                ('Quit', False)
+            ]
+        ).run()
+
+        bc_validators = get_bc_validator_details(network, public_keys)
+
+        if not bc_validators:
+            # TODO: Better handling of unability to get validator(s) details from beaconcha.in
+            return False
+
+    # Clean up deposit data file
+    deposit_file_copy_path.unlink()
+    os.unlink(keys['deposit_data_path'])
+    
+    return public_keys
+
+def get_bc_validator_details(network, public_keys):
+    # Return the validator details from the beaconcha.in API
+
+    pubkey_arg = ','.join(public_keys)
+    bc_api_query_url = (BEACONCHA_IN_URLS[network] +
+        BEACONCHA_VALIDATOR_API_URL.format(indexOrPubkey=pubkey_arg))
+    headers = {'accept': 'application/json'}
+    response = httpx.get(bc_api_query_url, headers=headers)
+
+    if response.status_code != 200:
+        # TODO: Better handling for network response issue
+        return False
+    
+    response_json = response.json()
+
+    if (
+        'status' not in response_json or
+        response_json['status'] != 'OK' or
+        'data' not in response_json or
+        type(response_json['data']) is not list
+        ):
+        # TODO: Better handling for response data or structure issue
+        return False
+    
+    bc_validators = response_json['data']
+
+    return bc_validators
+
+def show_whats_next(network, keys, public_keys):
     # Show what's next including wait time
 
     beaconcha_in_url = BEACONCHA_IN_URLS[network]
@@ -675,19 +761,8 @@ to get in touch with the ethstaker community on:
         ]
     ).run()
 
-def show_public_keys(network, keys):
+def show_public_keys(network, keys, public_keys):
     beaconcha_in_url = BEACONCHA_IN_URLS[network]
-
-    public_keys = []
-
-    with open(keys['deposit_data_path'], 'r') as deposit_data_file:
-        deposit_data = json.loads(deposit_data_file.read(204800))
-        
-        for validator_data in deposit_data:
-            if 'pubkey' not in validator_data:
-                continue
-            public_key = validator_data['pubkey']
-            public_keys.append('0x' + public_key)
 
     newline = '\n'
 
