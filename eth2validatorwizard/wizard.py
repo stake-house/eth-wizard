@@ -712,6 +712,7 @@ def get_bc_validator_details(network, public_keys):
     pubkey_arg = ','.join(public_keys)
     bc_api_query_url = (BEACONCHA_IN_URLS[network] +
         BEACONCHA_VALIDATOR_API_URL.format(indexOrPubkey=pubkey_arg))
+    print(f'Trying to get details from {bc_api_query_url}')
     headers = {'accept': 'application/json'}
     response = httpx.get(bc_api_query_url, headers=headers)
 
