@@ -707,9 +707,41 @@ When you are done with the deposit(s), click the "I'm done" button below.
             return False
     
     # Check if all the deposit(s) were done for each validator
-    if len(validator_deposits) < len(public_keys):
-        # TODO: Better handling if missing deposits
-        pass
+    while len(validator_deposits) < len(public_keys):
+
+        result = button_dialog(
+            title='Missing deposit(s)',
+            text=(
+f'''
+Only {len(validator_deposits)} deposit(s) has been found for your {len(public_keys)} validators on the
+beaconcha.in website. In order to become an active validator, you need
+to do a 32 {currency} deposit for each validator you created. In order to do
+this deposit, you will need your deposit file which was created during the
+key generation step. A copy of your deposit file can be found in
+
+{deposit_file_copy_path}
+
+To perform the deposit(s), go to the following URL in your browser:
+
+{launchpad_url}
+
+When you are done with the deposit(s), click the "I'm done" button below.
+'''     ),
+            buttons=[
+                ('I\'m done', True),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+
+        validator_deposits = get_bc_validator_deposits(network, public_keys)
+
+        if type(validator_deposits) is not list and not validator_deposits:
+            # TODO: Better handling of unability to get validator(s) deposits from beaconcha.in
+            print('Unability to get validator(s) deposits from beaconcha.in')
+            return False
 
     # Clean up deposit data file
     deposit_file_copy_path.unlink()

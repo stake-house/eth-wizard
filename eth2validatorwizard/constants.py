@@ -48,7 +48,7 @@ WantedBy=default.target
     NETWORK_PYRMONT: (
 '''
 [Unit]
-Description=Go Ethereum Client - Geth (Pyrmont)
+Description=Go Ethereum Client - Geth (Görli)
 After=network.target
 Wants=network.target
 
