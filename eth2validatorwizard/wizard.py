@@ -388,10 +388,12 @@ even with good hardware and good internet.
 def generate_keys(network):
     # Generate validator keys for the selected network
 
+    currency = NETWORK_CURRENCY[network]
+
     result = button_dialog(
         title='Generating keys',
         text=(
-'''
+f'''
 This next step will generate the keys needed to be a validator.
 
 It will download the official eth2.0-deposit-cli binary from GitHub,
@@ -404,7 +406,7 @@ It is VERY IMPORTANT to securely and privately store your mnemonic. It can
 be used to recreate your validator keys and eventually withdraw your funds.
 
 When asked how many validators you wish to run, remember that you will have
-to do a 32 ETH deposit for each validator.
+to do a 32 {currency} deposit for each validator.
 '''     ),
         buttons=[
             ('Generate', True),
@@ -607,6 +609,7 @@ def initiate_deposit(network, keys):
     # Initiate and explain the deposit on launchpad
 
     launchpad_url = LAUNCHPAD_URLS[network]
+    currency = NETWORK_CURRENCY[network]
 
     # Create an easily accessible copy of the deposit file
     deposit_file_copy_path = Path('/tmp', 'deposit_data.json')
@@ -619,7 +622,7 @@ def initiate_deposit(network, keys):
         title='Deposit on the launch pad',
         text=(
 f'''
-This next step is to perform the 32 ETH deposit(s) on the launch pad. In
+This next step is to perform the 32 {currency} deposit(s) on the launch pad. In
 order to do this deposit, you will need your deposit file which was created
 during the key generation step. A copy of your deposit file can be found in
 
@@ -659,14 +662,14 @@ When you are done with the deposit(s), click the "I'm done" button below.
         return False
 
     # Verify that the deposit was done correctly using beaconcha.in API
-    bc_validators = get_bc_validator_details(network, public_keys)
+    validator_deposits = get_bc_validator_deposits(network, public_keys)
 
-    if type(bc_validators) is not list and not bc_validators:
-        # TODO: Better handling of unability to get validator(s) details from beaconcha.in
-        print('Unability to get validator(s) details from beaconcha.in')
+    if type(validator_deposits) is not list and not validator_deposits:
+        # TODO: Better handling of unability to get validator(s) deposits from beaconcha.in
+        print('Unability to get validator(s) deposits from beaconcha.in')
         return False
 
-    while len(bc_validators) == 0:
+    while len(validator_deposits) == 0:
         # beaconcha.in does not see any validator with the public keys we generated
 
         result = button_dialog(
@@ -675,9 +678,9 @@ When you are done with the deposit(s), click the "I'm done" button below.
 f'''
 No deposit has been found on the beaconcha.in website for the validator
 keys that you generated. In order to become an active validator, you need
-to do a 32 ETH deposit for each validator you created. In order to do this
-deposit, you will need your deposit file which was created during the key
-generation step. A copy of your deposit file can be found in
+to do a 32 {currency} deposit for each validator you created. In order to do
+this deposit, you will need your deposit file which was created during the
+key generation step. A copy of your deposit file can be found in
 
 {deposit_file_copy_path}
 
@@ -693,11 +696,14 @@ When you are done with the deposit(s), click the "I'm done" button below.
             ]
         ).run()
 
-        bc_validators = get_bc_validator_details(network, public_keys)
+        if not result:
+            return result
 
-        if type(bc_validators) is not list and not bc_validators:
-            # TODO: Better handling of unability to get validator(s) details from beaconcha.in
-            print('Unability to get validator(s) details from beaconcha.in')
+        validator_deposits = get_bc_validator_deposits(network, public_keys)
+
+        if type(validator_deposits) is not list and not validator_deposits:
+            # TODO: Better handling of unability to get validator(s) deposits from beaconcha.in
+            print('Unability to get validator(s) deposits from beaconcha.in')
             return False
 
     # Clean up deposit data file
@@ -706,12 +712,12 @@ When you are done with the deposit(s), click the "I'm done" button below.
     
     return public_keys
 
-def get_bc_validator_details(network, public_keys):
-    # Return the validator details from the beaconcha.in API
+def get_bc_validator_deposits(network, public_keys):
+    # Return the validator deposits from the beaconcha.in API
 
     pubkey_arg = ','.join(public_keys)
     bc_api_query_url = (BEACONCHA_IN_URLS[network] +
-        BEACONCHA_VALIDATOR_API_URL.format(indexOrPubkey=pubkey_arg))
+        BEACONCHA_VALIDATOR_DEPOSITS_API_URL.format(indexOrPubkey=pubkey_arg))
     headers = {'accept': 'application/json'}
     response = httpx.get(bc_api_query_url, headers=headers)
 
@@ -732,9 +738,9 @@ def get_bc_validator_details(network, public_keys):
         print(f'Unexpected response data or structure from {bc_api_query_url}: {response_json}')
         return False
     
-    bc_validators = response_json['data']
+    validator_deposits = response_json['data']
 
-    return bc_validators
+    return validator_deposits
 
 def show_whats_next(network, keys, public_keys):
     # Show what's next including wait time

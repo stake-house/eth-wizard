@@ -19,7 +19,12 @@ BEACONCHA_IN_URLS = {
     NETWORK_PYRMONT: 'https://pyrmont.beaconcha.in'
 }
 
-BEACONCHA_VALIDATOR_API_URL = '/api/v1/validator/{indexOrPubkey}'
+NETWORK_CURRENCY = {
+    NETWORK_MAINNET: 'ETH',
+    NETWORK_PYRMONT: 'GöETH'
+}
+
+BEACONCHA_VALIDATOR_DEPOSITS_API_URL = '/api/v1/validator/{indexOrPubkey}/deposits'
 
 GETH_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (
