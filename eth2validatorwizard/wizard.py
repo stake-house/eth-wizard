@@ -663,6 +663,7 @@ When you are done with the deposit(s), click the "I'm done" button below.
 
     if not bc_validators:
         # TODO: Better handling of unability to get validator(s) details from beaconcha.in
+        print('Unability to get validator(s) details from beaconcha.in')
         return False
 
     while len(bc_validators) == 0:
@@ -696,6 +697,7 @@ When you are done with the deposit(s), click the "I'm done" button below.
 
         if not bc_validators:
             # TODO: Better handling of unability to get validator(s) details from beaconcha.in
+            print('Unability to get validator(s) details from beaconcha.in')
             return False
 
     # Clean up deposit data file
@@ -715,6 +717,7 @@ def get_bc_validator_details(network, public_keys):
 
     if response.status_code != 200:
         # TODO: Better handling for network response issue
+        print(f'Error code {response.status_code} when trying to get {bc_api_query_url}')
         return False
     
     response_json = response.json()
@@ -726,6 +729,7 @@ def get_bc_validator_details(network, public_keys):
         type(response_json['data']) is not list
         ):
         # TODO: Better handling for response data or structure issue
+        print(f'Unexpected response data or structure from {bc_api_query_url}: {response_json}')
         return False
     
     bc_validators = response_json['data']
