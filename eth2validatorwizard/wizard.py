@@ -689,6 +689,8 @@ To perform the deposit(s), go to the following URL in your browser:
 {launchpad_url}
 
 When you are done with the deposit(s), click the "I'm done" button below.
+Note that it can take a few minutes before beaconcha.in sees your
+deposit(s).
 '''     ),
             buttons=[
                 ('I\'m done', True),
@@ -726,6 +728,8 @@ To perform the deposit(s), go to the following URL in your browser:
 {launchpad_url}
 
 When you are done with the deposit(s), click the "I'm done" button below.
+Note that it can take a few minutes before beaconcha.in sees your
+deposit(s).
 '''     ),
             buttons=[
                 ('I\'m done', True),
@@ -823,7 +827,8 @@ Eth2 Validator Wizard completed!
 Network: {network.capitalize()}
 Number of validator(s): {len(keys['keystore_paths'])}
 
-Your validator public key(s) are:
+Make sure to note or save your public keys somewhere. Your validator public
+key(s) are:
 {newline.join(public_keys)}
 
 Make sure to check the beaconcha.in website for more details about your
