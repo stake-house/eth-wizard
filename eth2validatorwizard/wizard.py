@@ -661,7 +661,7 @@ When you are done with the deposit(s), click the "I'm done" button below.
     # Verify that the deposit was done correctly using beaconcha.in API
     bc_validators = get_bc_validator_details(network, public_keys)
 
-    if not bc_validators:
+    if type(bc_validators) is not list and not bc_validators:
         # TODO: Better handling of unability to get validator(s) details from beaconcha.in
         print('Unability to get validator(s) details from beaconcha.in')
         return False
@@ -695,7 +695,7 @@ When you are done with the deposit(s), click the "I'm done" button below.
 
         bc_validators = get_bc_validator_details(network, public_keys)
 
-        if not bc_validators:
+        if type(bc_validators) is not list and not bc_validators:
             # TODO: Better handling of unability to get validator(s) details from beaconcha.in
             print('Unability to get validator(s) details from beaconcha.in')
             return False
@@ -712,7 +712,6 @@ def get_bc_validator_details(network, public_keys):
     pubkey_arg = ','.join(public_keys)
     bc_api_query_url = (BEACONCHA_IN_URLS[network] +
         BEACONCHA_VALIDATOR_API_URL.format(indexOrPubkey=pubkey_arg))
-    print(f'Trying to get details from {bc_api_query_url}')
     headers = {'accept': 'application/json'}
     response = httpx.get(bc_api_query_url, headers=headers)
 
