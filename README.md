@@ -19,15 +19,10 @@ The eth2-validator-wizard is not ready to be used in the real world yet. It is s
 
 ## How to use
 
-This procedure is going to evolve over time (it's going to get much easier to launch), but you can use something like this in a terminal, on Ubuntu 20.04, to test and start the wizard:
+This procedure is going to evolve over time. For now, you can use something like this in a terminal, on Ubuntu 20.04, to test and start the wizard:
 
 ```
-sudo apt update
-sudo apt install python3-pip
-git clone https://github.com/remyroy/eth2-validator-wizard.git
-cd eth2-validator-wizard
-sudo pip3 install -r requirements.txt
-sudo python3 -m eth2validatorwizard
+wget https://github.com/remyroy/eth2-validator-wizard/releases/download/v0.2/eth2validatorwizard-0.2.pyz && sudo python3 eth2validatorwizard-0.2.pyz
 ```
 
 ## Support
