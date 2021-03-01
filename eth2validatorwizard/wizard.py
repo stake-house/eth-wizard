@@ -220,7 +220,7 @@ and good internet.
     subprocess.run([
         'apt', 'update'])
     subprocess.run([
-        'apt', 'install', 'geth'])
+        'apt', '-y', 'install', 'geth'])
     
     # Setup Geth user and directory
     subprocess.run([
