@@ -26,6 +26,8 @@ NETWORK_CURRENCY = {
 
 BEACONCHA_VALIDATOR_DEPOSITS_API_URL = '/api/v1/validator/{indexOrPubkey}/deposits'
 
+ETHEREUM_APT_SOURCE_URL = 'http://ppa.launchpad.net/ethereum/ethereum/ubuntu'
+
 GETH_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (
 '''

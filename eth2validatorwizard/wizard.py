@@ -6,6 +6,7 @@ import shutil
 import time
 import stat
 import json
+import re
 
 from pathlib import Path
 
@@ -49,13 +50,9 @@ def run():
         # User asked to quit or error
         quit()
 
-    # TODO: Verify proper Geth installation and syncing
-
     if not install_lighthouse(selected_network):
         # User asked to quit or error
         quit()
-
-    # TODO: Verify proper Lighthouse beacon node installation and syncing
 
     generated_keys = generate_keys(selected_network)
     if not generated_keys:
@@ -65,8 +62,6 @@ def run():
     if not install_lighthouse_validator(selected_network, generated_keys):
         # User asked to quit or error
         quit()
-
-    # TODO: Verify proper Lighthouse validator client installation and the connection with the beacon node
 
     public_keys = initiate_deposit(selected_network, generated_keys)
     if not public_keys:
@@ -190,6 +185,65 @@ For which network would you like to perform this installation?
 def install_geth(network):
     # Install geth for the selected network
 
+    # Check for existing systemd service
+    geth_service_exists = False
+
+    process_result = subprocess.run([
+        'systemctl', 'show', 'geth.service',
+        '--property=ActiveState,LoadState,ExecMainStartTimestamp,FragmentPath'
+        ], capture_output=True, text=True)
+    process_output = process_result.stdout
+
+    service_details = {
+        'load_state': 'unknown',
+        'active_state': 'unknown',
+        'exec_timestamp': 'unknown',
+        'fragment_path': 'unknown'
+    }
+
+    search_pairs = {
+        'LoadState': 'load_state',
+        'ActiveState': 'active_state',
+        'ExecMainStartTimestamp': 'exec_timestamp',
+        'FragmentPath': 'fragment_path'
+    }
+
+    for sproperty, key in search_pairs.items():
+        result = re.search(re.escape(sproperty) + r'=(.*?)\n', process_output)
+        if result:
+            service_details[key] = result.group(1).strip()
+
+    if service_details['load_state'] == 'loaded':
+        geth_service_exists = True
+    
+    if geth_service_exists:
+        result = button_dialog(
+            title='Geth service found',
+            text=(
+f'''
+The geth service seems to have already created. Here are some details
+found:
+
+LoadState: {search_pairs['load_state']}
+ActiveState: {search_pairs['active_state']}
+ExecMainStartTimestamp: {search_pairs['exec_timestamp']}
+FragmentPath: {search_pairs['fragment_path']}
+
+Do you want to skip installing geth and its service?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            return True
+
     result = button_dialog(
         title='Geth installation',
         text=(
@@ -214,14 +268,93 @@ and good internet.
 
     if not result:
         return result
+    
+    # Check if geth is already installed
+    geth_found = False
+    geth_package_installed = False
+    installed_from_ppa = False
+    geth_version = 'unknown'
+    geth_location = 'unknown'
 
-    # Install Geth from PPA
-    subprocess.run([
-        'add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
-    subprocess.run([
-        'apt', 'update'])
-    subprocess.run([
-        'apt', '-y', 'install', 'geth'])
+    try:
+        process_result = subprocess.run([
+            'geth', 'version'
+            ], capture_output=True, text=True)
+        geth_found = True
+
+        process_output = process_result.stdout
+        result = re.search(r'Version: (.*?)\n', process_output)
+        if result:
+            geth_version = result.group(1).strip()
+        
+        process_result = subprocess.run([
+            'whereis', 'geth'
+            ], capture_output=True, text=True)
+
+        process_output = process_result.stdout
+        result = re.search(r'geth: (.*?)\n', process_output)
+        if result:
+            geth_location = result.group(1).strip()
+
+        process_result = subprocess.run([
+            'dpkg', '-s', 'geth'
+            ])
+        if process_result.returncode == 0:
+            # Geth package is installed
+            geth_package_installed = True
+
+            process_result = subprocess.run([
+                'apt', 'show', 'geth'
+                ], capture_output=True, text=True)
+            
+            process_output = process_result.stdout
+            result = re.search(r'APT-Sources: (.*?)\n', process_output)
+            if result:
+                apt_sources = result.group(1).strip()
+                apt_sources_splits = apt_sources.split(' ')
+                if apt_sources_splits[0] == ETHEREUM_APT_SOURCE_URL:
+                    installed_from_ppa = True
+
+    except FileNotFoundError:
+        pass
+    
+    install_geth = True
+
+    if geth_found:
+        result = button_dialog(
+            title='Geth binary found',
+            text=(
+f'''
+The geth binary seems to have already been installed. Here are some
+details found:
+
+Version: {geth_version}
+Location: {geth_location}
+Installed from package: {geth_package_installed}
+Installed from official Ethereum PPA: {installed_from_ppa}
+
+Do you want to skip installing the geth binary?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        install_geth = (result == 2)
+
+    if install_geth:
+        # Install Geth from PPA
+        subprocess.run([
+            'add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
+        subprocess.run([
+            'apt', 'update'])
+        subprocess.run([
+            'apt', '-y', 'install', 'geth'])
     
     # Setup Geth user and directory
     subprocess.run([
@@ -241,6 +374,8 @@ and good internet.
     subprocess.run([
         'systemctl', 'enable', 'geth'])
     
+    # TODO: Verify proper Geth installation and syncing
+
     return True
 
 def install_lighthouse(network):
@@ -319,14 +454,14 @@ even with good hardware and good internet.
 
     binary_path = Path(download_path, binary_asset['file_name'])
 
-    with open(str(binary_path), 'wb') as binary_file:
+    with open(binary_path, 'wb') as binary_file:
         with httpx.stream('GET', binary_asset['file_url']) as http_stream:
             for data in http_stream.iter_bytes():
                 binary_file.write(data)
     
     signature_path = Path(download_path, signature_asset['file_name'])
 
-    with open(str(signature_path), 'wb') as signature_file:
+    with open(signature_path, 'wb') as signature_file:
         with httpx.stream('GET', signature_asset['file_url']) as http_stream:
             for data in http_stream.iter_bytes():
                 signature_file.write(data)
@@ -350,7 +485,7 @@ even with good hardware and good internet.
         return False
     
     process_result = subprocess.run([
-        'gpg', '--verify', str(signature_path)])
+        'gpg', '--verify', signature_path])
     if process_result.returncode != 0:
         # PGP signature failed
         # TODO: Better handling of failed PGP signature
@@ -358,7 +493,7 @@ even with good hardware and good internet.
     
     # Extracting the Lighthouse binary archive
     subprocess.run([
-        'tar', 'xvf', str(binary_path), '--directory', '/usr/local/bin'])
+        'tar', 'xvf', binary_path, '--directory', '/usr/local/bin'])
     
     # Remove download leftovers
     binary_path.unlink()
@@ -384,6 +519,8 @@ even with good hardware and good internet.
     subprocess.run([
         'systemctl', 'enable', 'lighthousebeacon'])
     
+    # TODO: Verify proper Lighthouse beacon node installation and syncing
+
     return True
 
 def generate_keys(network):
@@ -467,7 +604,7 @@ to do a 32 {currency} deposit for each validator.
     binary_path = Path(download_path, binary_asset['file_name'])
     binary_hash = hashlib.sha256()
 
-    with open(str(binary_path), 'wb') as binary_file:
+    with open(binary_path, 'wb') as binary_file:
         with httpx.stream('GET', binary_asset['file_url']) as http_stream:
             for data in http_stream.iter_bytes():
                 binary_file.write(data)
@@ -477,13 +614,13 @@ to do a 32 {currency} deposit for each validator.
 
     checksum_path = Path(download_path, checksum_asset['file_name'])
 
-    with open(str(checksum_path), 'wb') as signature_file:
+    with open(checksum_path, 'wb') as signature_file:
         with httpx.stream('GET', checksum_asset['file_url']) as http_stream:
             for data in http_stream.iter_bytes():
                 signature_file.write(data)
 
     # Verify SHA256 signature
-    with open(str(checksum_path), 'r') as signature_file:
+    with open(checksum_path, 'r') as signature_file:
         if binary_hexdigest != signature_file.read(1024).strip():
             # SHA256 checksum failed
             # TODO: Better handling of failed SHA256 checksum
@@ -493,7 +630,7 @@ to do a 32 {currency} deposit for each validator.
     eth2_deposit_cli_path = Path(Path.home(), 'eth2validatorwizard', 'eth2depositcli')
     eth2_deposit_cli_path.mkdir(parents=True, exist_ok=True)
     subprocess.run([
-        'tar', 'xvf', str(binary_path), '--strip-components', '2', '--directory',
+        'tar', 'xvf', binary_path, '--strip-components', '2', '--directory',
         eth2_deposit_cli_path])
     
     # Remove download leftovers
@@ -504,14 +641,14 @@ to do a 32 {currency} deposit for each validator.
     validator_keys_path = Path(eth2_deposit_cli_path, 'validator_keys')
     if validator_keys_path.exists():
         if validator_keys_path.is_dir():
-            shutil.rmtree(str(validator_keys_path))
+            shutil.rmtree(validator_keys_path)
         elif validator_keys_path.is_file():
             validator_keys_path.unlink()
     
     # Launch eth2.0-deposit-cli
     eth2_deposit_cli_binary = Path(eth2_deposit_cli_path, 'deposit')
     subprocess.run([
-        str(eth2_deposit_cli_binary), 'new-mnemonic', '--chain', network],
+        eth2_deposit_cli_binary, 'new-mnemonic', '--chain', network],
         cwd=eth2_deposit_cli_path)
 
     # Verify the generated keys
@@ -537,7 +674,7 @@ to do a 32 {currency} deposit for each validator.
     eth2_deposit_cli_binary.unlink()
 
     return {
-        'validator_keys_path': str(validator_keys_path),
+        'validator_keys_path': validator_keys_path,
         'deposit_data_path': deposit_data_path,
         'keystore_paths': keystore_paths
     }
@@ -605,6 +742,8 @@ ready to start validating once your validator(s) get activated.
     subprocess.run([
         'systemctl', 'enable', 'lighthousevalidator'])
 
+    # TODO: Verify proper Lighthouse validator client installation and the connection with the beacon node
+
     return True
 
 def initiate_deposit(network, keys):
@@ -615,8 +754,8 @@ def initiate_deposit(network, keys):
 
     # Create an easily accessible copy of the deposit file
     deposit_file_copy_path = Path('/tmp', 'deposit_data.json')
-    shutil.copyfile(keys['deposit_data_path'], str(deposit_file_copy_path))
-    os.chmod(str(deposit_file_copy_path), stat.S_IROTH)
+    shutil.copyfile(keys['deposit_data_path'], deposit_file_copy_path)
+    os.chmod(deposit_file_copy_path, stat.S_IROTH)
 
     # TODO: Create an alternative way to easily obtain the deposit file with a simple HTTP server
 
