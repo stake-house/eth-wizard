@@ -224,10 +224,10 @@ f'''
 The geth service seems to have already created. Here are some details
 found:
 
-LoadState: {search_pairs['load_state']}
-ActiveState: {search_pairs['active_state']}
-ExecMainStartTimestamp: {search_pairs['exec_timestamp']}
-FragmentPath: {search_pairs['fragment_path']}
+LoadState: {service_details['load_state']}
+ActiveState: {service_details['active_state']}
+ExecMainStartTimestamp: {service_details['exec_timestamp']}
+FragmentPath: {service_details['fragment_path']}
 
 Do you want to skip installing geth and its service?
 '''         ),
