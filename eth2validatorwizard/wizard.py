@@ -188,30 +188,7 @@ def install_geth(network):
     # Check for existing systemd service
     geth_service_exists = False
 
-    process_result = subprocess.run([
-        'systemctl', 'show', 'geth.service',
-        '--property=ActiveState,LoadState,ExecMainStartTimestamp,FragmentPath'
-        ], capture_output=True, text=True)
-    process_output = process_result.stdout
-
-    service_details = {
-        'load_state': 'unknown',
-        'active_state': 'unknown',
-        'exec_timestamp': 'unknown',
-        'fragment_path': 'unknown'
-    }
-
-    search_pairs = {
-        'LoadState': 'load_state',
-        'ActiveState': 'active_state',
-        'ExecMainStartTimestamp': 'exec_timestamp',
-        'FragmentPath': 'fragment_path'
-    }
-
-    for sproperty, key in search_pairs.items():
-        result = re.search(re.escape(sproperty) + r'=(.*?)\n', process_output)
-        if result:
-            service_details[key] = result.group(1).strip()
+    service_details = get_systemd_service_details('geth.service')
 
     if service_details['load_state'] == 'loaded':
         geth_service_exists = True
@@ -377,6 +354,36 @@ Do you want to skip installing the geth binary?
     # TODO: Verify proper Geth installation and syncing
 
     return True
+
+def get_systemd_service_details(service):
+    # Return some systemd service details
+    
+    process_result = subprocess.run([
+        'systemctl', 'show', service,
+        '--property=ActiveState,LoadState,ExecMainStartTimestamp,FragmentPath'
+        ], capture_output=True, text=True)
+    process_output = process_result.stdout
+
+    service_details = {
+        'load_state': 'unknown',
+        'active_state': 'unknown',
+        'exec_timestamp': 'unknown',
+        'fragment_path': 'unknown'
+    }
+
+    search_pairs = {
+        'LoadState': 'load_state',
+        'ActiveState': 'active_state',
+        'ExecMainStartTimestamp': 'exec_timestamp',
+        'FragmentPath': 'fragment_path'
+    }
+
+    for sproperty, key in search_pairs.items():
+        result = re.search(re.escape(sproperty) + r'=(.*?)\n', process_output)
+        if result:
+            service_details[key] = result.group(1).strip()
+    
+    return service_details
 
 def install_lighthouse(network):
     # Install Lighthouse for the selected network
