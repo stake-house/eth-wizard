@@ -72,7 +72,8 @@ class Bundle(Command):
         dist_path = Path(project_path, 'dist')
         dist_path.mkdir(parents=True, exist_ok=True)
 
-        bundle_path = Path(dist_path, f'eth2validatorwizard-{version}.pyz')
+        bundle_name = f'eth2validatorwizard-{version}.pyz'
+        bundle_path = Path(dist_path, bundle_name)
         if bundle_path.exists():
             if bundle_path.is_dir():
                 shutil.rmtree(str(bundle_path))
@@ -82,6 +83,14 @@ class Bundle(Command):
         subprocess.run([
             'python3', '-m', 'zipapp', str(build_path), '-p', '/usr/bin/env python3',
             '-c', '-o', str(bundle_path)
+        ])
+
+        # Sign bundle with GPG key
+        bundle_sign_name = f'{bundle_name}.asc'
+        bundle_sign_path = Path(dist_path, bundle_sign_name)
+        subprocess.run([
+            'gpg', '--default-key', '6EEC4CD326C4BBC79F51F55AE68A0CC47982CB5F', '--sign',
+            '--armor', '--output', str(bundle_sign_path), '--detach-sig', bundle_path
         ])
    
 if __name__ == "__main__":
