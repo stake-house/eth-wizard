@@ -32,7 +32,7 @@ class Bundle(Command):
         build_path = Path(project_path, 'build')
         if build_path.exists():
             if build_path.is_dir():
-                shutil.rmtree(str(build_path))
+                shutil.rmtree(build_path)
             elif build_path.is_file():
                 build_path.unlink()
         
@@ -45,8 +45,8 @@ class Bundle(Command):
         # Install packages from requirements.txt file into build dir
         requirements_path = Path(project_path, 'requirements.txt')
         subprocess.run([
-            'python3', '-m', 'pip', 'install', '-r', str(requirements_path),
-            '--target', str(build_path)
+            'python3', '-m', 'pip', 'install', '-r', requirements_path,
+            '--target', build_path
         ])
 
         # Copy __main__.py into build root
@@ -76,21 +76,27 @@ class Bundle(Command):
         bundle_path = Path(dist_path, bundle_name)
         if bundle_path.exists():
             if bundle_path.is_dir():
-                shutil.rmtree(str(bundle_path))
+                shutil.rmtree(bundle_path)
             elif bundle_path.is_file():
                 bundle_path.unlink()
         
         subprocess.run([
-            'python3', '-m', 'zipapp', str(build_path), '-p', '/usr/bin/env python3',
-            '-c', '-o', str(bundle_path)
+            'python3', '-m', 'zipapp', build_path, '-p', '/usr/bin/env python3',
+            '-c', '-o', bundle_path
         ])
 
         # Sign bundle with GPG key
         bundle_sign_name = f'{bundle_name}.asc'
         bundle_sign_path = Path(dist_path, bundle_sign_name)
+        if bundle_sign_path.exists():
+            if bundle_sign_path.is_dir():
+                shutil.rmtree(bundle_sign_path)
+            elif bundle_sign_path.is_file():
+                bundle_sign_path.unlink()
+        
         subprocess.run([
             'gpg', '--default-key', '6EEC4CD326C4BBC79F51F55AE68A0CC47982CB5F', '--sign',
-            '--armor', '--output', str(bundle_sign_path), '--detach-sig', bundle_path
+            '--armor', '--output', bundle_sign_path, '--detach-sig', bundle_path
         ])
    
 if __name__ == "__main__":
