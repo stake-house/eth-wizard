@@ -404,7 +404,7 @@ $ sudo journalctl -ru geth.service
     try:
         subprocess.run([
             'journalctl', '-fu', 'geth.service'
-        ], timeout=30)
+        ], timeout=20)
     except subprocess.TimeoutExpired:
         pass
 
@@ -457,11 +457,14 @@ $ sudo journalctl -ru geth.service
     
     response_json = response.json()
 
-    if (
+    retry_index = 0
+    retry_count = 5
+
+    while (
         not response_json or
         'result' not in response_json or
         not response_json['result']
-    ):
+    ) and retry_index < retry_count:
         result = button_dialog(
             title='Unexpected response from Geth',
             text=(
@@ -482,19 +485,62 @@ logs with:
 $ sudo journalctl -ru geth.service
 '''         ),
             buttons=[
+                ('Retry', 1),
                 ('Quit', False)
             ]
         ).run()
 
-        print(
+        if not result:
+
+            print(
 '''
 To examine your geth service logs, type the following command:
 
 $ sudo journalctl -ru geth.service
 '''
-        )
+            )
 
-        return False
+            return False
+        
+        retry_index = retry_index + 1
+        response = httpx.post(local_geth_jsonrpc_url, json=request_json, headers=headers)
+
+        if response.status_code != 200:
+            result = button_dialog(
+                title='Cannot connect to Geth',
+                text=(
+f'''
+We could not connect to geth HTTP-RPC server. Here are some details for
+this last test we tried to perform:
+
+URL: {local_geth_jsonrpc_url}
+Method: POST
+Headers: {headers}
+JSON payload: {json.dumps(request_json)}
+Status code: {response.status_code}
+
+We cannot proceed if the geth HTTP-RPC server is not responding properly.
+Make sure to check the logs and fix any issue found there. You can see the
+logs with:
+
+$ sudo journalctl -ru geth.service
+    '''         ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            print(
+    '''
+    To examine your geth service logs, type the following command:
+
+    $ sudo journalctl -ru geth.service
+    '''
+            )
+
+            return False
+
+        response_json = response.json()
 
     response_result = response_json['result']
 
