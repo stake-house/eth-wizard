@@ -626,8 +626,8 @@ $ sudo journalctl -ru geth.service
 
         return False
 
-    # TODO: Using async and prompt_toolkit asyncio loop to display syncing updated values
-    # for a few seconds
+    # TODO: Using async and prompt_toolkit asyncio loop to display syncing values updating
+    # in realtime for a few seconds
 
     print(
 f'''
