@@ -503,6 +503,10 @@ $ sudo journalctl -ru geth.service
             return False
         
         retry_index = retry_index + 1
+
+        # Wait a little before the next retry
+        time.sleep(5)
+
         response = httpx.post(local_geth_jsonrpc_url, json=request_json, headers=headers)
 
         if response.status_code != 200:
@@ -531,20 +535,111 @@ $ sudo journalctl -ru geth.service
             ).run()
 
             print(
-    '''
-    To examine your geth service logs, type the following command:
+'''
+To examine your geth service logs, type the following command:
 
-    $ sudo journalctl -ru geth.service
-    '''
+$ sudo journalctl -ru geth.service
+'''
             )
 
             return False
 
         response_json = response.json()
 
+    if (
+        not response_json or
+        'result' not in response_json or
+        not response_json['result']
+    ):
+        # We could not get a proper result from Geth after all those retries
+        result = button_dialog(
+            title='Unexpected response from Geth',
+            text=(
+f'''
+After a few retries, we still received an unexpected response from geth
+HTTP-RPC server. Here are some details for this last test we tried to
+perform:
+
+URL: {local_geth_jsonrpc_url}
+Method: POST
+Headers: {headers}
+JSON payload: {json.dumps(request_json)}
+Response: {json.dumps(response_json)}
+
+We cannot proceed if the geth HTTP-RPC server is not responding properly.
+Make sure to check the logs and fix any issue found there. You can see the
+logs with:
+
+$ sudo journalctl -ru geth.service
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+'''
+To examine your geth service logs, type the following command:
+
+$ sudo journalctl -ru geth.service
+'''
+        )
+
+        return False
+
     response_result = response_json['result']
 
-    # "result":{"currentBlock":"0x18240","highestBlock":"0x42d634","knownStates":"0x1c267","pulledStates":"0x18af2","startingBlock":"0x0"}
+    if not (
+        'currentBlock' in response_result and
+        'highestBlock' in response_result and
+        'knownStates' in response_result and
+        'pulledStates' in response_result and
+        'startingBlock' in response_result
+    ):
+        result = button_dialog(
+            title='Unexpected response from Geth',
+            text=(
+f'''
+The response from the eth_syncing JSON-RPC call on Geth HTTP-RPC server
+was unexpected. Here are some details for this call:
+
+result field: {json.dumps(response_result)}
+
+We cannot proceed if the geth HTTP-RPC server is not responding properly.
+Make sure to check the logs and fix any issue found there. You can see the
+logs with:
+
+$ sudo journalctl -ru geth.service
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+'''
+To examine your geth service logs, type the following command:
+
+$ sudo journalctl -ru geth.service
+'''
+        )
+
+        return False
+
+    # TODO: Using async and prompt_toolkit asyncio loop to display syncing updated values
+    # for a few seconds
+
+    print(
+f'''
+Geth is currently syncing properly.
+
+currentBlock: {int(response_result['currentBlock'], base=16)}
+highestBlock: {int(response_result['highestBlock'], base=16)}
+knownStates: {int(response_result['knownStates'], base=16)}
+pulledStates: {int(response_result['pulledStates'], base=16)}
+startingBlock: {int(response_result['startingBlock'], base=16)}
+''')
+    time.sleep(5)
 
     return True
 
