@@ -237,7 +237,8 @@ Once the installation is completed, it will create a systemd service that
 will automatically start Geth on reboot or if it crashes. Geth will be
 started and you will slowly start syncing with the Ethereum 1.0 network.
 This syncing process can take a few hours or days even with good hardware
-and good internet.
+and good internet. We will perform a few tests to make sure Geth is running
+properly.
 '''     ),
         buttons=[
             ('Install', True),
@@ -398,6 +399,10 @@ $ sudo journalctl -ru geth.service
 
         return False
 
+    # Wait a little before checking for Geth syncing since it can be slow to start
+    print('We are giving Geth a few seconds to start before testing syncing.')
+    time.sleep(10)
+
     # Verify proper Geth syncing
     local_geth_jsonrpc_url = 'http://127.0.0.1:8545'
     request_json = {
@@ -486,6 +491,9 @@ $ sudo journalctl -ru geth.service
 
         return False
 
+    response_result = response_json['result']
+
+    # "result":{"currentBlock":"0x18240","highestBlock":"0x42d634","knownStates":"0x1c267","pulledStates":"0x18af2","startingBlock":"0x0"}
 
     return True
 
@@ -606,11 +614,13 @@ even with good hardware and good internet.
     command_line = ['gpg', '--keyserver', 'pool.sks-keyservers.net', '--recv-keys',
         LIGHTHOUSE_PRIME_PGP_KEY_ID]
     process_result = subprocess.run(command_line)
+
+    retry_count = 5
     if process_result.returncode != 0:
         # GPG failed to download Sigma Prime's PGP key, let's wait and retry a few times
-        retry_count = 0
-        while process_result.returncode != 0 and retry_count < 5:
-            retry_count = retry_count + 1
+        retry_index = 0
+        while process_result.returncode != 0 and retry_index < retry_count:
+            retry_index = retry_index + 1
             print('GPG failed to download the PGP key. We will wait 10 seconds and try again.')
             time.sleep(10)
             process_result = subprocess.run(command_line)
