@@ -362,7 +362,8 @@ Do you want to skip installing the geth binary?
         service_details['LoadState'] == 'loaded' and
         service_details['ActiveState'] == 'active' and
         service_details['SubState'] == 'running'
-        ):
+    ):
+
         result = button_dialog(
             title='Geth service not running properly',
             text=(
@@ -397,7 +398,93 @@ $ sudo journalctl -ru geth.service
 
         return False
 
-    # TODO: Verify proper Geth syncing
+    # Verify proper Geth syncing
+    local_geth_jsonrpc_url = 'http://127.0.0.1:8545'
+    request_json = {
+        'jsonrpc': '2.0',
+        'method': 'eth_syncing',
+        'id': 1
+    }
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    response = httpx.post(local_geth_jsonrpc_url, json=request_json, headers=headers)
+
+    if response.status_code != 200:
+        result = button_dialog(
+            title='Cannot connect to Geth',
+            text=(
+f'''
+We could not connect to geth HTTP-RPC server. Here are some details for
+this last test we tried to perform:
+
+URL: {local_geth_jsonrpc_url}
+Method: POST
+Headers: {headers}
+JSON payload: {json.dumps(request_json)}
+
+We cannot proceed if the geth HTTP-RPC server is not responding properly.
+Make sure to check the logs and fix any issue found there. You can see the
+logs with:
+
+$ sudo journalctl -ru geth.service
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+'''
+To examine your geth service logs, type the following command:
+
+$ sudo journalctl -ru geth.service
+'''
+        )
+
+        return False
+    
+    response_json = response.json()
+
+    if (
+        not response_json or
+        'result' not in response_json or
+        not response_json['result']
+    ):
+        result = button_dialog(
+            title='Unexpected response from Geth',
+            text=(
+f'''
+We received an unexpected response from geth HTTP-RPC server. Here are
+some details for this last test we tried to perform:
+
+URL: {local_geth_jsonrpc_url}
+Method: POST
+Headers: {headers}
+JSON payload: {json.dumps(request_json)}
+Response: {json.dumps(response_json)}
+
+We cannot proceed if the geth HTTP-RPC server is not responding properly.
+Make sure to check the logs and fix any issue found there. You can see the
+logs with:
+
+$ sudo journalctl -ru geth.service
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+'''
+To examine your geth service logs, type the following command:
+
+$ sudo journalctl -ru geth.service
+'''
+        )
+
+        return False
+
 
     return True
 
