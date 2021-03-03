@@ -422,6 +422,7 @@ URL: {local_geth_jsonrpc_url}
 Method: POST
 Headers: {headers}
 JSON payload: {json.dumps(request_json)}
+Status code: {response.status_code}
 
 We cannot proceed if the geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
