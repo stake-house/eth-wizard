@@ -190,7 +190,7 @@ def install_geth(network):
 
     service_details = get_systemd_service_details('geth.service')
 
-    if service_details['load_state'] == 'loaded':
+    if service_details['LoadState'] == 'loaded':
         geth_service_exists = True
     
     if geth_service_exists:
@@ -201,10 +201,12 @@ f'''
 The geth service seems to have already created. Here are some details
 found:
 
-LoadState: {service_details['load_state']}
-ActiveState: {service_details['active_state']}
-ExecMainStartTimestamp: {service_details['exec_timestamp']}
-FragmentPath: {service_details['fragment_path']}
+Description: {service_details['Description']}
+States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+UnitFilePreset: {service_details['UnitFilePreset']}
+ExecStart: {service_details['ExecStart']}
+ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
+FragmentPath: {service_details['FragmentPath']}
 
 Do you want to skip installing geth and its service?
 '''         ),
@@ -358,31 +360,26 @@ Do you want to skip installing the geth binary?
 def get_systemd_service_details(service):
     # Return some systemd service details
     
+    properties = ('Description', 'LoadState', 'ActiveState', 'ExecMainStartTimestamp',
+        'FragmentPath', 'UnitFilePreset', 'SubState', 'ExecStart')
+
     process_result = subprocess.run([
         'systemctl', 'show', service,
-        '--property=ActiveState,LoadState,ExecMainStartTimestamp,FragmentPath'
+        '--property=' + ','.join(properties)
         ], capture_output=True, text=True)
     process_output = process_result.stdout
 
-    service_details = {
-        'load_state': 'unknown',
-        'active_state': 'unknown',
-        'exec_timestamp': 'unknown',
-        'fragment_path': 'unknown'
-    }
+    service_details = {}
 
-    search_pairs = {
-        'LoadState': 'load_state',
-        'ActiveState': 'active_state',
-        'ExecMainStartTimestamp': 'exec_timestamp',
-        'FragmentPath': 'fragment_path'
-    }
-
-    for sproperty, key in search_pairs.items():
+    for sproperty in properties:
         result = re.search(re.escape(sproperty) + r'=(.*?)\n', process_output)
         if result:
-            service_details[key] = result.group(1).strip()
+            service_details[sproperty] = result.group(1).strip()
     
+    for sproperty in properties:
+        if sproperty not in service_details:
+            service_details[sproperty] = 'unknown'
+
     return service_details
 
 def install_lighthouse(network):
