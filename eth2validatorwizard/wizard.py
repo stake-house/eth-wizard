@@ -401,7 +401,12 @@ $ sudo journalctl -ru geth.service
 
     # Wait a little before checking for Geth syncing since it can be slow to start
     print('We are giving Geth a few seconds to start before testing syncing.')
-    time.sleep(10)
+    try:
+        subprocess.run({
+            'journalctl', '-u', 'geth.service', '-f'
+        }, timeout=30)
+    except subprocess.TimeoutExpired:
+        pass
 
     # Verify proper Geth syncing
     local_geth_jsonrpc_url = 'http://127.0.0.1:8545'
