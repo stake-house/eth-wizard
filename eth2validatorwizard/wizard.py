@@ -402,9 +402,9 @@ $ sudo journalctl -ru geth.service
     # Wait a little before checking for Geth syncing since it can be slow to start
     print('We are giving Geth a few seconds to start before testing syncing.')
     try:
-        subprocess.run({
-            'journalctl', '-u', 'geth.service', '-f'
-        }, timeout=30)
+        subprocess.run([
+            'journalctl', '-fu', 'geth.service'
+        ], timeout=30)
     except subprocess.TimeoutExpired:
         pass
 
