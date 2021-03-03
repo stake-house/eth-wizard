@@ -335,6 +335,8 @@ Do you want to skip installing the geth binary?
         subprocess.run([
             'apt', '-y', 'install', 'geth'])
     
+    # TODO: Check if Geth user or directory already exists
+
     # Setup Geth user and directory
     subprocess.run([
         'useradd', '--no-create-home', '--shell', '/bin/false', 'goeth'])
@@ -353,7 +355,49 @@ Do you want to skip installing the geth binary?
     subprocess.run([
         'systemctl', 'enable', 'geth'])
     
-    # TODO: Verify proper Geth installation and syncing
+    # Verify proper Geth service installation
+    service_details = get_systemd_service_details('geth.service')
+
+    if not (
+        service_details['LoadState'] == 'loaded' and
+        service_details['ActiveState'] == 'active' and
+        service_details['SubState'] == 'running'
+        ):
+        result = button_dialog(
+            title='Geth service not running properly',
+            text=(
+f'''
+The geth service we just created seems to have issues. Here are some
+details found:
+
+Description: {service_details['Description']}
+States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+UnitFilePreset: {service_details['UnitFilePreset']}
+ExecStart: {service_details['ExecStart']}
+ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
+FragmentPath: {service_details['FragmentPath']}
+
+We cannot proceed if the geth service cannot be started properly. Make sure
+to check the logs and fix any issue found there. You can see the logs with:
+
+$ sudo journalctl -ru geth.service
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+'''
+To examine your geth service logs, type the following command:
+
+$ sudo journalctl -ru geth.service
+'''
+        )
+
+        return False
+
+    # TODO: Verify proper Geth syncing
 
     return True
 
