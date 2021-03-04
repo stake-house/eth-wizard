@@ -1020,7 +1020,7 @@ def generate_keys(network):
     if process_result.returncode == 0:
         process_output = process_result.stdout
         public_keys = re.findall(r'0x[0-9a-f]{96}\s', process_output)
-        public_keys = map(lambda x: x.strip(), public_keys)
+        public_keys = list(map(lambda x: x.strip(), public_keys))
         
         if len(public_keys) > 0:
             # We already have keys imported
@@ -1271,7 +1271,7 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
 
 def search_for_generated_keys(validator_keys_path):
     # Search for keys generated with the eth2.0-deposit-cli binary
-    
+
     deposit_data_path = None
     keystore_paths = []
 
