@@ -352,7 +352,7 @@ Do you want to skip installing the geth binary?
             ], capture_output=True, text=True)
         
         process_output = process_result.stdout
-        geth_datadir_size = process_output.split(' ')[0]
+        geth_datadir_size = process_output.split('\t')[0]
 
         result = button_dialog(
             title='Geth data directory found',
@@ -452,7 +452,7 @@ $ sudo journalctl -ru {geth_service_name}
     try:
         subprocess.run([
             'journalctl', '-fu', geth_service_name
-        ], timeout=20)
+        ], timeout=30)
     except subprocess.TimeoutExpired:
         pass
 
