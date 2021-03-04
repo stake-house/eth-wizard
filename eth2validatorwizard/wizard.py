@@ -306,7 +306,7 @@ properly.
     except FileNotFoundError:
         pass
     
-    install_geth = True
+    install_geth_binary = True
 
     if geth_found:
         result = button_dialog(
@@ -333,9 +333,9 @@ Do you want to skip installing the geth binary?
         if not result:
             return result
         
-        install_geth = (result == 2)
+        install_geth_binary = (result == 2)
 
-    if install_geth:
+    if install_geth_binary:
         # Install Geth from PPA
         subprocess.run([
             'add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
@@ -719,6 +719,49 @@ def get_systemd_service_details(service):
 def install_lighthouse(network):
     # Install Lighthouse for the selected network
 
+    # Check for existing systemd service
+    lighthouse_bn_service_exists = False
+    lighthouse_bn_service_name = 'lighthousebeacon.service'
+
+    service_details = get_systemd_service_details(lighthouse_bn_service_name)
+
+    if service_details['LoadState'] == 'loaded':
+        lighthouse_bn_service_exists = True
+    
+    if lighthouse_bn_service_exists:
+        result = button_dialog(
+            title='Lighthouse beacon node service found',
+            text=(
+f'''
+The lighthouse beacon node service seems to have already been created. Here
+are some details found:
+
+Description: {service_details['Description']}
+States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+UnitFilePreset: {service_details['UnitFilePreset']}
+ExecStart: {service_details['ExecStart']}
+ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
+FragmentPath: {service_details['FragmentPath']}
+
+Do you want to skip installing lighthouse and its beacon node service?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            return True
+        
+        # User wants to proceed, make sure the lighthouse beacon node service is stopped first
+        subprocess.run([
+            'systemctl', 'stop', lighthouse_bn_service_name])
+
     result = button_dialog(
         title='Lighthouse installation',
         text=(
@@ -744,104 +787,202 @@ even with good hardware and good internet.
     if not result:
         return result
     
-    # Getting latest Lighthouse release files
-    lighthouse_gh_release_url = GITHUB_REST_API_URL + LIGHTHOUSE_LATEST_RELEASE
-    headers = {'Accept': GITHUB_API_VERSION}
-    response = httpx.get(lighthouse_gh_release_url, headers=headers)
+    # Check if lighthouse is already installed
+    lighthouse_found = False
+    lighthouse_version = 'unknown'
+    lighthouse_location = 'unknown'
 
-    if response.status_code != 200:
-        # TODO: Better handling for network response issue
-        return False
+    try:
+        process_result = subprocess.run([
+            'lighthouse', '--version'
+            ], capture_output=True, text=True)
+        lighthouse_found = True
+
+        process_output = process_result.stdout
+        result = re.search(r'Lighthouse (.*?)\n', process_output)
+        if result:
+            lighthouse_version = result.group(1).strip()
+        
+        process_result = subprocess.run([
+            'whereis', 'lighthouse'
+            ], capture_output=True, text=True)
+
+        process_output = process_result.stdout
+        result = re.search(r'lighthouse: (.*?)\n', process_output)
+        if result:
+            lighthouse_location = result.group(1).strip()
+
+    except FileNotFoundError:
+        pass
     
-    release_json = response.json()
+    install_lighthouse_binary = True
 
-    if 'assets' not in release_json:
-        # TODO: Better handling on unexpected response structure
-        return False
+    if lighthouse_found:
+        result = button_dialog(
+            title='Lighthouse binary found',
+            text=(
+f'''
+The lighthouse binary seems to have already been installed. Here are some
+details found:
+
+Version: {lighthouse_version}
+Location: {lighthouse_location}
+
+Do you want to skip installing the lighthouse binary?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        install_lighthouse_binary = (result == 2)
     
-    binary_asset = None
-    signature_asset = None
+    if install_lighthouse_binary:
+        # Getting latest Lighthouse release files
+        lighthouse_gh_release_url = GITHUB_REST_API_URL + LIGHTHOUSE_LATEST_RELEASE
+        headers = {'Accept': GITHUB_API_VERSION}
+        response = httpx.get(lighthouse_gh_release_url, headers=headers)
 
-    for asset in release_json['assets']:
-        if 'name' not in asset:
-            continue
-        if 'browser_download_url' not in asset:
-            continue
-    
-        file_name = asset['name']
-        file_url = asset['browser_download_url']
+        if response.status_code != 200:
+            # TODO: Better handling for network response issue
+            return False
+        
+        release_json = response.json()
 
-        if file_name.endswith('x86_64-unknown-linux-gnu.tar.gz'):
-            binary_asset = {
-                'file_name': file_name,
-                'file_url': file_url
-            }
-        elif file_name.endswith('x86_64-unknown-linux-gnu.tar.gz.asc'):
-            signature_asset = {
-                'file_name': file_name,
-                'file_url': file_url
-            }
+        if 'assets' not in release_json:
+            # TODO: Better handling on unexpected response structure
+            return False
+        
+        binary_asset = None
+        signature_asset = None
 
-    if binary_asset is None or signature_asset is None:
-        # TODO: Better handling of missing asset in latest release
-        return False
-    
-    # Downloading latest Lighthouse release files
-    download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
-    download_path.mkdir(parents=True, exist_ok=True)
+        for asset in release_json['assets']:
+            if 'name' not in asset:
+                continue
+            if 'browser_download_url' not in asset:
+                continue
+        
+            file_name = asset['name']
+            file_url = asset['browser_download_url']
 
-    binary_path = Path(download_path, binary_asset['file_name'])
+            if file_name.endswith('x86_64-unknown-linux-gnu.tar.gz'):
+                binary_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+            elif file_name.endswith('x86_64-unknown-linux-gnu.tar.gz.asc'):
+                signature_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
 
-    with open(binary_path, 'wb') as binary_file:
-        with httpx.stream('GET', binary_asset['file_url']) as http_stream:
-            for data in http_stream.iter_bytes():
-                binary_file.write(data)
-    
-    signature_path = Path(download_path, signature_asset['file_name'])
+        if binary_asset is None or signature_asset is None:
+            # TODO: Better handling of missing asset in latest release
+            return False
+        
+        # Downloading latest Lighthouse release files
+        download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
+        download_path.mkdir(parents=True, exist_ok=True)
 
-    with open(signature_path, 'wb') as signature_file:
-        with httpx.stream('GET', signature_asset['file_url']) as http_stream:
-            for data in http_stream.iter_bytes():
-                signature_file.write(data)
+        binary_path = Path(download_path, binary_asset['file_name'])
 
-    # Verify PGP signature
-    command_line = ['gpg', '--keyserver', 'pool.sks-keyservers.net', '--recv-keys',
-        LIGHTHOUSE_PRIME_PGP_KEY_ID]
-    process_result = subprocess.run(command_line)
+        with open(binary_path, 'wb') as binary_file:
+            with httpx.stream('GET', binary_asset['file_url']) as http_stream:
+                for data in http_stream.iter_bytes():
+                    binary_file.write(data)
+        
+        signature_path = Path(download_path, signature_asset['file_name'])
 
-    retry_count = 5
-    if process_result.returncode != 0:
-        # GPG failed to download Sigma Prime's PGP key, let's wait and retry a few times
-        retry_index = 0
-        while process_result.returncode != 0 and retry_index < retry_count:
-            retry_index = retry_index + 1
-            print('GPG failed to download the PGP key. We will wait 10 seconds and try again.')
-            time.sleep(10)
-            process_result = subprocess.run(command_line)
-    
-    if process_result.returncode != 0:
-        # We failed to download Sigma Prime's PGP key after a few retries
-        # TODO: Better handling of failed PGP key download
-        return False
-    
+        with open(signature_path, 'wb') as signature_file:
+            with httpx.stream('GET', signature_asset['file_url']) as http_stream:
+                for data in http_stream.iter_bytes():
+                    signature_file.write(data)
+
+        # Verify PGP signature
+        command_line = ['gpg', '--keyserver', 'pool.sks-keyservers.net', '--recv-keys',
+            LIGHTHOUSE_PRIME_PGP_KEY_ID]
+        process_result = subprocess.run(command_line)
+
+        retry_count = 5
+        if process_result.returncode != 0:
+            # GPG failed to download Sigma Prime's PGP key, let's wait and retry a few times
+            retry_index = 0
+            while process_result.returncode != 0 and retry_index < retry_count:
+                retry_index = retry_index + 1
+                print('GPG failed to download the PGP key. We will wait 10 seconds and try again.')
+                time.sleep(10)
+                process_result = subprocess.run(command_line)
+        
+        if process_result.returncode != 0:
+            # TODO: Better handling of failed PGP key download
+            print('We failed to download the Sigma Prime\'s PGP key to verify the lighthouse binary.')
+            return False
+        
+        process_result = subprocess.run([
+            'gpg', '--verify', signature_path])
+        if process_result.returncode != 0:
+            # TODO: Better handling of failed PGP signature
+            print('The lighthouse binary signature is wrong. We\'ll stop here to protect you.')
+            return False
+        
+        # Extracting the Lighthouse binary archive
+        subprocess.run([
+            'tar', 'xvf', binary_path, '--directory', '/usr/local/bin'])
+        
+        # Remove download leftovers
+        binary_path.unlink()
+        signature_path.unlink()
+
+    # Check if lighthouse beacon node user or directory already exists
+    lighthouse_datadir_bn = Path('/var/lib/lighthouse/beacon')
+    if lighthouse_datadir_bn.exists() and lighthouse_datadir_bn.is_dir():
+        process_result = subprocess.run([
+            'du', '-sh', lighthouse_datadir_bn
+            ], capture_output=True, text=True)
+        
+        process_output = process_result.stdout
+        lighthouse_datadir_bn_size = process_output.split('\t')[0]
+
+        result = button_dialog(
+            title='Lighthouse beacon node data directory found',
+            text=(
+f'''
+An existing lighthouse beacon node data directory has been found. Here are
+some details found:
+
+Location: {lighthouse_datadir_bn}
+Size: {lighthouse_datadir_bn_size}
+
+Do you want to remove this directory first and start from nothing?
+'''         ),
+            buttons=[
+                ('Remove', 1),
+                ('Keep', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            shutil.rmtree(lighthouse_datadir_bn)
+
+    lighthouse_bn_user_exists = False
     process_result = subprocess.run([
-        'gpg', '--verify', signature_path])
-    if process_result.returncode != 0:
-        # PGP signature failed
-        # TODO: Better handling of failed PGP signature
-        return False
-    
-    # Extracting the Lighthouse binary archive
-    subprocess.run([
-        'tar', 'xvf', binary_path, '--directory', '/usr/local/bin'])
-    
-    # Remove download leftovers
-    binary_path.unlink()
-    signature_path.unlink()
+        'id', '-u', 'lighthousebeacon'
+    ])
+    lighthouse_bn_user_exists = (process_result.returncode == 0)
 
     # Setup Lighthouse beacon node user and directory
-    subprocess.run([
-        'useradd', '--no-create-home', '--shell', '/bin/false', 'lighthousebeacon'])
+    if not lighthouse_bn_user_exists:
+        subprocess.run([
+            'useradd', '--no-create-home', '--shell', '/bin/false', 'lighthousebeacon'])
     subprocess.run([
         'mkdir', '-p', '/var/lib/lighthouse/beacon'])
     subprocess.run([
@@ -850,14 +991,14 @@ even with good hardware and good internet.
         'chmod', '700', '/var/lib/lighthouse/beacon'])
     
     # Setup Lighthouse beacon node systemd service
-    with open('/etc/systemd/system/lighthousebeacon.service', 'w') as service_file:
+    with open('/etc/systemd/system/' + lighthouse_bn_service_name, 'w') as service_file:
         service_file.write(LIGHTHOUSE_BN_SERVICE_DEFINITION[network])
     subprocess.run([
         'systemctl', 'daemon-reload'])
     subprocess.run([
-        'systemctl', 'start', 'lighthousebeacon'])
+        'systemctl', 'start', lighthouse_bn_service_name])
     subprocess.run([
-        'systemctl', 'enable', 'lighthousebeacon'])
+        'systemctl', 'enable', lighthouse_bn_service_name])
     
     # TODO: Verify proper Lighthouse beacon node installation and syncing
 
