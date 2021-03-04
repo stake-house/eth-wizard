@@ -449,6 +449,7 @@ $ sudo journalctl -ru {geth_service_name}
 
     # Wait a little before checking for Geth syncing since it can be slow to start
     print('We are giving Geth a few seconds to start before testing syncing.')
+    time.sleep(2)
     try:
         subprocess.run([
             'journalctl', '-fu', geth_service_name
