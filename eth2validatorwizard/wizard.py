@@ -921,7 +921,12 @@ Do you want to skip installing the lighthouse binary?
         
         if process_result.returncode != 0:
             # TODO: Better handling of failed PGP key download
-            print('We failed to download the Sigma Prime\'s PGP key to verify the lighthouse binary.')
+            print(
+f'''
+We failed to download the Sigma Prime\'s PGP key to verify the lighthouse
+binary after {retry_count} retries.
+'''
+)
             return False
         
         process_result = subprocess.run([
@@ -1001,7 +1006,60 @@ Do you want to remove this directory first and start from nothing?
     subprocess.run([
         'systemctl', 'enable', lighthouse_bn_service_name])
     
-    # TODO: Verify proper Lighthouse beacon node installation and syncing
+    print('We are giving the lighthouse beacon node a few seconds to start before testing it.')
+    time.sleep(2)
+    try:
+        subprocess.run([
+            'journalctl', '-fu', lighthouse_bn_service_name
+        ], timeout=30)
+    except subprocess.TimeoutExpired:
+        pass
+
+    # Verify proper Lighthouse beacon node installation and syncing
+    local_lighthouse_bn_http_base = 'http://127.0.0.1:5052'
+    lighthouse_bn_version_query = '/eth/v1/node/version'
+    lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_version_query
+    headers = {
+        'accept': 'application/json'
+    }
+    response = httpx.get(lighthouse_bn_query_url, headers=headers)
+
+    if response.status_code != 200:
+        result = button_dialog(
+            title='Cannot connect to Lighthouse beacon node',
+            text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Status code: {response.status_code}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+        )
+
+        return False
+    
+    # TODO: Verify proper Lighthouse beacon node syncing
 
     return True
 
