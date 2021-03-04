@@ -1007,6 +1007,87 @@ Do you want to remove this directory first and start from nothing?
 def generate_keys(network):
     # Generate validator keys for the selected network
 
+    # Check if there are keys already imported or created
+    eth2_deposit_cli_path = Path(Path.home(), 'eth2validatorwizard', 'eth2depositcli')
+    validator_keys_path = Path(eth2_deposit_cli_path, 'validator_keys')
+
+    lighthouse_datadir = Path('/var/lib/lighthouse')
+
+    process_result = subprocess.run([
+        '/usr/local/bin/lighthouse', '--network', network, 'account', 'validator', 'list',
+        '--datadir', lighthouse_datadir], capture_output=True, text=True)
+    if process_result.returncode == 0:
+        process_output = process_result.stdout
+        public_keys = re.findall(r'0x[0-9a-f]{96}\s', process_output)
+        public_keys = map(lambda x: x.strip(), public_keys)
+        
+        if len(public_keys) > 0:
+            # We already have keys imported
+
+            result = button_dialog(
+                title='Validator keys already imported',
+                text=(
+f'''
+It seems like validator keys have already been imported. Here are some
+details found:
+
+Number of validators: {len(public_keys)}
+Location: {lighthouse_datadir}
+
+Do you want to skip generating new keys?
+'''             ),
+                buttons=[
+                    ('Skip', 1),
+                    ('Generate', 2),
+                    ('Quit', False)
+                ]
+            ).run()
+
+            if not result:
+                return result
+            
+            if result == 1:
+                generated_keys = search_for_generated_keys(validator_keys_path)
+                return generated_keys
+
+            # We want to generate new keys from here
+    
+    # Check if there are keys already created
+    generated_keys = search_for_generated_keys(validator_keys_path)
+    if (
+        generated_keys['deposit_data_path'] is not None or
+        len(generated_keys['keystore_paths']) > 0
+    ):
+        result = button_dialog(
+            title='Validator keys already created',
+            text=(
+f'''
+It seems like validator keys have already been created. Here are some
+details found:
+
+Number of keystores: {len(generated_keys['keystore_paths'])}
+Deposit data file: {generated_keys['deposit_data_path']}
+Location: {validator_keys_path}
+
+If there is no keystore, it's probably because they were already imported
+into the validator client.
+
+Do you want to skip generating new keys? Generating new keys will destroy
+all previously generated keys and deposit data file.
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Generate', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            return generated_keys
+
     currency = NETWORK_CURRENCY[network]
 
     result = button_dialog(
@@ -1036,90 +1117,133 @@ to do a 32 {currency} deposit for each validator.
     if not result:
         return result
     
-    # Getting latest eth2.0-deposit-cli release files
-    eth2_cli_gh_release_url = GITHUB_REST_API_URL + ETH2_DEPOSIT_CLI_LATEST_RELEASE
-    headers = {'Accept': GITHUB_API_VERSION}
-    response = httpx.get(eth2_cli_gh_release_url, headers=headers)
+    # Check if eth2.0-deposit-cli is already installed
+    eth2_deposit_cli_binary = Path(eth2_deposit_cli_path, 'deposit')
 
-    if response.status_code != 200:
-        # TODO: Better handling for network response issue
-        return False
+    eth2_deposit_found = False
+
+    if eth2_deposit_cli_binary.exists() and eth2_deposit_cli_binary.is_file():
+        try:
+            process_result = subprocess.run([
+                eth2_deposit_cli_binary, '--help'
+                ], capture_output=True, text=True)
+            eth2_deposit_found = True
+
+            # TODO: Validate the output of deposit --help to make sure it's fine? Maybe?
+            # process_output = process_result.stdout
+
+        except FileNotFoundError:
+            pass
     
-    release_json = response.json()
+    install_eth2_deposit_binary = True
 
-    if 'assets' not in release_json:
-        # TODO: Better handling on unexpected response structure
-        return False
-    
-    binary_asset = None
-    checksum_asset = None
+    if eth2_deposit_found:
+        result = button_dialog(
+            title='eth2.0-deposit-cli binary found',
+            text=(
+f'''
+The eth2.0-deposit-cli binary seems to have already been installed. Here
+are some details found:
 
-    for asset in release_json['assets']:
-        if 'name' not in asset:
-            continue
-        if 'browser_download_url' not in asset:
-            continue
-    
-        file_name = asset['name']
-        file_url = asset['browser_download_url']
+Location: {eth2_deposit_cli_binary}
 
-        if file_name.endswith('linux-amd64.tar.gz'):
-            binary_asset = {
-                'file_name': file_name,
-                'file_url': file_url
-            }
-        elif file_name.endswith('linux-amd64.sha256'):
-            checksum_asset = {
-                'file_name': file_name,
-                'file_url': file_url
-            }
+Do you want to skip installing the eth2.0-deposit-cli binary?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
 
-    if binary_asset is None or checksum_asset is None:
-        # TODO: Better handling of missing asset in latest release
-        return False
-    
-    # Downloading latest eth2.0-deposit-cli release files
-    download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
-    download_path.mkdir(parents=True, exist_ok=True)
+        if not result:
+            return result
+        
+        install_eth2_deposit_binary = (result == 2)
 
-    binary_path = Path(download_path, binary_asset['file_name'])
-    binary_hash = hashlib.sha256()
+    if install_eth2_deposit_binary:
+        # Getting latest eth2.0-deposit-cli release files
+        eth2_cli_gh_release_url = GITHUB_REST_API_URL + ETH2_DEPOSIT_CLI_LATEST_RELEASE
+        headers = {'Accept': GITHUB_API_VERSION}
+        response = httpx.get(eth2_cli_gh_release_url, headers=headers)
 
-    with open(binary_path, 'wb') as binary_file:
-        with httpx.stream('GET', binary_asset['file_url']) as http_stream:
-            for data in http_stream.iter_bytes():
-                binary_file.write(data)
-                binary_hash.update(data)
-
-    binary_hexdigest = binary_hash.hexdigest()
-
-    checksum_path = Path(download_path, checksum_asset['file_name'])
-
-    with open(checksum_path, 'wb') as signature_file:
-        with httpx.stream('GET', checksum_asset['file_url']) as http_stream:
-            for data in http_stream.iter_bytes():
-                signature_file.write(data)
-
-    # Verify SHA256 signature
-    with open(checksum_path, 'r') as signature_file:
-        if binary_hexdigest != signature_file.read(1024).strip():
-            # SHA256 checksum failed
-            # TODO: Better handling of failed SHA256 checksum
+        if response.status_code != 200:
+            # TODO: Better handling for network response issue
             return False
-    
-    # Extracting the eth2.0-deposit-cli binary archive
-    eth2_deposit_cli_path = Path(Path.home(), 'eth2validatorwizard', 'eth2depositcli')
-    eth2_deposit_cli_path.mkdir(parents=True, exist_ok=True)
-    subprocess.run([
-        'tar', 'xvf', binary_path, '--strip-components', '2', '--directory',
-        eth2_deposit_cli_path])
-    
-    # Remove download leftovers
-    binary_path.unlink()
-    checksum_path.unlink()
+        
+        release_json = response.json()
+
+        if 'assets' not in release_json:
+            # TODO: Better handling on unexpected response structure
+            return False
+        
+        binary_asset = None
+        checksum_asset = None
+
+        for asset in release_json['assets']:
+            if 'name' not in asset:
+                continue
+            if 'browser_download_url' not in asset:
+                continue
+        
+            file_name = asset['name']
+            file_url = asset['browser_download_url']
+
+            if file_name.endswith('linux-amd64.tar.gz'):
+                binary_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+            elif file_name.endswith('linux-amd64.sha256'):
+                checksum_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+
+        if binary_asset is None or checksum_asset is None:
+            # TODO: Better handling of missing asset in latest release
+            return False
+        
+        # Downloading latest eth2.0-deposit-cli release files
+        download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
+        download_path.mkdir(parents=True, exist_ok=True)
+
+        binary_path = Path(download_path, binary_asset['file_name'])
+        binary_hash = hashlib.sha256()
+
+        with open(binary_path, 'wb') as binary_file:
+            with httpx.stream('GET', binary_asset['file_url']) as http_stream:
+                for data in http_stream.iter_bytes():
+                    binary_file.write(data)
+                    binary_hash.update(data)
+
+        binary_hexdigest = binary_hash.hexdigest()
+
+        checksum_path = Path(download_path, checksum_asset['file_name'])
+
+        with open(checksum_path, 'wb') as signature_file:
+            with httpx.stream('GET', checksum_asset['file_url']) as http_stream:
+                for data in http_stream.iter_bytes():
+                    signature_file.write(data)
+
+        # Verify SHA256 signature
+        with open(checksum_path, 'r') as signature_file:
+            if binary_hexdigest != signature_file.read(1024).strip():
+                # SHA256 checksum failed
+                # TODO: Better handling of failed SHA256 checksum
+                return False
+        
+        # Extracting the eth2.0-deposit-cli binary archive
+        eth2_deposit_cli_path.mkdir(parents=True, exist_ok=True)
+        subprocess.run([
+            'tar', 'xvf', binary_path, '--strip-components', '2', '--directory',
+            eth2_deposit_cli_path])
+        
+        # Remove download leftovers
+        binary_path.unlink()
+        checksum_path.unlink()
 
     # Clean potential leftover keys
-    validator_keys_path = Path(eth2_deposit_cli_path, 'validator_keys')
     if validator_keys_path.exists():
         if validator_keys_path.is_dir():
             shutil.rmtree(validator_keys_path)
@@ -1127,12 +1251,24 @@ to do a 32 {currency} deposit for each validator.
             validator_keys_path.unlink()
     
     # Launch eth2.0-deposit-cli
-    eth2_deposit_cli_binary = Path(eth2_deposit_cli_path, 'deposit')
     subprocess.run([
         eth2_deposit_cli_binary, 'new-mnemonic', '--chain', network],
         cwd=eth2_deposit_cli_path)
 
+    # Clean up eth2.0-deposit-cli tool
+    eth2_deposit_cli_binary.unlink()
+
     # Verify the generated keys
+    generated_keys = search_for_generated_keys(validator_keys_path)
+    
+    if generated_keys['deposit_data_path'] is None or len(generated_keys['keystore_paths']) == 0:
+        # TODO: Better handling of no keys generated
+        print('No key has been generated with the eth2.0-deposit-cli tool. We cannot continue.')
+        return False
+
+    return generated_keys
+
+def search_for_generated_keys(validator_keys_path):
     deposit_data_path = None
     keystore_paths = []
 
@@ -1146,14 +1282,6 @@ to do a 32 {currency} deposit for each validator.
             elif entry.name.startswith('keystore'):
                 keystore_paths.append(entry.path)
     
-    if deposit_data_path is None or len(keystore_paths) == 0:
-        # No key generated
-        # TODO: Better handling of no keys generated
-        return False
-
-    # Clean up eth2.0-deposit-cli tool
-    eth2_deposit_cli_binary.unlink()
-
     return {
         'validator_keys_path': validator_keys_path,
         'deposit_data_path': deposit_data_path,
@@ -1198,10 +1326,11 @@ ready to start validating once your validator(s) get activated.
     subprocess.run([
         'chmod', '700', '/var/lib/lighthouse/validators'])
     
-    # Import keystore(s)
-    subprocess.run([
-        '/usr/local/bin/lighthouse', '--network', network, 'account', 'validator', 'import',
-        '--directory', keys['validator_keys_path'], '--datadir', '/var/lib/lighthouse'])
+    # Import keystore(s) if we have some
+    if len(keys['keystore_paths']) > 0:
+        subprocess.run([
+            '/usr/local/bin/lighthouse', '--network', network, 'account', 'validator', 'import',
+            '--directory', keys['validator_keys_path'], '--datadir', '/var/lib/lighthouse'])
 
     # TODO: Check for correct keystore(s) import
 
