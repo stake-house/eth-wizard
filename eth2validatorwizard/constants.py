@@ -24,6 +24,11 @@ NETWORK_CURRENCY = {
     NETWORK_PYRMONT: 'GöETH'
 }
 
+ETH1_NETWORK_CHAINID = {
+    NETWORK_MAINNET: 1,
+    NETWORK_PYRMONT: 5
+}
+
 BEACONCHA_VALIDATOR_DEPOSITS_API_URL = '/api/v1/validator/{indexOrPubkey}/deposits'
 
 ETHEREUM_APT_SOURCE_URL = 'http://ppa.launchpad.net/ethereum/ethereum/ubuntu'

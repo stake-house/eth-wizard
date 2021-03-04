@@ -50,6 +50,9 @@ def run():
         # User asked to quit or error
         quit()
 
+    # TODO: Guide user to create Infura account and Alchemy account for Eth1 fallback. Test
+    # those accounts and prepare them for use in Lighthouse beacon node configuration
+
     if not install_lighthouse(selected_network):
         # User asked to quit or error
         quit()
@@ -187,8 +190,9 @@ def install_geth(network):
 
     # Check for existing systemd service
     geth_service_exists = False
+    geth_service_name = 'geth.service'
 
-    service_details = get_systemd_service_details('geth.service')
+    service_details = get_systemd_service_details(geth_service_name)
 
     if service_details['LoadState'] == 'loaded':
         geth_service_exists = True
@@ -222,6 +226,10 @@ Do you want to skip installing geth and its service?
         
         if result == 1:
             return True
+        
+        # User wants to proceed, make sure the geth service is stopped first
+        subprocess.run([
+            'systemctl', 'stop', geth_service_name])
 
     result = button_dialog(
         title='Geth installation',
@@ -336,28 +344,68 @@ Do you want to skip installing the geth binary?
         subprocess.run([
             'apt', '-y', 'install', 'geth'])
     
-    # TODO: Check if Geth user or directory already exists
+    # Check if Geth user or directory already exists
+    geth_datadir = Path('/var/lib/goethereum')
+    if geth_datadir.exists and geth_datadir.is_dir():
+        process_result = subprocess.run([
+            'du', '-sh', geth_datadir
+            ], capture_output=True, text=True)
+        
+        process_output = process_result.stdout
+        geth_datadir_size = process_output.split(' ')[0]
+
+        result = button_dialog(
+            title='Geth data directory found',
+            text=(
+f'''
+An existing geth data directory has been found. Here are some
+details found:
+
+Location: {geth_datadir}
+Size: {geth_datadir_size}
+
+Do you want to remove this directory first and start from nothing?
+'''         ),
+            buttons=[
+                ('Remove', 1),
+                ('Keep', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            shutil.rmtree(geth_datadir)
+
+    geth_user_exists = False
+    process_result = subprocess.run([
+        'id', '-u', 'goeth'
+    ])
+    geth_user_exists = (process_result.returncode == 0)
 
     # Setup Geth user and directory
+    if not geth_user_exists:
+        subprocess.run([
+            'useradd', '--no-create-home', '--shell', '/bin/false', 'goeth'])
     subprocess.run([
-        'useradd', '--no-create-home', '--shell', '/bin/false', 'goeth'])
+        'mkdir', '-p', geth_datadir])
     subprocess.run([
-        'mkdir', '-p', '/var/lib/goethereum'])
-    subprocess.run([
-        'chown', '-R', 'goeth:goeth', '/var/lib/goethereum'])
+        'chown', '-R', 'goeth:goeth', geth_datadir])
     
     # Setup Geth systemd service
-    with open('/etc/systemd/system/geth.service', 'w') as service_file:
+    with open('/etc/systemd/system/' + geth_service_name, 'w') as service_file:
         service_file.write(GETH_SERVICE_DEFINITION[network])
     subprocess.run([
         'systemctl', 'daemon-reload'])
     subprocess.run([
-        'systemctl', 'start', 'geth'])
+        'systemctl', 'start', geth_service_name])
     subprocess.run([
-        'systemctl', 'enable', 'geth'])
+        'systemctl', 'enable', geth_service_name])
     
     # Verify proper Geth service installation
-    service_details = get_systemd_service_details('geth.service')
+    service_details = get_systemd_service_details(geth_service_name)
 
     if not (
         service_details['LoadState'] == 'loaded' and
@@ -382,7 +430,7 @@ FragmentPath: {service_details['FragmentPath']}
 We cannot proceed if the geth service cannot be started properly. Make sure
 to check the logs and fix any issue found there. You can see the logs with:
 
-$ sudo journalctl -ru geth.service
+$ sudo journalctl -ru {geth_service_name}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -390,10 +438,10 @@ $ sudo journalctl -ru geth.service
         ).run()
 
         print(
-'''
+f'''
 To examine your geth service logs, type the following command:
 
-$ sudo journalctl -ru geth.service
+$ sudo journalctl -ru {geth_service_name}
 '''
         )
 
@@ -403,7 +451,7 @@ $ sudo journalctl -ru geth.service
     print('We are giving Geth a few seconds to start before testing syncing.')
     try:
         subprocess.run([
-            'journalctl', '-fu', 'geth.service'
+            'journalctl', '-fu', geth_service_name
         ], timeout=20)
     except subprocess.TimeoutExpired:
         pass
@@ -438,7 +486,7 @@ We cannot proceed if the geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
 logs with:
 
-$ sudo journalctl -ru geth.service
+$ sudo journalctl -ru {geth_service_name}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -446,10 +494,10 @@ $ sudo journalctl -ru geth.service
         ).run()
 
         print(
-'''
+f'''
 To examine your geth service logs, type the following command:
 
-$ sudo journalctl -ru geth.service
+$ sudo journalctl -ru {geth_service_name}
 '''
         )
 
@@ -482,7 +530,7 @@ We cannot proceed if the geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
 logs with:
 
-$ sudo journalctl -ru geth.service
+$ sudo journalctl -ru {geth_service_name}
 '''         ),
             buttons=[
                 ('Retry', 1),
@@ -493,10 +541,10 @@ $ sudo journalctl -ru geth.service
         if not result:
 
             print(
-'''
+f'''
 To examine your geth service logs, type the following command:
 
-$ sudo journalctl -ru geth.service
+$ sudo journalctl -ru {geth_service_name}
 '''
             )
 
@@ -527,7 +575,7 @@ We cannot proceed if the geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
 logs with:
 
-$ sudo journalctl -ru geth.service
+$ sudo journalctl -ru {geth_service_name}
     '''         ),
                 buttons=[
                     ('Quit', False)
@@ -535,10 +583,10 @@ $ sudo journalctl -ru geth.service
             ).run()
 
             print(
-'''
+f'''
 To examine your geth service logs, type the following command:
 
-$ sudo journalctl -ru geth.service
+$ sudo journalctl -ru {geth_service_name}
 '''
             )
 
@@ -570,7 +618,7 @@ We cannot proceed if the geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
 logs with:
 
-$ sudo journalctl -ru geth.service
+$ sudo journalctl -ru {geth_service_name}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -578,10 +626,10 @@ $ sudo journalctl -ru geth.service
         ).run()
 
         print(
-'''
+f'''
 To examine your geth service logs, type the following command:
 
-$ sudo journalctl -ru geth.service
+$ sudo journalctl -ru {geth_service_name}
 '''
         )
 
@@ -609,7 +657,7 @@ We cannot proceed if the geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
 logs with:
 
-$ sudo journalctl -ru geth.service
+$ sudo journalctl -ru {geth_service_name}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -617,10 +665,10 @@ $ sudo journalctl -ru geth.service
         ).run()
 
         print(
-'''
+f'''
 To examine your geth service logs, type the following command:
 
-$ sudo journalctl -ru geth.service
+$ sudo journalctl -ru {geth_service_name}
 '''
         )
 
