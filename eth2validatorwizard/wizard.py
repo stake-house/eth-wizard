@@ -1008,7 +1008,7 @@ Do you want to remove this directory first and start from nothing?
 def generate_keys(network):
     # Generate validator keys for the selected network
 
-    # Check if there are keys already imported or created
+    # Check if there are keys already imported
     eth2_deposit_cli_path = Path(Path.home(), 'eth2validatorwizard', 'eth2depositcli')
     validator_keys_path = Path(eth2_deposit_cli_path, 'validator_keys')
 
@@ -1016,7 +1016,8 @@ def generate_keys(network):
 
     process_result = subprocess.run([
         '/usr/local/bin/lighthouse', '--network', network, 'account', 'validator', 'list',
-        '--datadir', lighthouse_datadir], capture_output=True, text=True)
+        '--datadir', lighthouse_datadir
+        ], capture_output=True, text=True)
     if process_result.returncode == 0:
         process_output = process_result.stdout
         public_keys = re.findall(r'0x[0-9a-f]{96}\s', process_output)
@@ -1295,6 +1296,49 @@ def search_for_generated_keys(validator_keys_path):
 def install_lighthouse_validator(network, keys):
     # Import keystore(s) and configure the Lighthouse validator client
 
+    # Check for existing systemd service
+    lighthouse_vc_service_exists = False
+    lighthouse_vc_service_name = 'lighthousevalidator.service'
+
+    service_details = get_systemd_service_details(lighthouse_vc_service_name)
+
+    if service_details['LoadState'] == 'loaded':
+        lighthouse_vc_service_exists = True
+    
+    if lighthouse_vc_service_exists:
+        result = button_dialog(
+            title='Lighthouse validator client service found',
+            text=(
+f'''
+The lighthouse validator client service seems to have already been created.
+Here are some details found:
+
+Description: {service_details['Description']}
+States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+UnitFilePreset: {service_details['UnitFilePreset']}
+ExecStart: {service_details['ExecStart']}
+ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
+FragmentPath: {service_details['FragmentPath']}
+
+Do you want to skip installing and configuring the lighthouse validator client?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            return True
+        
+        # User wants to proceed, make sure the lighthouse validator service is stopped first
+        subprocess.run([
+            'systemctl', 'stop', lighthouse_vc_service_name])
+
     result = button_dialog(
         title='Lighthouse validator client',
         text=(
@@ -1320,9 +1364,16 @@ ready to start validating once your validator(s) get activated.
     if not result:
         return result
     
+    lighthouse_vc_user_exists = False
+    process_result = subprocess.run([
+        'id', '-u', 'lighthousevalidator'
+    ])
+    lighthouse_vc_user_exists = (process_result.returncode == 0)
+
     # Setup Lighthouse validator client user and directory
-    subprocess.run([
-        'useradd', '--no-create-home', '--shell', '/bin/false', 'lighthousevalidator'])
+    if not lighthouse_vc_user_exists:
+        subprocess.run([
+            'useradd', '--no-create-home', '--shell', '/bin/false', 'lighthousevalidator'])
     subprocess.run([
         'mkdir', '-p', '/var/lib/lighthouse/validators'])
     subprocess.run([
@@ -1331,12 +1382,44 @@ ready to start validating once your validator(s) get activated.
         'chmod', '700', '/var/lib/lighthouse/validators'])
     
     # Import keystore(s) if we have some
+    lighthouse_datadir = Path('/var/lib/lighthouse')
+
     if len(keys['keystore_paths']) > 0:
         subprocess.run([
             '/usr/local/bin/lighthouse', '--network', network, 'account', 'validator', 'import',
-            '--directory', keys['validator_keys_path'], '--datadir', '/var/lib/lighthouse'])
+            '--directory', keys['validator_keys_path'], '--datadir', lighthouse_datadir])
+    else:
+        print('No keystore files found to import. We\'ll guess they were already imported for now.')
+        time.sleep(2)
 
-    # TODO: Check for correct keystore(s) import
+    # Check for correct keystore(s) import
+    process_result = subprocess.run([
+        '/usr/local/bin/lighthouse', '--network', network, 'account', 'validator', 'list',
+        '--datadir', lighthouse_datadir
+        ], capture_output=True, text=True)
+    if process_result.returncode == 0:
+        process_output = process_result.stdout
+        public_keys = re.findall(r'0x[0-9a-f]{96}\s', process_output)
+        public_keys = list(map(lambda x: x.strip(), public_keys))
+        
+        if len(public_keys) == 0:
+            # We have no key imported
+
+            result = button_dialog(
+                title='No validator key imported',
+                text=(
+f'''
+It seems like no validator key has been imported.
+
+We cannot continue here without validator keys imported by the lighthouse
+validator client.
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            return False
 
     # Clean up generated keys
     for keystore_path in keys['keystore_paths']:
@@ -1347,14 +1430,14 @@ ready to start validating once your validator(s) get activated.
         'chown', '-R', 'lighthousevalidator:lighthousevalidator', '/var/lib/lighthouse/validators'])
 
     # Setup Lighthouse validator client systemd service
-    with open('/etc/systemd/system/lighthousevalidator.service', 'w') as service_file:
+    with open('/etc/systemd/system/' + lighthouse_vc_service_name, 'w') as service_file:
         service_file.write(LIGHTHOUSE_VC_SERVICE_DEFINITION[network])
     subprocess.run([
         'systemctl', 'daemon-reload'])
     subprocess.run([
-        'systemctl', 'start', 'lighthousevalidator'])
+        'systemctl', 'start', lighthouse_vc_service_name])
     subprocess.run([
-        'systemctl', 'enable', 'lighthousevalidator'])
+        'systemctl', 'enable', lighthouse_vc_service_name])
 
     # TODO: Verify proper Lighthouse validator client installation and the connection with the beacon node
 
