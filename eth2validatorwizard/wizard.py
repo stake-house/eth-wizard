@@ -202,7 +202,7 @@ def install_geth(network):
             title='Geth service found',
             text=(
 f'''
-The geth service seems to have already created. Here are some details
+The geth service seems to have already been created. Here are some details
 found:
 
 Description: {service_details['Description']}
