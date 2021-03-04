@@ -1320,7 +1320,8 @@ ExecStart: {service_details['ExecStart']}
 ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
 FragmentPath: {service_details['FragmentPath']}
 
-Do you want to skip installing and configuring the lighthouse validator client?
+Do you want to skip installing and configuring the lighthouse validator
+client?
 '''         ),
             buttons=[
                 ('Skip', 1),
