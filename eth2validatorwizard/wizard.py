@@ -1256,7 +1256,7 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
         eth2_deposit_cli_binary, 'new-mnemonic', '--chain', network],
         cwd=eth2_deposit_cli_path)
 
-    # Clean up eth2.0-deposit-cli tool
+    # Clean up eth2.0-deposit-cli binary
     eth2_deposit_cli_binary.unlink()
 
     # Verify the generated keys
@@ -1270,18 +1270,21 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
     return generated_keys
 
 def search_for_generated_keys(validator_keys_path):
+    # Search for keys generated with the eth2.0-deposit-cli binary
+    
     deposit_data_path = None
     keystore_paths = []
 
-    with os.scandir(validator_keys_path) as dir_it:
-        for entry in dir_it:
-            if entry.name.startswith('.') or not entry.is_file():
-                continue
+    if validator_keys_path.exists() and validator_keys_path.is_dir():
+        with os.scandir(validator_keys_path) as dir_it:
+            for entry in dir_it:
+                if entry.name.startswith('.') or not entry.is_file():
+                    continue
 
-            if entry.name.startswith('deposit_data'):
-                deposit_data_path = entry.path
-            elif entry.name.startswith('keystore'):
-                keystore_paths.append(entry.path)
+                if entry.name.startswith('deposit_data'):
+                    deposit_data_path = entry.path
+                elif entry.name.startswith('keystore'):
+                    keystore_paths.append(entry.path)
     
     return {
         'validator_keys_path': validator_keys_path,
