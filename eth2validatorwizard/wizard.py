@@ -1017,6 +1017,7 @@ Do you want to remove this directory first and start from nothing?
 
     # Verify proper Lighthouse beacon node installation and syncing
     local_lighthouse_bn_http_base = 'http://127.0.0.1:5052'
+    
     lighthouse_bn_version_query = '/eth/v1/node/version'
     lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_version_query
     headers = {
@@ -1059,7 +1060,191 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
         return False
     
-    # TODO: Verify proper Lighthouse beacon node syncing
+    # Verify proper Lighthouse beacon node syncing
+    lighthouse_bn_syncing_query = '/eth/v1/node/syncing'
+    lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_syncing_query
+    headers = {
+        'accept': 'application/json'
+    }
+    response = httpx.get(lighthouse_bn_query_url, headers=headers)
+
+    if response.status_code != 200:
+        button_dialog(
+            title='Cannot connect to Lighthouse beacon node',
+            text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Status code: {response.status_code}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+        )
+
+        return False
+    
+    response_json = response.json()
+
+    retry_index = 0
+    retry_count = 5
+
+    while (
+        'data' not in response_json or
+        'is_syncing' not in response_json['data'] or
+        not response_json['data']['is_syncing']
+    ) and retry_index < retry_count:
+        result = button_dialog(
+            title='Unexpected response from Lighthouse beacon node',
+            text=(
+f'''
+We received an unexpected response from the lighthouse beacon node HTTP
+server. Here are some details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Response: {json.dumps(response_json)}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''         ),
+            buttons=[
+                ('Retry', 1),
+                ('Quit', False)
+            ]
+        ).run()
+        
+        if not result:
+
+            print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+            )
+
+            return False
+        
+        retry_index = retry_index + 1
+
+        # Wait a little before the next retry
+        time.sleep(5)
+
+        response = httpx.get(lighthouse_bn_query_url, headers=headers)
+
+        if response.status_code != 200:
+            button_dialog(
+                title='Cannot connect to Lighthouse beacon node',
+                text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Status code: {response.status_code}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+    '''         ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+            )
+
+            return False
+        
+        response_json = response.json()
+    
+    if (
+        'data' not in response_json or
+        'is_syncing' not in response_json['data'] or
+        not response_json['data']['is_syncing']
+    ):
+        # We could not get a proper result from the Lighthouse beacon node after all those retries
+        result = button_dialog(
+            title='Unexpected response from Lighthouse beacon node',
+            text=(
+f'''
+After a few retries, we still received an unexpected response from the
+lighthouse beacon node HTTP server. Here are some details for this last
+test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Response: {json.dumps(response_json)}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+        )
+
+        return False
+
+    # TODO: Using async and prompt_toolkit asyncio loop to display syncing values updating
+    # in realtime for a few seconds
+
+    print(
+f'''
+The lighthouse beacon node is currently syncing properly.
+
+{response_json['data']}
+''' )
+    time.sleep(5)
 
     return True
 
