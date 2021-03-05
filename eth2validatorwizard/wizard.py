@@ -1234,8 +1234,6 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
     # TODO: Using async and prompt_toolkit asyncio loop to display syncing values updating
     # in realtime for a few seconds
 
-    response_json.get()
-
     print(
 f'''
 The lighthouse beacon node is currently syncing properly.
