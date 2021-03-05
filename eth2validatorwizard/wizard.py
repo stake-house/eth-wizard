@@ -638,13 +638,7 @@ $ sudo journalctl -ru {geth_service_name}
 
     response_result = response_json['result']
 
-    if not (
-        'currentBlock' in response_result and
-        'highestBlock' in response_result and
-        'knownStates' in response_result and
-        'pulledStates' in response_result and
-        'startingBlock' in response_result
-    ):
+    if 'currentBlock' not in response_result:
         result = button_dialog(
             title='Unexpected response from Geth',
             text=(
@@ -682,11 +676,13 @@ $ sudo journalctl -ru {geth_service_name}
 f'''
 Geth is currently syncing properly.
 
-currentBlock: {int(response_result['currentBlock'], base=16)}
-highestBlock: {int(response_result['highestBlock'], base=16)}
-knownStates: {int(response_result['knownStates'], base=16)}
-pulledStates: {int(response_result['pulledStates'], base=16)}
-startingBlock: {int(response_result['startingBlock'], base=16)}
+currentBlock: {int(response_result.get('currentBlock', '0x0'), base=16)}
+highestBlock: {int(response_result.get('highestBlock', '0x0'), base=16)}
+knownStates: {int(response_result.get('knownStates', '0x0'), base=16)}
+pulledStates: {int(response_result.get('pulledStates', '0x0'), base=16)}
+startingBlock: {int(response_result.get('startingBlock', '0x0'), base=16)}
+
+Raw result: {response_result}
 ''')
     time.sleep(5)
 
@@ -1238,11 +1234,16 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
     # TODO: Using async and prompt_toolkit asyncio loop to display syncing values updating
     # in realtime for a few seconds
 
+    response_json.get()
+
     print(
 f'''
 The lighthouse beacon node is currently syncing properly.
 
-{response_json['data']}
+Head slot: {response_json['data'].get('head_slot', 'unknown')}
+Sync distance: {response_json['data'].get('sync_distance', 'unknown')}
+
+Raw data: {response_json['data']}
 ''' )
     time.sleep(5)
 
