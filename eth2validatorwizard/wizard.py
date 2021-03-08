@@ -51,12 +51,12 @@ def run():
         # User asked to quit or error
         quit()
 
-    eth1_fallbacks = select_eth1_fallbacks(selected_network)
-    if type(eth1_fallbacks) is not list and not eth1_fallbacks:
+    selected_eth1_fallbacks = select_eth1_fallbacks(selected_network)
+    if type(selected_eth1_fallbacks) is not list and not selected_eth1_fallbacks:
         # User asked to quit
         quit()
 
-    if not install_lighthouse(selected_network, eth1_fallbacks):
+    if not install_lighthouse(selected_network, selected_eth1_fallbacks):
         # User asked to quit or error
         quit()
 
@@ -594,7 +594,42 @@ $ sudo journalctl -ru {geth_service_name}
         # Wait a little before the next retry
         time.sleep(5)
 
-        response = httpx.post(local_geth_jsonrpc_url, json=request_json, headers=headers)
+        try:
+            response = httpx.post(local_geth_jsonrpc_url, json=request_json, headers=headers)
+        except httpx.RequestError as exception:
+            result = button_dialog(
+                title='Cannot connect to Geth',
+                text=(
+f'''
+We could not connect to geth HTTP-RPC server. Here are some details for
+this last test we tried to perform:
+
+URL: {local_geth_jsonrpc_url}
+Method: POST
+Headers: {headers}
+JSON payload: {json.dumps(request_json)}
+Exception: {exception}
+
+We cannot proceed if the geth HTTP-RPC server is not responding properly.
+Make sure to check the logs and fix any issue found there. You can see the
+logs with:
+
+$ sudo journalctl -ru {geth_service_name}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            print(
+f'''
+To examine your geth service logs, type the following command:
+
+$ sudo journalctl -ru {geth_service_name}
+'''
+            )
+
+            return False
 
         if response.status_code != 200:
             result = button_dialog(
@@ -1090,10 +1125,15 @@ Do you want to skip installing the lighthouse binary?
         # Getting latest Lighthouse release files
         lighthouse_gh_release_url = GITHUB_REST_API_URL + LIGHTHOUSE_LATEST_RELEASE
         headers = {'Accept': GITHUB_API_VERSION}
-        response = httpx.get(lighthouse_gh_release_url, headers=headers)
+        try:
+            response = httpx.get(lighthouse_gh_release_url, headers=headers)
+        except httpx.RequestError as exception:
+            print('Cannot connect to Github')
+            return False
 
         if response.status_code != 200:
             # TODO: Better handling for network response issue
+            print('Github returned error code')
             return False
         
         release_json = response.json()
@@ -1127,6 +1167,7 @@ Do you want to skip installing the lighthouse binary?
 
         if binary_asset is None or signature_asset is None:
             # TODO: Better handling of missing asset in latest release
+            print('Could not find binary or signature asset in Github release')
             return False
         
         # Downloading latest Lighthouse release files
@@ -1135,17 +1176,25 @@ Do you want to skip installing the lighthouse binary?
 
         binary_path = Path(download_path, binary_asset['file_name'])
 
-        with open(binary_path, 'wb') as binary_file:
-            with httpx.stream('GET', binary_asset['file_url']) as http_stream:
-                for data in http_stream.iter_bytes():
-                    binary_file.write(data)
+        try:
+            with open(binary_path, 'wb') as binary_file:
+                with httpx.stream('GET', binary_asset['file_url']) as http_stream:
+                    for data in http_stream.iter_bytes():
+                        binary_file.write(data)
+        except httpx.RequestError as exception:
+            print('Exception while downloading Lighthouse binary from Github')
+            return False
         
         signature_path = Path(download_path, signature_asset['file_name'])
 
-        with open(signature_path, 'wb') as signature_file:
-            with httpx.stream('GET', signature_asset['file_url']) as http_stream:
-                for data in http_stream.iter_bytes():
-                    signature_file.write(data)
+        try:
+            with open(signature_path, 'wb') as signature_file:
+                with httpx.stream('GET', signature_asset['file_url']) as http_stream:
+                    for data in http_stream.iter_bytes():
+                        signature_file.write(data)
+        except httpx.RequestError as exception:
+            print('Exception while downloading Lighthouse signature from Github')
+            return False
 
         # Verify PGP signature
         command_line = ['gpg', '--keyserver', 'pool.sks-keyservers.net', '--recv-keys',
@@ -1325,7 +1374,42 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
     headers = {
         'accept': 'application/json'
     }
-    response = httpx.get(lighthouse_bn_query_url, headers=headers)
+    try:
+        response = httpx.get(lighthouse_bn_query_url, headers=headers)
+    except httpx.RequestError as exception:
+        result = button_dialog(
+            title='Cannot connect to Lighthouse beacon node',
+            text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Exception: {exception}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+        )
+
+        return False
 
     if response.status_code != 200:
         result = button_dialog(
@@ -1368,7 +1452,42 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
     headers = {
         'accept': 'application/json'
     }
-    response = httpx.get(lighthouse_bn_query_url, headers=headers)
+    try:
+        response = httpx.get(lighthouse_bn_query_url, headers=headers)
+    except httpx.RequestError as exception:
+        button_dialog(
+            title='Cannot connect to Lighthouse beacon node',
+            text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Exception: {exception}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+        )
+
+        return False
 
     if response.status_code != 200:
         button_dialog(
@@ -1457,7 +1576,42 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
         # Wait a little before the next retry
         time.sleep(5)
 
-        response = httpx.get(lighthouse_bn_query_url, headers=headers)
+        try:
+            response = httpx.get(lighthouse_bn_query_url, headers=headers)
+        except httpx.RequestError as exception:
+            button_dialog(
+                title='Cannot connect to Lighthouse beacon node',
+                text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Exception: {exception}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+    '''         ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+            )
+
+            return False
 
         if response.status_code != 200:
             button_dialog(
@@ -1715,10 +1869,15 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
         # Getting latest eth2.0-deposit-cli release files
         eth2_cli_gh_release_url = GITHUB_REST_API_URL + ETH2_DEPOSIT_CLI_LATEST_RELEASE
         headers = {'Accept': GITHUB_API_VERSION}
-        response = httpx.get(eth2_cli_gh_release_url, headers=headers)
+        try:
+            response = httpx.get(eth2_cli_gh_release_url, headers=headers)
+        except httpx.RequestError as exception:
+            print('Cannot get latest eth2.0-deposit-cli release from Github')
+            return False
 
         if response.status_code != 200:
             # TODO: Better handling for network response issue
+            print('Cannot get latest eth2.0-deposit-cli release from Github')
             return False
         
         release_json = response.json()
@@ -1752,6 +1911,7 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
 
         if binary_asset is None or checksum_asset is None:
             # TODO: Better handling of missing asset in latest release
+            print('No binary or checksum found in Github release')
             return False
         
         # Downloading latest eth2.0-deposit-cli release files
@@ -1761,20 +1921,28 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
         binary_path = Path(download_path, binary_asset['file_name'])
         binary_hash = hashlib.sha256()
 
-        with open(binary_path, 'wb') as binary_file:
-            with httpx.stream('GET', binary_asset['file_url']) as http_stream:
-                for data in http_stream.iter_bytes():
-                    binary_file.write(data)
-                    binary_hash.update(data)
+        try:
+            with open(binary_path, 'wb') as binary_file:
+                with httpx.stream('GET', binary_asset['file_url']) as http_stream:
+                    for data in http_stream.iter_bytes():
+                        binary_file.write(data)
+                        binary_hash.update(data)
+        except httpx.RequestError as exception:
+            print('Exception while downloading eth2.0-deposit-cli binary from Github')
+            return False
 
         binary_hexdigest = binary_hash.hexdigest()
 
         checksum_path = Path(download_path, checksum_asset['file_name'])
 
-        with open(checksum_path, 'wb') as signature_file:
-            with httpx.stream('GET', checksum_asset['file_url']) as http_stream:
-                for data in http_stream.iter_bytes():
-                    signature_file.write(data)
+        try:
+            with open(checksum_path, 'wb') as signature_file:
+                with httpx.stream('GET', checksum_asset['file_url']) as http_stream:
+                    for data in http_stream.iter_bytes():
+                        signature_file.write(data)
+        except httpx.RequestError as exception:
+            print('Exception while downloading eth2.0-deposit-cli checksum from Github')
+            return False
 
         # Verify SHA256 signature
         with open(checksum_path, 'r') as signature_file:
@@ -2255,7 +2423,11 @@ def get_bc_validator_deposits(network, public_keys):
     bc_api_query_url = (BEACONCHA_IN_URLS[network] +
         BEACONCHA_VALIDATOR_DEPOSITS_API_URL.format(indexOrPubkey=pubkey_arg))
     headers = {'accept': 'application/json'}
-    response = httpx.get(bc_api_query_url, headers=headers)
+    try:
+        response = httpx.get(bc_api_query_url, headers=headers)
+    except httpx.RequestError as exception:
+        print(f'Exception {exception} when trying to get {bc_api_query_url}')
+        return False
 
     if response.status_code != 200:
         # TODO: Better handling for network response issue
