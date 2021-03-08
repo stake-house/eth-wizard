@@ -24,6 +24,11 @@ NETWORK_CURRENCY = {
     NETWORK_PYRMONT: 'GöETH'
 }
 
+ETH1_NETWORK_NAME = {
+    NETWORK_MAINNET: 'Mainnet',
+    NETWORK_PYRMONT: 'Görli'
+}
+
 ETH1_NETWORK_CHAINID = {
     NETWORK_MAINNET: 1,
     NETWORK_PYRMONT: 5
@@ -86,7 +91,7 @@ User=lighthousebeacon
 Group=lighthousebeacon
 Restart=always
 RestartSec=5
-ExecStart=/usr/local/bin/lighthouse bn --network mainnet --datadir /var/lib/lighthouse --staking --eth1-endpoints http://127.0.0.1:8545 --validator-monitor-auto --metrics
+ExecStart=/usr/local/bin/lighthouse bn --network mainnet --datadir /var/lib/lighthouse --staking --eth1-endpoints {eth1endpoints} --validator-monitor-auto --metrics
 
 [Install]
 WantedBy=multi-user.target
@@ -104,7 +109,7 @@ User=lighthousebeacon
 Group=lighthousebeacon
 Restart=always
 RestartSec=5
-ExecStart=/usr/local/bin/lighthouse bn --network pyrmont --datadir /var/lib/lighthouse --staking --eth1-endpoints http://127.0.0.1:8545 --validator-monitor-auto --metrics
+ExecStart=/usr/local/bin/lighthouse bn --network pyrmont --datadir /var/lib/lighthouse --staking --eth1-endpoints {eth1endpoints} --validator-monitor-auto --metrics
 
 [Install]
 WantedBy=multi-user.target
