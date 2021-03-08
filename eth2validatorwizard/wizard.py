@@ -1011,6 +1011,51 @@ Do you want to remove this directory first and start from nothing?
     except subprocess.TimeoutExpired:
         pass
 
+    # Check if the Lighthouse beacon node service is still running
+    service_details = get_systemd_service_details(lighthouse_bn_service_name)
+
+    if not (
+        service_details['LoadState'] == 'loaded' and
+        service_details['ActiveState'] == 'active' and
+        service_details['SubState'] == 'running'
+    ):
+
+        result = button_dialog(
+            title='Lighthouse beacon node service not running properly',
+            text=(
+f'''
+The lighthouse beacon node service we just created seems to have issues.
+Here are some details found:
+
+Description: {service_details['Description']}
+States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+UnitFilePreset: {service_details['UnitFilePreset']}
+ExecStart: {service_details['ExecStart']}
+ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
+FragmentPath: {service_details['FragmentPath']}
+
+We cannot proceed if the lighthouse beacon node service cannot be started
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+        )
+
+        return False
+
     # Verify proper Lighthouse beacon node installation and syncing
     local_lighthouse_bn_http_base = 'http://127.0.0.1:5052'
     
@@ -1727,7 +1772,60 @@ We found {len(public_keys)} key(s) imported into the lighthouse validator client
     subprocess.run([
         'systemctl', 'enable', lighthouse_vc_service_name])
 
-    # TODO: Verify proper Lighthouse validator client installation and the connection with the beacon node
+    # Verify proper Lighthouse validator client installation
+    print('We are giving the lighthouse validator client a few seconds to start before testing it.')
+    time.sleep(2)
+    try:
+        subprocess.run([
+            'journalctl', '-fu', lighthouse_vc_service_name
+        ], timeout=30)
+    except subprocess.TimeoutExpired:
+        pass
+
+    # Check if the Lighthouse validator client service is still running
+    service_details = get_systemd_service_details(lighthouse_vc_service_name)
+
+    if not (
+        service_details['LoadState'] == 'loaded' and
+        service_details['ActiveState'] == 'active' and
+        service_details['SubState'] == 'running'
+    ):
+
+        result = button_dialog(
+            title='Lighthouse validator client service not running properly',
+            text=(
+f'''
+The lighthouse validator client service we just created seems to have
+issues. Here are some details found:
+
+Description: {service_details['Description']}
+States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+UnitFilePreset: {service_details['UnitFilePreset']}
+ExecStart: {service_details['ExecStart']}
+ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
+FragmentPath: {service_details['FragmentPath']}
+
+We cannot proceed if the lighthouse validator client service cannot be
+started properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_vc_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your lighthouse validator client service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_vc_service_name}
+'''
+        )
+
+        return False
 
     return True
 
