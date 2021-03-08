@@ -470,7 +470,42 @@ $ sudo journalctl -ru {geth_service_name}
     headers = {
         'Content-Type': 'application/json'
     }
-    response = httpx.post(local_geth_jsonrpc_url, json=request_json, headers=headers)
+    try:
+        response = httpx.post(local_geth_jsonrpc_url, json=request_json, headers=headers)
+    except httpx.RequestError as exception:
+        result = button_dialog(
+            title='Cannot connect to Geth',
+            text=(
+f'''
+We could not connect to geth HTTP-RPC server. Here are some details for
+this last test we tried to perform:
+
+URL: {local_geth_jsonrpc_url}
+Method: POST
+Headers: {headers}
+JSON payload: {json.dumps(request_json)}
+Exception: {exception}
+
+We cannot proceed if the geth HTTP-RPC server is not responding properly.
+Make sure to check the logs and fix any issue found there. You can see the
+logs with:
+
+$ sudo journalctl -ru {geth_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your geth service logs, type the following command:
+
+$ sudo journalctl -ru {geth_service_name}
+'''
+        )
+
+        return False
 
     if response.status_code != 200:
         result = button_dialog(
