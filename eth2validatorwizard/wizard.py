@@ -1607,6 +1607,42 @@ ready to start validating once your validator(s) get activated.
     if not result:
         return result
     
+    # Check if lighthouse validators client user or directory already exists
+    lighthouse_datadir_vc = Path('/var/lib/lighthouse/validators')
+    if lighthouse_datadir_vc.exists() and lighthouse_datadir_vc.is_dir():
+        process_result = subprocess.run([
+            'du', '-sh', lighthouse_datadir_vc
+            ], capture_output=True, text=True)
+        
+        process_output = process_result.stdout
+        lighthouse_datadir_vc_size = process_output.split('\t')[0]
+
+        result = button_dialog(
+            title='Lighthouse validator client data directory found',
+            text=(
+f'''
+An existing lighthouse validator client data directory has been found. Here
+are some details found:
+
+Location: {lighthouse_datadir_vc}
+Size: {lighthouse_datadir_vc_size}
+
+Do you want to remove this directory first and start from nothing? Removing
+this directory will also remove any key imported previously.
+'''         ),
+            buttons=[
+                ('Remove', 1),
+                ('Keep', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            shutil.rmtree(lighthouse_datadir_vc)
+
     lighthouse_vc_user_exists = False
     process_result = subprocess.run([
         'id', '-u', 'lighthousevalidator'
@@ -1618,11 +1654,11 @@ ready to start validating once your validator(s) get activated.
         subprocess.run([
             'useradd', '--no-create-home', '--shell', '/bin/false', 'lighthousevalidator'])
     subprocess.run([
-        'mkdir', '-p', '/var/lib/lighthouse/validators'])
+        'mkdir', '-p', lighthouse_datadir_vc])
     subprocess.run([
-        'chown', '-R', 'lighthousevalidator:lighthousevalidator', '/var/lib/lighthouse/validators'])
+        'chown', '-R', 'lighthousevalidator:lighthousevalidator', lighthouse_datadir_vc])
     subprocess.run([
-        'chmod', '700', '/var/lib/lighthouse/validators'])
+        'chmod', '700', lighthouse_datadir_vc])
     
     # Import keystore(s) if we have some
     lighthouse_datadir = Path('/var/lib/lighthouse')
@@ -1636,6 +1672,8 @@ ready to start validating once your validator(s) get activated.
         time.sleep(2)
 
     # Check for correct keystore(s) import
+    public_keys = []
+
     process_result = subprocess.run([
         '/usr/local/bin/lighthouse', '--network', network, 'account', 'validator', 'list',
         '--datadir', lighthouse_datadir
@@ -1645,24 +1683,24 @@ ready to start validating once your validator(s) get activated.
         public_keys = re.findall(r'0x[0-9a-f]{96}\s', process_output)
         public_keys = list(map(lambda x: x.strip(), public_keys))
         
-        if len(public_keys) == 0:
-            # We have no key imported
+    if len(public_keys) == 0:
+        # We have no key imported
 
-            result = button_dialog(
-                title='No validator key imported',
-                text=(
+        result = button_dialog(
+            title='No validator key imported',
+            text=(
 f'''
 It seems like no validator key has been imported.
 
 We cannot continue here without validator keys imported by the lighthouse
 validator client.
 '''             ),
-                buttons=[
-                    ('Quit', False)
-                ]
-            ).run()
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
 
-            return False
+        return False
 
     # Clean up generated keys
     for keystore_path in keys['keystore_paths']:
@@ -1670,7 +1708,14 @@ validator client.
 
     # Make sure validators directory is owned by the right user/group
     subprocess.run([
-        'chown', '-R', 'lighthousevalidator:lighthousevalidator', '/var/lib/lighthouse/validators'])
+        'chown', '-R', 'lighthousevalidator:lighthousevalidator', lighthouse_datadir_vc])
+    
+    print(
+f'''
+We found {len(public_keys)} key(s) imported into the lighthouse validator client.
+'''
+    )
+    time.sleep(2)
 
     # Setup Lighthouse validator client systemd service
     with open('/etc/systemd/system/' + lighthouse_vc_service_name, 'w') as service_file:
@@ -1740,6 +1785,7 @@ When you are done with the deposit(s), click the "I'm done" button below.
     
     if len(public_keys) == 0:
         # TODO: Better handling of no public keys in deposit data file
+        print('No public key(s) found in the deposit file.')
         return False
 
     # Verify that the deposit was done correctly using beaconcha.in API
