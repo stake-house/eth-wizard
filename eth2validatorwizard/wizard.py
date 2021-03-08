@@ -1002,8 +1002,17 @@ Do you want to remove this directory first and start from nothing?
     subprocess.run([
         'systemctl', 'enable', lighthouse_bn_service_name])
     
-    print('We are giving the lighthouse beacon node a few seconds to start before testing it.')
-    time.sleep(2)
+    print(
+'''
+We are giving the lighthouse beacon node a few seconds to start before testing
+it.
+
+You might see some error and warn messages about your eth1 node not being in
+sync, being far behind or about the beacon node being unable to connect to any
+eth1 node. Those message are normal to see while your eth1 client is syncing.
+'''
+)
+    time.sleep(6)
     try:
         subprocess.run([
             'journalctl', '-fu', lighthouse_bn_service_name
@@ -1773,8 +1782,17 @@ We found {len(public_keys)} key(s) imported into the lighthouse validator client
         'systemctl', 'enable', lighthouse_vc_service_name])
 
     # Verify proper Lighthouse validator client installation
-    print('We are giving the lighthouse validator client a few seconds to start before testing it.')
-    time.sleep(2)
+    print(
+'''
+We are giving the lighthouse validator client a few seconds to start before
+testing it.
+
+You might see some error and warn messages about your beacon node not being
+synced or about a failure to download validator duties. Those message are
+normal to see while your beacon node is syncing.
+'''
+    )
+    time.sleep(6)
     try:
         subprocess.run([
             'journalctl', '-fu', lighthouse_vc_service_name
