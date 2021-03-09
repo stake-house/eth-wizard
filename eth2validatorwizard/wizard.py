@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 from eth2validatorwizard import __version__
 from eth2validatorwizard.constants import *
 
+from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog, radiolist_dialog, input_dialog
 
 def run():
@@ -1796,7 +1797,7 @@ all previously generated keys and deposit data file.
 
     result = button_dialog(
         title='Generating keys',
-        text=(
+        text=(HTML(
 f'''
 This next step will generate the keys needed to be a validator.
 
@@ -1806,14 +1807,30 @@ verify its SHA256 checksum, extract it and start it.
 The eth2.0-deposit-cli tool is executed in an interactive way where you
 have to answer a few questions. It will help you create a mnemonic from
 which all your keys will be derived from. The mnemonic is the ultimate key.
-It is VERY IMPORTANT to securely and privately store your mnemonic. It can
+It is <style fg="black" bg="red"><b>VERY IMPORTANT</b></style> to securely and privately store your mnemonic. It can
 be used to recreate your validator keys and eventually withdraw your funds.
 
 When asked how many validators you wish to run, remember that you will have
 to do a 32 {currency} deposit for each validator.
-'''     ),
+'''     )),
         buttons=[
             ('Generate', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+    
+    result = button_dialog(
+        title='CAUTION',
+        text=(HTML(
+f'''
+<style fg="black" bg="red">If the <b>mnemonic</b> you are about to create is lost or stolen, you will also
+lose your funds.</style>
+'''     )),
+        buttons=[
+            ('Understood', True),
             ('Quit', False)
         ]
     ).run()
