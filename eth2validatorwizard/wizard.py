@@ -1984,7 +1984,7 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
         
         # Remove download leftovers
         binary_path.unlink()
-        if checksum_asset is not None:
+        if checksum_path is not None:
             checksum_path.unlink()
 
     # Clean potential leftover keys
