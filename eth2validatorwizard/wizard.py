@@ -2449,26 +2449,51 @@ def get_bc_validator_deposits(network, public_keys):
     bc_api_query_url = (BEACONCHA_IN_URLS[network] +
         BEACONCHA_VALIDATOR_DEPOSITS_API_URL.format(indexOrPubkey=pubkey_arg))
     headers = {'accept': 'application/json'}
-    try:
-        response = httpx.get(bc_api_query_url, headers=headers)
-    except httpx.RequestError as exception:
-        print(f'Exception {exception} when trying to get {bc_api_query_url}')
-        return False
 
-    if response.status_code != 200:
-        # TODO: Better handling for network response issue
-        print(f'Error code {response.status_code} when trying to get {bc_api_query_url}')
-        return False
+    keep_retrying = True
+
+    retry_index = 0
+    retry_count = 5
+    retry_delay = 30
+
+    while keep_retrying and retry_index < retry_count:
+        try:
+            response = httpx.get(bc_api_query_url, headers=headers)
+        except httpx.RequestError as exception:
+            print(f'Exception {exception} when trying to get {bc_api_query_url}')
+
+            retry_index = retry_index + 1
+            print(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            continue
+
+        if response.status_code != 200:
+            print(f'Error code {response.status_code} when trying to get {bc_api_query_url}')
+            
+            retry_index = retry_index + 1
+            print(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            continue
+        
+        response_json = response.json()
+
+        if (
+            'status' not in response_json or
+            response_json['status'] != 'OK' or
+            'data' not in response_json
+            ):
+            print(f'Unexpected response data or structure from {bc_api_query_url}: {response_json}')
+            
+            retry_index = retry_index + 1
+            print(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            continue
+        
+        keep_retrying = False
     
-    response_json = response.json()
-
-    if (
-        'status' not in response_json or
-        response_json['status'] != 'OK' or
-        'data' not in response_json
-        ):
-        # TODO: Better handling for response data or structure issue
-        print(f'Unexpected response data or structure from {bc_api_query_url}: {response_json}')
+    if keep_retrying:
+        print(f'We failed to get the validator deposits from the beaconcha.in API after '
+            '{retry_count} retries.')
         return False
     
     validator_deposits = response_json['data']
