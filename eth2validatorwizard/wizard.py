@@ -1925,11 +1925,17 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
                     'file_name': file_name,
                     'file_url': file_url
                 }
-
-        if binary_asset is None or checksum_asset is None:
-            # TODO: Better handling of missing asset in latest release
-            print('No binary or checksum found in Github release')
+        
+        if binary_asset is None:
+            # TODO: Better handling of missing binary in latest release
+            print('No eth2.0-deposit-cli binary found in Github release')
             return False
+        
+        checksum_path = None
+
+        if checksum_asset is None:
+            # TODO: Better handling of missing checksum in latest release
+            print('Warning: No eth2.0-deposit-cli checksum found in Github release')
         
         # Downloading latest eth2.0-deposit-cli release files
         download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
@@ -1948,25 +1954,27 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
             print('Exception while downloading eth2.0-deposit-cli binary from Github')
             return False
 
-        binary_hexdigest = binary_hash.hexdigest()
+        if checksum_asset is not None:
+            binary_hexdigest = binary_hash.hexdigest()
 
-        checksum_path = Path(download_path, checksum_asset['file_name'])
+            checksum_path = Path(download_path, checksum_asset['file_name'])
 
-        try:
-            with open(checksum_path, 'wb') as signature_file:
-                with httpx.stream('GET', checksum_asset['file_url']) as http_stream:
-                    for data in http_stream.iter_bytes():
-                        signature_file.write(data)
-        except httpx.RequestError as exception:
-            print('Exception while downloading eth2.0-deposit-cli checksum from Github')
-            return False
-
-        # Verify SHA256 signature
-        with open(checksum_path, 'r') as signature_file:
-            if binary_hexdigest != signature_file.read(1024).strip():
-                # SHA256 checksum failed
-                # TODO: Better handling of failed SHA256 checksum
+            try:
+                with open(checksum_path, 'wb') as signature_file:
+                    with httpx.stream('GET', checksum_asset['file_url']) as http_stream:
+                        for data in http_stream.iter_bytes():
+                            signature_file.write(data)
+            except httpx.RequestError as exception:
+                print('Exception while downloading eth2.0-deposit-cli checksum from Github')
                 return False
+
+            # Verify SHA256 signature
+            with open(checksum_path, 'r') as signature_file:
+                if binary_hexdigest != signature_file.read(1024).strip():
+                    # SHA256 checksum failed
+                    # TODO: Better handling of failed SHA256 checksum
+                    print('SHA256 checksum failed on eth2.0-deposit-cli binary from Github')
+                    return False
         
         # Extracting the eth2.0-deposit-cli binary archive
         eth2_deposit_cli_path.mkdir(parents=True, exist_ok=True)
@@ -1976,7 +1984,8 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
         
         # Remove download leftovers
         binary_path.unlink()
-        checksum_path.unlink()
+        if checksum_asset is not None:
+            checksum_path.unlink()
 
     # Clean potential leftover keys
     if validator_keys_path.exists():
