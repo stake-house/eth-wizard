@@ -22,7 +22,7 @@ The eth2-validator-wizard is not ready to be used in the real world yet. It is s
 This procedure is going to evolve over time. For now, you can use something like this in a terminal, on Ubuntu 20.04, to test and start the wizard:
 
 ```
-wget https://github.com/remyroy/eth2-validator-wizard/releases/download/v0.4/eth2validatorwizard-0.4.pyz && sudo python3 eth2validatorwizard-0.4.pyz
+wget https://github.com/remyroy/eth2-validator-wizard/releases/download/v0.5/eth2validatorwizard-0.5.pyz && sudo python3 eth2validatorwizard-0.5.pyz
 ```
 
 ## Support
