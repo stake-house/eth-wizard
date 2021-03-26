@@ -8,30 +8,36 @@ ETH2_DEPOSIT_CLI_LATEST_RELEASE = '/repos/ethereum/eth2.0-deposit-cli/releases/l
 
 NETWORK_MAINNET = 'mainnet'
 NETWORK_PYRMONT = 'pyrmont'
+NETWORK_PRATER = 'prater'
 
 LAUNCHPAD_URLS = {
     NETWORK_MAINNET: 'https://launchpad.ethereum.org',
-    NETWORK_PYRMONT: 'https://pyrmont.launchpad.ethereum.org'
+    NETWORK_PYRMONT: 'https://pyrmont.launchpad.ethereum.org',
+    NETWORK_PRATER: 'https://prater.launchpad.ethereum.org'
 }
 
 BEACONCHA_IN_URLS = {
     NETWORK_MAINNET: 'https://beaconcha.in',
-    NETWORK_PYRMONT: 'https://pyrmont.beaconcha.in'
+    NETWORK_PYRMONT: 'https://pyrmont.beaconcha.in',
+    NETWORK_PRATER: 'https://prater.beaconcha.in'
 }
 
 NETWORK_CURRENCY = {
     NETWORK_MAINNET: 'ETH',
-    NETWORK_PYRMONT: 'GöETH'
+    NETWORK_PYRMONT: 'GöETH',
+    NETWORK_PRATER: 'GöETH',
 }
 
 ETH1_NETWORK_NAME = {
     NETWORK_MAINNET: 'Mainnet',
-    NETWORK_PYRMONT: 'Görli'
+    NETWORK_PYRMONT: 'Görli',
+    NETWORK_PRATER: 'Görli'
 }
 
 ETH1_NETWORK_CHAINID = {
     NETWORK_MAINNET: 1,
-    NETWORK_PYRMONT: 5
+    NETWORK_PYRMONT: 5,
+    NETWORK_PRATER: 5
 }
 
 BEACONCHA_VALIDATOR_DEPOSITS_API_URL = '/api/v1/validator/{indexOrPubkey}/deposits'
@@ -58,6 +64,24 @@ ExecStart=geth --cache 2048 --http --datadir /var/lib/goethereum --metrics --met
 WantedBy=default.target
 '''),
     NETWORK_PYRMONT: (
+'''
+[Unit]
+Description=Go Ethereum Client - Geth (Görli)
+After=network.target
+Wants=network.target
+
+[Service]
+User=goeth
+Group=goeth
+Type=simple
+Restart=always
+RestartSec=5
+ExecStart=geth --goerli --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof
+
+[Install]
+WantedBy=default.target
+'''),
+    NETWORK_PRATER: (
 '''
 [Unit]
 Description=Go Ethereum Client - Geth (Görli)
@@ -113,6 +137,24 @@ ExecStart=/usr/local/bin/lighthouse bn --network pyrmont --datadir /var/lib/ligh
 
 [Install]
 WantedBy=multi-user.target
+'''),
+    NETWORK_PRATER: (
+'''
+[Unit]
+Description=Lighthouse Eth2 Client Beacon Node (Prater)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=lighthousebeacon
+Group=lighthousebeacon
+Restart=always
+RestartSec=5
+ExecStart=/usr/local/bin/lighthouse bn --network prater --datadir /var/lib/lighthouse --staking --eth1-endpoints {eth1endpoints} --validator-monitor-auto --metrics
+
+[Install]
+WantedBy=multi-user.target
 ''')
 }
 
@@ -149,6 +191,24 @@ Type=simple
 Restart=always
 RestartSec=5
 ExecStart=/usr/local/bin/lighthouse vc --network pyrmont --datadir /var/lib/lighthouse --metrics
+
+[Install]
+WantedBy=multi-user.target
+'''),
+    NETWORK_PRATER: (
+'''
+[Unit]
+Description=Lighthouse Eth2 Client Validator Client (Prater)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=lighthousevalidator
+Group=lighthousevalidator
+Type=simple
+Restart=always
+RestartSec=5
+ExecStart=/usr/local/bin/lighthouse vc --network prater --datadir /var/lib/lighthouse --metrics
 
 [Install]
 WantedBy=multi-user.target

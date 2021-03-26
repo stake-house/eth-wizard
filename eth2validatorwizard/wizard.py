@@ -181,7 +181,8 @@ For which network would you like to perform this installation?
         ),
         values=[
             (NETWORK_MAINNET, "Mainnet"),
-            (NETWORK_PYRMONT, "Pyrmont")
+            (NETWORK_PYRMONT, "Pyrmont"),
+            (NETWORK_PRATER, "Prater")
         ],
         ok_text='Use this',
         cancel_text='Quit'
