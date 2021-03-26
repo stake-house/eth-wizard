@@ -1890,18 +1890,24 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
         try:
             response = httpx.get(eth2_cli_gh_release_url, headers=headers)
         except httpx.RequestError as exception:
-            print('Cannot get latest eth2.0-deposit-cli release from Github')
+            # TODO: Better handling for network response issue
+            print(
+f'Cannot get latest eth2.0-deposit-cli release from Github. Exception {exception}'
+            )
             return False
 
         if response.status_code != 200:
             # TODO: Better handling for network response issue
-            print('Cannot get latest eth2.0-deposit-cli release from Github')
+            print(
+f'Cannot get latest eth2.0-deposit-cli release from Github. Error code {response.status_code}'
+            )
             return False
         
         release_json = response.json()
 
         if 'assets' not in release_json:
             # TODO: Better handling on unexpected response structure
+            print('Unexpected response from Github API.')
             return False
         
         binary_asset = None
