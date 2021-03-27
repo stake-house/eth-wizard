@@ -146,8 +146,7 @@ Here is an overview of the different steps required to become an active
 validator on an Ethereum 2.0 network.
 
 * Consolidate 32 ETH for each active validator you want (You can have
-an almost unlimited amount of active validators using a single computer
-and this setup)
+a large amount of active validators using a single machine and this setup)
 * Install an Eth1 client and let it synchronize
 * Install an Eth2 beacon node and let it synchronize
 * Generate your validator(s) keys
