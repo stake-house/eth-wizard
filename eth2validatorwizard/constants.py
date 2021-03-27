@@ -58,7 +58,7 @@ Group=goeth
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart=geth --cache 2048 --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof
+ExecStart=geth --cache 2048 --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof
 
 [Install]
 WantedBy=default.target
@@ -76,7 +76,7 @@ Group=goeth
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart=geth --goerli --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof
+ExecStart=geth --goerli --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof
 
 [Install]
 WantedBy=default.target
@@ -94,7 +94,7 @@ Group=goeth
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart=geth --goerli --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof
+ExecStart=geth --goerli --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof
 
 [Install]
 WantedBy=default.target
