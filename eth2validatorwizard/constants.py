@@ -15,6 +15,8 @@ DEFAULT_LIGHTHOUSE_BN_PORT = 9000
 
 SPEEDTEST_SCRIPT_URL = 'https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py'
 
+MIN_AVAILABLE_DISK_SPACE_GB = 900.0
+
 MIN_DOWN_MBS = 5.0
 MIN_UP_MBS = 5.0
 

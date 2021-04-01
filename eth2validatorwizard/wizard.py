@@ -50,6 +50,9 @@ def run():
     if want_to_test == 1:
         # TODO: Check for opened ports
         # TODO: Check for disk size
+        if not test_disk_size():
+            # User asked to quit
+            quit()
         # TODO: Check for disk speed
         # TODO: Check for available RAM
         if not test_internet_speed():
@@ -188,7 +191,7 @@ We can test your system to make sure it is fit for being a validator. Here
 is the list of tests we will perform:
 
 * Opened ports (2 ports: 1 port for eth1 and 1 port for eth2 beacon node)
-* Disk size (>= 900 GB of available space)
+* Disk size (>= {MIN_AVAILABLE_DISK_SPACE_GB:.0f} GB of available space)
 * Disk speed (>= 3k sustained read IOPS and >= 1k sustained write IOPS)
 * Memory size (>= 8 GB of available RAM)
 * Internet speed (>= {MIN_DOWN_MBS:.1f}MB/s down and >= {MIN_UP_MBS:.1f}MB/s up)
@@ -198,6 +201,65 @@ Do you want to test your system?
         buttons=[
             ('Test', 1),
             ('Skip', 2),
+            ('Quit', False)
+        ]
+    ).run()
+
+    return result
+
+def test_disk_size():
+    process_result = subprocess.run([
+        'df', '-h', '--output=avail', '-B1MB', '/var/lib'
+        ], capture_output=True, text=True)
+    
+    if process_result.returncode != 0:
+        print(f'Unable to test disk size. Return code {process_result.returncode}')
+        print(f'{process_result.stdout}\n{process_result.stderr}')
+        return False
+    
+    process_output = process_result.stdout
+    result = re.search(r'(\d+)', process_output)
+    available_space_gb = None
+    if result:
+        available_space_gb = int(result.group(1)) / 1000.0
+
+    if available_space_gb is None:
+        print('Unable to test disk size. Unexpected output from df command. {process_output}')
+        return False
+    
+    if not available_space_gb >= MIN_AVAILABLE_DISK_SPACE_GB:
+        result = button_dialog(
+            title='Disk size failed',
+            text=(
+f'''
+Your available space results seems to indicate that your disk size is lower
+than what would be required to be a fully working validator. Here are your
+results:
+
+* Available space in /var/lib: {available_space_gb:.1f}GB (>= {MIN_AVAILABLE_DISK_SPACE_GB:.1f}GB)
+
+It might still be possible to be a validator but you should consider a
+larger disk for your system.
+'''         ),
+            buttons=[
+                ('Keep going', True),
+                ('Quit', False)
+            ]
+        ).run()
+
+        return result
+
+    result = button_dialog(
+        title='Disk size passed',
+        text=(
+f'''
+Your available space results seems to indicate that your disk size is large
+enough to be a fully working validator. Here are your results:
+
+* Available space in /var/lib: {available_space_gb:.1f}GB (>= {MIN_AVAILABLE_DISK_SPACE_GB:.1f}GB)
+'''     ),
+        buttons=[
+            ('Keep going', True),
             ('Quit', False)
         ]
     ).run()
@@ -230,6 +292,9 @@ def test_internet_speed():
     process_result = subprocess.run([
         'python3', script_path, '--secure', '--json'
         ], capture_output=True, text=True)
+
+    # Remove download leftovers
+    script_path.unlink()
 
     if process_result.returncode != 0:
         print(f'Unable to run speedtest script. Return code {process_result.returncode}')
@@ -312,10 +377,6 @@ enough to be a fully working validator. Here are your results:
     ).run()
 
     return result
-
-    # Remove download leftovers
-    script_path.unlink()
-
 
 def select_network():
     # Prompt for the selection on which network to perform the installation
