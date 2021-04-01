@@ -227,21 +227,21 @@ def test_disk_size():
     if available_space_gb is None:
         print('Unable to test disk size. Unexpected output from df command. {process_output}')
         return False
-    
+
     if not available_space_gb >= MIN_AVAILABLE_DISK_SPACE_GB:
         result = button_dialog(
-            title='Disk size failed',
-            text=(
+            title=HTML('Disk size test <style bg="red" fg="black">failed</style>'),
+            text=(HTML(
 f'''
-Your available space results seem to indicate that your disk size is lower
-than what would be required to be a fully working validator. Here are your
+Your available space results seem to indicate that <style bg="red" fg="black">your disk size is <b>lower
+than</b> what would be required</style> to be a fully working validator. Here are your
 results:
 
 * Available space in /var/lib: {available_space_gb:.1f}GB (>= {MIN_AVAILABLE_DISK_SPACE_GB:.1f}GB)
 
 It might still be possible to be a validator but you should consider a
 larger disk for your system.
-'''         ),
+'''         )),
             buttons=[
                 ('Keep going', True),
                 ('Quit', False)
@@ -251,14 +251,14 @@ larger disk for your system.
         return result
 
     result = button_dialog(
-        title='Disk size passed',
-        text=(
+        title=HTML('Disk size test <style bg="green" fg="white">passed</style>'),
+        text=(HTML(
 f'''
-Your available space results seem to indicate that your disk size is large
-enough to be a fully working validator. Here are your results:
+Your available space results seem to indicate that <style bg="green" fg="white">your disk size is <b>large
+enough</b></style> to be a fully working validator. Here are your results:
 
 * Available space in /var/lib: {available_space_gb:.1f}GB (>= {MIN_AVAILABLE_DISK_SPACE_GB:.1f}GB)
-'''     ),
+'''     )),
         buttons=[
             ('Keep going', True),
             ('Quit', False)
@@ -350,11 +350,11 @@ def test_disk_speed():
         k_write_iops >= MIN_SUSTAINED_K_WRITE_IOPS):
 
         result = button_dialog(
-            title='Disk speed failed',
-            text=(
+            title=HTML('Disk speed test <style bg="red" fg="black">failed</style>'),
+            text=(HTML(
 f'''
-Your disk speed results seem to indicate that your disk is slower than
-what would be required to be a fully working validator. Here are your
+Your disk speed results seem to indicate that <style bg="red" fg="black">your disk is <b>slower than</b>
+what would be required</style> to be a fully working validator. Here are your
 results:
 
 * Read speed: {k_read_iops:.1f}K read IOPS (>= {MIN_SUSTAINED_K_READ_IOPS:.1f}K sustained read IOPS)
@@ -362,7 +362,7 @@ results:
 
 It might still be possible to be a validator but you should consider a
 faster disk.
-'''         ),
+'''         )),
             buttons=[
                 ('Keep going', True),
                 ('Quit', False)
@@ -372,15 +372,15 @@ faster disk.
         return result
 
     result = button_dialog(
-        title='Disk speed passed',
-        text=(
+        title=HTML('Disk speed test <style bg="green" fg="white">passed</style>'),
+        text=(HTML(
 f'''
-Your disk speed results seem to indicate that your disk is fast enough to
+Your disk speed results seem to indicate that <style bg="green" fg="white">your disk is <b>fast enough</b></style> to
 be a fully working validator. Here are your results:
 
 * Read speed: {k_read_iops:.1f}K read IOPS (>= {MIN_SUSTAINED_K_READ_IOPS:.1f}K sustained read IOPS)
 * Write speed: {k_write_iops:.1f}K write IOPS (>= {MIN_SUSTAINED_K_WRITE_IOPS:.1f}K sustained write IOPS)
-'''     ),
+'''     )),
         buttons=[
             ('Keep going', True),
             ('Quit', False)
@@ -456,11 +456,11 @@ def test_internet_speed():
     if not (down_mbs >= MIN_DOWN_MBS and up_mbs >= MIN_UP_MBS):
 
         result = button_dialog(
-            title='Speedtest failed',
-            text=(
+            title=HTML('Internet speed test <style bg="red" fg="black">failed</style>'),
+            text=(HTML(
 f'''
-Your speedtest results seem to indicate that your Internet speed is lower
-than what would be required to be a fully working validator. Here are your
+Your speedtest results seem to indicate that <style bg="red" fg="black">your Internet speed is <b>lower
+than</b> what would be required</style> to be a fully working validator. Here are your
 results:
 
 * Download speed: {down_mbs:.1f}MB/s (>= {MIN_DOWN_MBS:.1f}MB/s)
@@ -472,7 +472,7 @@ results:
 
 It might still be possible to be a validator but you should consider an
 improved Internet plan or a different Internet service provider.
-'''         ),
+'''         )),
             buttons=[
                 ('Keep going', True),
                 ('Quit', False)
@@ -482,11 +482,11 @@ improved Internet plan or a different Internet service provider.
         return result
 
     result = button_dialog(
-        title='Speedtest passed',
-        text=(
+        title=HTML('Internet speed test <style bg="green" fg="white">passed</style>'),
+        text=(HTML(
 f'''
-Your speedtest results seem to indicate that your Internet speed is good
-enough to be a fully working validator. Here are your results:
+Your speedtest results seem to indicate that <style bg="green" fg="white">your Internet speed is <b>good
+enough</b></style> to be a fully working validator. Here are your results:
 
 * Download speed: {down_mbs:.1f}MB/s (>= {MIN_DOWN_MBS:.1f}MB/s)
 * Upload speed: {up_mbs:.1f}MB/s (>= {MIN_UP_MBS:.1f}MB/s)
@@ -494,7 +494,7 @@ enough to be a fully working validator. Here are your results:
 * Server name: {server_name}
 * Server country: {server_country}
 * Server location: {server_lat}, {server_lon}
-'''     ),
+'''     )),
         buttons=[
             ('Keep going', True),
             ('Quit', False)
@@ -2148,7 +2148,7 @@ verify its SHA256 checksum, extract it and start it.
 The eth2.0-deposit-cli tool is executed in an interactive way where you
 have to answer a few questions. It will help you create a mnemonic from
 which all your keys will be derived from. The mnemonic is the ultimate key.
-It is <style fg="black" bg="red"><b>VERY IMPORTANT</b></style> to securely and privately store your mnemonic. It can
+It is <style bg="red" fg="black"><b>VERY IMPORTANT</b></style> to securely and privately store your mnemonic. It can
 be used to recreate your validator keys and eventually withdraw your funds.
 
 When asked how many validators you wish to run, remember that you will have
@@ -2167,7 +2167,7 @@ to do a 32 {currency} deposit for each validator.
         title='CAUTION',
         text=(HTML(
 f'''
-<style fg="black" bg="red">If the <b>mnemonic</b> you are about to create is lost or stolen, you will also
+<style bg="red" fg="black">If the <b>mnemonic</b> you are about to create is lost or stolen, you will also
 lose your funds.</style>
 '''     )),
         buttons=[
