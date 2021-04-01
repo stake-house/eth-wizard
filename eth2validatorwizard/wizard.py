@@ -52,7 +52,9 @@ def run():
         if not test_disk_size():
             # User asked to quit
             quit()
-        # TODO: Check for disk speed
+        if not test_disk_speed():
+            # User asked to quit
+            quit()
         # TODO: Check for available RAM
         if not test_internet_speed():
             # User asked to quit
@@ -190,9 +192,9 @@ We can test your system to make sure it is fit for being a validator. Here
 is the list of tests we will perform:
 
 * Opened ports (2 ports: 1 port for eth1 and 1 port for eth2 beacon node)
-* Disk size (>= {MIN_AVAILABLE_DISK_SPACE_GB:.0f} GB of available space)
-* Disk speed (>= 3k sustained read IOPS and >= 1k sustained write IOPS)
-* Memory size (>= 8 GB of available RAM)
+* Disk size (>= {MIN_AVAILABLE_DISK_SPACE_GB:.0f}GB of available space)
+* Disk speed (>= {MIN_SUSTAINED_K_READ_IOPS:.1f}K sustained read IOPS and >= {MIN_SUSTAINED_K_WRITE_IOPS:.1f}K sustained write IOPS)
+* Memory size (>= 8GB of available RAM)
 * Internet speed (>= {MIN_DOWN_MBS:.1f}MB/s down and >= {MIN_UP_MBS:.1f}MB/s up)
 
 Do you want to test your system?
@@ -231,7 +233,7 @@ def test_disk_size():
             title='Disk size failed',
             text=(
 f'''
-Your available space results seems to indicate that your disk size is lower
+Your available space results seem to indicate that your disk size is lower
 than what would be required to be a fully working validator. Here are your
 results:
 
@@ -252,10 +254,132 @@ larger disk for your system.
         title='Disk size passed',
         text=(
 f'''
-Your available space results seems to indicate that your disk size is large
+Your available space results seem to indicate that your disk size is large
 enough to be a fully working validator. Here are your results:
 
 * Available space in /var/lib: {available_space_gb:.1f}GB (>= {MIN_AVAILABLE_DISK_SPACE_GB:.1f}GB)
+'''     ),
+        buttons=[
+            ('Keep going', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    return result
+
+def test_disk_speed():
+    # Install fio using APT
+    subprocess.run([
+        'apt', '-y', 'update'])
+    subprocess.run([
+        'apt', '-y', 'install', 'fio'])
+    
+    # Run fio test
+    fio_path = Path(Path.home(), 'eth2validatorwizard', 'fio')
+    fio_path.mkdir(parents=True, exist_ok=True)
+
+    fio_target_filename = 'random_read_write.fio'
+    fio_output_filename = 'fio.out'
+
+    fio_target_path = Path(fio_path, fio_target_filename)
+    fio_output_path = Path(fio_path, fio_output_filename)
+
+    process_result = subprocess.run([
+        'fio', '--randrepeat=1', '--ioengine=libaio', '--direct=1', '--gtod_reduce=1',
+        '--name=test', '--filename=' + fio_target_filename, '--bs=4k', '--iodepth=64',
+        '--size=4G', '--readwrite=randrw', '--rwmixread=75', '--output=' + fio_output_filename,
+        '--output-format=json'
+        ], cwd=fio_path)
+
+    if process_result.returncode != 0:
+        print(f'Error while running fio disk test. Return code {process_result.returncode}')
+        return False
+    
+    # Remove test file
+    fio_target_path.unlink()
+
+    results_json = None
+
+    with open(fio_output_path, 'r') as output_file:
+        results_json = json.loads(output_file.read(8 * 1024 * 20))
+
+    # Remove test results
+    fio_output_path.unlink()
+
+    if results_json is None:
+        print('Could not read the results from fio output file.')
+        return False
+    
+    if 'jobs' not in results_json or type(results_json['jobs']) is not list:
+        print('Unexpected structure from fio output file. No jobs list.')
+        return False
+    
+    jobs = results_json['jobs']
+
+    # Find our test job and the results
+    test_job = None
+    for job in jobs:
+        if 'jobname' not in job:
+            print('Unexpected structure from fio output file. No jobname in a job.')
+            return False
+        jobname = job['jobname']
+        if jobname == 'test':
+            test_job = job
+            break
+
+    if test_job is None:
+        print('Unable to find our test job in fio output file.')
+        return False
+    
+    if not (
+        'read' in test_job and
+        'iops' in test_job['read'] and
+        type(test_job['read']['iops']) is float and
+        'write' in test_job and
+        'iops' in test_job['write'] and
+        type(test_job['write']['iops']) is float):
+        print('Unexpected structure from fio output file. No read or write iops.')
+        return False
+    
+    k_read_iops = test_job['read']['iops'] / 1000.0
+    k_write_iops = test_job['write']['iops'] / 1000.0
+
+    # Test if disk speed is above minimal values
+    if not (
+        k_read_iops >= MIN_SUSTAINED_K_READ_IOPS and
+        k_write_iops >= MIN_SUSTAINED_K_WRITE_IOPS):
+
+        result = button_dialog(
+            title='Disk speed failed',
+            text=(
+f'''
+Your disk speed results seem to indicate that your disk is slower than
+what would be required to be a fully working validator. Here are your
+results:
+
+* Read speed: {k_read_iops:.1f}K read IOPS (>= {MIN_SUSTAINED_K_READ_IOPS:.1f}K sustained read IOPS)
+* Write speed: {k_write_iops:.1f}K write IOPS (>= {MIN_SUSTAINED_K_WRITE_IOPS:.1f}K sustained write IOPS)
+
+It might still be possible to be a validator but you should consider a
+faster disk.
+'''         ),
+            buttons=[
+                ('Keep going', True),
+                ('Quit', False)
+            ]
+        ).run()
+
+        return result
+
+    result = button_dialog(
+        title='Disk speed passed',
+        text=(
+f'''
+Your disk speed results seem to indicate that your disk is fast enough to
+be a fully working validator. Here are your results:
+
+* Read speed: {k_read_iops:.1f}K read IOPS (>= {MIN_SUSTAINED_K_READ_IOPS:.1f}K sustained read IOPS)
+* Write speed: {k_write_iops:.1f}K write IOPS (>= {MIN_SUSTAINED_K_WRITE_IOPS:.1f}K sustained write IOPS)
 '''     ),
         buttons=[
             ('Keep going', True),
@@ -328,12 +452,14 @@ def test_internet_speed():
         server_lat = speedtest_server.get('lat', 'unknown')
         server_lon = speedtest_server.get('lon', 'unknown')
 
+    # Test if Internet speed is above minimal values
     if not (down_mbs >= MIN_DOWN_MBS and up_mbs >= MIN_UP_MBS):
+
         result = button_dialog(
             title='Speedtest failed',
             text=(
 f'''
-Your speedtest results seems to indicate that your Internet speed is lower
+Your speedtest results seem to indicate that your Internet speed is lower
 than what would be required to be a fully working validator. Here are your
 results:
 
@@ -359,7 +485,7 @@ improved Internet plan or a different Internet service provider.
         title='Speedtest passed',
         text=(
 f'''
-Your speedtest results seems to indicate that your Internet speed is good
+Your speedtest results seem to indicate that your Internet speed is good
 enough to be a fully working validator. Here are your results:
 
 * Download speed: {down_mbs:.1f}MB/s (>= {MIN_DOWN_MBS:.1f}MB/s)
@@ -559,7 +685,7 @@ Do you want to skip installing the geth binary?
         subprocess.run([
             'add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
         subprocess.run([
-            'apt', 'update'])
+            'apt', '-y', 'update'])
         subprocess.run([
             'apt', '-y', 'install', 'geth'])
     

@@ -17,8 +17,11 @@ SPEEDTEST_SCRIPT_URL = 'https://raw.githubusercontent.com/sivel/speedtest-cli/ma
 
 MIN_AVAILABLE_DISK_SPACE_GB = 900.0
 
-MIN_DOWN_MBS = 5.0
-MIN_UP_MBS = 5.0
+MIN_SUSTAINED_K_READ_IOPS = 3.0
+MIN_SUSTAINED_K_WRITE_IOPS = 1.0
+
+MIN_DOWN_MBS = 4.5
+MIN_UP_MBS = 4.5
 
 LAUNCHPAD_URLS = {
     NETWORK_MAINNET: 'https://launchpad.ethereum.org',
