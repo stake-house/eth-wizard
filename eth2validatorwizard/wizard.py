@@ -233,9 +233,9 @@ def test_disk_size():
             title=HTML('Disk size test <style bg="red" fg="black">failed</style>'),
             text=(HTML(
 f'''
-Your available space results seem to indicate that <style bg="red" fg="black">your disk size is <b>lower
-than</b> what would be required</style> to be a fully working validator. Here are your
-results:
+Your available space results seem to indicate that <style bg="red" fg="black">your disk size is
+<b>smaller than</b> what would be required</style> to be a fully working validator. Here are
+your results:
 
 * Available space in /var/lib: {available_space_gb:.1f}GB (>= {MIN_AVAILABLE_DISK_SPACE_GB:.1f}GB)
 
@@ -459,7 +459,7 @@ def test_internet_speed():
             title=HTML('Internet speed test <style bg="red" fg="black">failed</style>'),
             text=(HTML(
 f'''
-Your speedtest results seem to indicate that <style bg="red" fg="black">your Internet speed is <b>lower
+Your speedtest results seem to indicate that <style bg="red" fg="black">your Internet speed is <b>slower
 than</b> what would be required</style> to be a fully working validator. Here are your
 results:
 
@@ -485,7 +485,7 @@ improved Internet plan or a different Internet service provider.
         title=HTML('Internet speed test <style bg="green" fg="white">passed</style>'),
         text=(HTML(
 f'''
-Your speedtest results seem to indicate that <style bg="green" fg="white">your Internet speed is <b>good
+Your speedtest results seem to indicate that <style bg="green" fg="white">your Internet speed is <b>fast
 enough</b></style> to be a fully working validator. Here are your results:
 
 * Download speed: {down_mbs:.1f}MB/s (>= {MIN_DOWN_MBS:.1f}MB/s)
