@@ -49,7 +49,6 @@ def run():
 
     if want_to_test == 1:
         # TODO: Check for opened ports
-        # TODO: Check for disk size
         if not test_disk_size():
             # User asked to quit
             quit()
