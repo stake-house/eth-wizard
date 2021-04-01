@@ -37,10 +37,25 @@ def run():
         # User asked to quit
         quit()
 
-    # TODO: Check for open ports
-    # TODO: Check for disk size
-    # TODO: Check for disk speed
-    # TODO: Check for internet speed
+    selected_ports = {
+        'eth1': DEFAULT_GETH_PORT,
+        'eth2_bn': DEFAULT_LIGHTHOUSE_BN_PORT
+    }
+
+    want_to_test = show_test_overview()
+    if not want_to_test:
+        # User asked to quit
+        quit()
+
+    if want_to_test == 1:
+        # TODO: Check for opened ports
+        # TODO: Check for disk size
+        # TODO: Check for disk speed
+        # TODO: Check for internet speed
+        if not test_internet_speed():
+            # User asked to quit
+            quit()
+    
     # TODO: Check time synchronization and configure it if needed
 
     selected_network = select_network()
@@ -48,7 +63,7 @@ def run():
         # User asked to quit
         quit()
 
-    if not install_geth(selected_network):
+    if not install_geth(selected_network, selected_ports):
         # User asked to quit or error
         quit()
 
@@ -57,7 +72,7 @@ def run():
         # User asked to quit
         quit()
 
-    if not install_lighthouse(selected_network, selected_eth1_fallbacks):
+    if not install_lighthouse(selected_network, selected_eth1_fallbacks, selected_ports):
         # User asked to quit or error
         quit()
 
@@ -162,6 +177,145 @@ a large amount of active validators using a single machine and this setup)
 
     return result
 
+def show_test_overview():
+    # Show the overall tests to perform
+
+    result = button_dialog(
+        title='Testing your system',
+        text=(
+f'''
+We can test your system to make sure it is fit for being a validator. Here
+is the list of tests we will perform:
+
+* Opened ports (2 ports: 1 port for eth1 and 1 port for eth2 beacon node)
+* Disk size (>= 900 GB of available space)
+* Disk speed (>= 3k sustained read IOPS and >= 1k sustained write IOPS)
+* Internet speed (>= {MIN_DOWN_MBS:.1f}MB/s down and >= {MIN_UP_MBS:.1f}MB/s up)
+
+Do you want to test your system?
+'''     ),
+        buttons=[
+            ('Test', 1),
+            ('Skip', 2),
+            ('Quit', False)
+        ]
+    ).run()
+
+    return result
+
+def test_internet_speed():
+    # Downloading speedtest script
+    download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
+    download_path.mkdir(parents=True, exist_ok=True)
+
+    script_path = Path(download_path, 'speedtest-cli')
+
+    try:
+        with open(script_path, 'wb') as binary_file:
+            with httpx.stream('GET', SPEEDTEST_SCRIPT_URL) as http_stream:
+                if http_stream.status_code != 200:
+                    print('HTTP error while downloading speedtest-cli script. '
+                        f'Status code {http_stream.status_code}')
+                    return False
+                for data in http_stream.iter_bytes():
+                    binary_file.write(data)
+    except httpx.RequestError as exception:
+        print(f'Exception while downloading speedtest-cli script. {exception}')
+        return False
+    
+    # Run speedtest script
+    print('Running speedtest...')
+
+    process_result = subprocess.run([
+        'python3', script_path, '--secure', '--json'
+        ], capture_output=True, text=True)
+
+    if process_result.returncode != 0:
+        print(f'Unable to run speedtest script. Return code {process_result.returncode}')
+        print(f'{process_result.stdout}\n{process_result.stderr}')
+        return False
+
+    process_output = process_result.stdout
+    speedtest_results = json.loads(process_output)
+
+    if (
+        'download' not in speedtest_results or
+        type(speedtest_results['download']) is not float or
+        'upload' not in speedtest_results or
+        type(speedtest_results['upload']) is not float
+    ):
+        print(f'Unexpected response from speedtest. \n {speedtest_results}')
+        return False
+    
+    down_mbs = speedtest_results['download'] / 1000000.0 / 8.0
+    up_mbs = speedtest_results['upload'] / 1000000.0 / 8.0
+    speedtest_server = speedtest_results.get('server', None)
+    server_sponsor = 'unknown'
+    server_name = 'unknown'
+    server_country = 'unknown'
+    server_lat = 'unknown'
+    server_lon = 'unknown'
+
+    if speedtest_server is not None:
+        server_sponsor = speedtest_server.get('sponsor', 'unknown')
+        server_name = speedtest_server.get('name', 'unknown')
+        server_country = speedtest_server.get('country', 'unknown')
+        server_lat = speedtest_server.get('lat', 'unknown')
+        server_lon = speedtest_server.get('lon', 'unknown')
+
+    if not (down_mbs >= MIN_DOWN_MBS and up_mbs >= MIN_UP_MBS):
+        result = button_dialog(
+            title='Speedtest failed',
+            text=(
+f'''
+Your speedtest results seems to indicate that your Internet speed is lower
+than what would be required to be a fully working validator. Here are your
+results:
+
+* Download speed: {down_mbs:.1f}MB/s (>= {MIN_DOWN_MBS:.1f}MB/s)
+* Upload speed: {up_mbs:.1f}MB/s (>= {MIN_UP_MBS:.1f}MB/s)
+* Server sponsor: {server_sponsor}
+* Server name: {server_name}
+* Server country: {server_country}
+* Server location: {server_lat}, {server_lon}
+
+It might still be possible to be a validator but you should consider an
+improved Internet plan or a different Internet service provider.
+'''         ),
+            buttons=[
+                ('Keep going', True),
+                ('Quit', False)
+            ]
+        ).run()
+
+        return result
+
+    result = button_dialog(
+        title='Speedtest passed',
+        text=(
+f'''
+Your speedtest results seems to indicate that your Internet speed is good
+enough to be a fully working validator. Here are your results:
+
+* Download speed: {down_mbs:.1f}MB/s (>= {MIN_DOWN_MBS:.1f}MB/s)
+* Upload speed: {up_mbs:.1f}MB/s (>= {MIN_UP_MBS:.1f}MB/s)
+* Server sponsor: {server_sponsor}
+* Server name: {server_name}
+* Server country: {server_country}
+* Server location: {server_lat}, {server_lon}
+'''     ),
+        buttons=[
+            ('Keep going', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    return result
+
+    # Remove download leftovers
+    script_path.unlink()
+
+
 def select_network():
     # Prompt for the selection on which network to perform the installation
 
@@ -189,7 +343,7 @@ For which network would you like to perform this installation?
 
     return result
 
-def install_geth(network):
+def install_geth(network, ports):
     # Install geth for the selected network
 
     # Check for existing systemd service
@@ -996,7 +1150,7 @@ def uri_validator(uri):
     except:
         return False
 
-def install_lighthouse(network, eth1_fallbacks):
+def install_lighthouse(network, eth1_fallbacks, ports):
     # Install Lighthouse for the selected network
 
     # Check for existing systemd service
@@ -2313,16 +2467,16 @@ def initiate_deposit(network, keys):
     # TODO: Create an alternative way to easily obtain the deposit file with a simple HTTP server
 
     result = button_dialog(
-        title='Deposit on the launch pad',
+        title='Deposit on the launchpad',
         text=(
 f'''
-This next step is to perform the 32 {currency} deposit(s) on the launch pad. In
+This next step is to perform the 32 {currency} deposit(s) on the launchpad. In
 order to do this deposit, you will need your deposit file which was created
 during the key generation step. A copy of your deposit file can be found in
 
 {deposit_file_copy_path}
 
-On the Eth2 Launch Pad website, you will be asked a few questions and it
+On the Eth2 Launchpad website, you will be asked a few questions and it
 will explain some of the risks and mitigation strategies. Make sure to read
 everything carefully and make sure you understand it all. When you are
 ready, go to the following URL in your browser:

@@ -10,6 +10,14 @@ NETWORK_MAINNET = 'mainnet'
 NETWORK_PYRMONT = 'pyrmont'
 NETWORK_PRATER = 'prater'
 
+DEFAULT_GETH_PORT = 30303
+DEFAULT_LIGHTHOUSE_BN_PORT = 9000
+
+SPEEDTEST_SCRIPT_URL = 'https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py'
+
+MIN_DOWN_MBS = 5.0
+MIN_UP_MBS = 5.0
+
 LAUNCHPAD_URLS = {
     NETWORK_MAINNET: 'https://launchpad.ethereum.org',
     NETWORK_PYRMONT: 'https://pyrmont.launchpad.ethereum.org',
