@@ -51,7 +51,7 @@ def run():
         # TODO: Check for opened ports
         # TODO: Check for disk size
         # TODO: Check for disk speed
-        # TODO: Check for internet speed
+        # TODO: Check for available RAM
         if not test_internet_speed():
             # User asked to quit
             quit()
@@ -190,6 +190,7 @@ is the list of tests we will perform:
 * Opened ports (2 ports: 1 port for eth1 and 1 port for eth2 beacon node)
 * Disk size (>= 900 GB of available space)
 * Disk speed (>= 3k sustained read IOPS and >= 1k sustained write IOPS)
+* Memory size (>= 8 GB of available RAM)
 * Internet speed (>= {MIN_DOWN_MBS:.1f}MB/s down and >= {MIN_UP_MBS:.1f}MB/s up)
 
 Do you want to test your system?
