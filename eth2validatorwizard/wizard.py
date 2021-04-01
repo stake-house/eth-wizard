@@ -2431,20 +2431,20 @@ client?
 
     result = button_dialog(
         title='Lighthouse validator client',
-        text=(
+        text=(HTML(
 '''
 This next step will import your keystore(s) to be used with the Lighthouse
 validator client and it will configure the Lighthouse validator client.
 
 During the importation process, you will be asked to enter the password
-you typed during the keys generation step. It is not your mnemonic. Do not
-omit typing your password during this importation process.
+you typed during the keys generation step. It is not your mnemonic. <style bg="red" fg="black">Do not
+omit typing your password during this importation process.</style>
 
 It will create a systemd service that will automatically start the
 Lighthouse validator client on reboot or if it crashes. The validator
 client will be started, it will connect to your beacon node and it will be
 ready to start validating once your validator(s) get activated.
-'''     ),
+'''     )),
         buttons=[
             ('Configure', True),
             ('Quit', False)
