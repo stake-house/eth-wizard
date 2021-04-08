@@ -127,8 +127,8 @@ def show_unsupported_platform():
 The Eth2 Validator Wizard has no support for your platform. We only support
 the following platforms:
 
-* <b>Ubuntu 20.04</b> (64 bit)
-* <b>Windows 10</b> (64 bit)
+* <b>Ubuntu 20.04</b> (x86_64)
+* <b>Windows 10</b> (amd64)
 '''     )),
         buttons=[
             ('Quit', False)
