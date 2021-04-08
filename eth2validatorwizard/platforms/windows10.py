@@ -4,7 +4,8 @@ import ctypes
 import sys
 import codecs
 import base64
-import os
+
+from pathlib import Path
 
 from eth2validatorwizard.constants import *
 
@@ -22,6 +23,9 @@ def installation_steps(*args, **kwargs):
         print('Press enter to quit')
         input()
         quit()
+    
+    print('Press enter to quit')
+    input()
 
 def install_chocolatey():
     # Install chocolatey to obtain other tools
@@ -56,44 +60,60 @@ def install_chocolatey():
 def install_nssm():
     # Install nssm for service management
 
-    env = os.environ.copy()
-    env['PATH'] = env['PATH'] + ';' + CHOCOLATEY_DEFAULT_BIN_PATH
+    choco_path = Path(CHOCOLATEY_DEFAULT_BIN_PATH, 'choco')
 
     # Check to see if choco is installed
     choco_installed = False
 
     try:
-        process_result = subprocess.run(['choco', '--version'], env=env)
+        process_result = subprocess.run(['choco', '--version'])
 
         if process_result.returncode == 0:
             choco_installed = True
     except FileNotFoundError:
-        choco_installed = False
+        try:
+            process_result = subprocess.run([choco_path, '--version'])
+
+            if process_result.returncode == 0:
+                choco_installed = True
+        except FileNotFoundError:
+            choco_installed = False
 
     if not choco_installed:
         print('We could not find choco. You might need to close this '
-            'windows and restart the wizard to continue.')
+            'window and restart the wizard to continue.')
         return False
+
+    nssm_path = Path(CHOCOLATEY_DEFAULT_BIN_PATH, 'nssm')
 
     # Check to see if nssm is already installed
     nssm_installed = False
 
     try:
-        process_result = subprocess.run(['nssm', '--version'], env=env)
+        process_result = subprocess.run(['nssm', '--version'])
 
         if process_result.returncode == 0:
             nssm_installed = True
-            
-            print('NSSM is already installed, no need to install it')
-
+        
     except FileNotFoundError:
-        nssm_installed = False
+        try:
+            process_result = subprocess.run([nssm_path, '--version'])
+
+            if process_result.returncode == 0:
+                nssm_installed = True
+        except FileNotFoundError:
+            nssm_installed = False
     
     if nssm_installed:
+        print('NSSM is already installed, no need to install it')
         return True
     
-    subprocess.run([
-        'choco', 'install', '-y', 'nssm'], env=env)
+    try:
+        subprocess.run([
+            'choco', 'install', '-y', 'nssm'])
+    except FileNotFoundError:
+        subprocess.run([
+            choco_path, 'install', '-y', 'nssm'])
     
     return True
     
