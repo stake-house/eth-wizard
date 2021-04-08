@@ -11,7 +11,6 @@ import re
 from pathlib import Path
 from urllib.parse import urlparse
 
-from eth2validatorwizard import __version__
 from eth2validatorwizard.constants import *
 
 from prompt_toolkit.formatted_text import HTML

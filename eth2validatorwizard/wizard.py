@@ -1,5 +1,4 @@
 from eth2validatorwizard import __version__
-from eth2validatorwizard.constants import *
 
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog
