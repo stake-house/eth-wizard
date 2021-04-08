@@ -1439,6 +1439,12 @@ Do you want to skip installing the lighthouse binary?
             print('Exception while downloading Lighthouse signature from Github')
             return False
 
+        # Install gpg using APT
+        subprocess.run([
+            'apt', '-y', 'update'])
+        subprocess.run([
+            'apt', '-y', 'install', 'gpg'])
+
         # Verify PGP signature
         command_line = ['gpg', '--keyserver', 'pool.sks-keyservers.net', '--recv-keys',
             LIGHTHOUSE_PRIME_PGP_KEY_ID]
