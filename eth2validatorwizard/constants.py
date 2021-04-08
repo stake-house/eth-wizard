@@ -23,6 +23,8 @@ MIN_SUSTAINED_K_WRITE_IOPS = 1.0
 MIN_DOWN_MBS = 4.5
 MIN_UP_MBS = 4.5
 
+CHOCOLATEY_DEFAULT_BIN_PATH = r'C:\ProgramData\chocolatey\bin'
+
 LAUNCHPAD_URLS = {
     NETWORK_MAINNET: 'https://launchpad.ethereum.org',
     NETWORK_PYRMONT: 'https://pyrmont.launchpad.ethereum.org',

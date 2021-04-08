@@ -4,6 +4,9 @@ import ctypes
 import sys
 import codecs
 import base64
+import os
+
+from eth2validatorwizard.constants import *
 
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog, radiolist_dialog, input_dialog
@@ -12,11 +15,12 @@ RESUME_CHOCOLATEY = 'resume_chocolatey'
 
 def installation_steps(*args, **kwargs):
 
-    if 'resume_chocolatey' not in kwargs:
-        install_chocolatey()
+    install_chocolatey()
 
     if not install_nssm():
         # We could not install nssm
+        print('Press enter to quit')
+        input()
         quit()
 
 def install_chocolatey():
@@ -52,11 +56,14 @@ def install_chocolatey():
 def install_nssm():
     # Install nssm for service management
 
+    env = os.environ.copy()
+    env['PATH'] = env['PATH'] + ';' + CHOCOLATEY_DEFAULT_BIN_PATH
+
     # Check to see if choco is installed
     choco_installed = False
 
     try:
-        process_result = subprocess.run(['choco', '--version'])
+        process_result = subprocess.run(['choco', '--version'], env=env)
 
         if process_result.returncode == 0:
             choco_installed = True
@@ -72,7 +79,7 @@ def install_nssm():
     nssm_installed = False
 
     try:
-        process_result = subprocess.run(['nssm', '--version'])
+        process_result = subprocess.run(['nssm', '--version'], env=env)
 
         if process_result.returncode == 0:
             nssm_installed = True
@@ -86,7 +93,7 @@ def install_nssm():
         return True
     
     subprocess.run([
-        'choco', 'install', '-y', 'nssm'])
+        'choco', 'install', '-y', 'nssm'], env=env)
     
     return True
     
