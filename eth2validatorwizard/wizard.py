@@ -8,12 +8,6 @@ from eth2validatorwizard.platform import get_install_steps, supported_platform, 
 def run():
     # Main entry point for the wizard.
 
-    if not show_welcome():
-        # User asked to quit
-        quit()
-
-    self_update()
-
     platform = supported_platform()
 
     if not platform:
@@ -25,6 +19,12 @@ def run():
         # User is not a super user
         show_not_su()
         quit()
+    
+    if not show_welcome():
+        # User asked to quit
+        quit()
+
+    self_update()
 
     # TODO: Detect if installation is already started and resume if needed
 

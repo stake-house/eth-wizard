@@ -2,6 +2,8 @@ import os
 import platform
 import subprocess
 import re
+import ctypes
+import sys
 
 from packaging import version
 
@@ -66,9 +68,23 @@ def has_su_perm(platform):
         # Check to see if the script has super user (root or sudo) permissions
         return os.geteuid() == 0
     elif platform == PLATFORM_WINDOWS10:
-        # TODO Implement windows elevated privilege test and automatic privilege elevation
-        # See https://stackoverflow.com/questions/130763/request-uac-elevation-from-within-a-python-script
-        return False
+        perform_elevation = False
+        try:
+            if ctypes.windll.shell32.IsUserAnAdmin():
+                return True
+            else:
+                perform_elevation = True
+        except:
+            perform_elevation = True
+        
+        if perform_elevation:
+            ctypes.windll.shell32.ShellExecuteW(
+                None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+        
+        # End the unprivileged process
+        quit()
+    
+    return False
 
 def get_install_steps(platform):
     if platform == PLATFORM_UBUNTU:
