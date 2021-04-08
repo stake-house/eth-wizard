@@ -12,6 +12,8 @@ from packaging import version
 from eth2validatorwizard.platforms.ubuntu import installation_steps as ubuntu_steps
 from eth2validatorwizard.platforms.windows10 import installation_steps as windows10_steps
 
+from eth2validatorwizard.platforms.windows10 import RESUME_CHOCOLATEY
+
 PLATFORM_UBUNTU = 'Ubuntu'
 PLATFORM_WINDOWS10 = 'Windows10'
 
@@ -100,3 +102,12 @@ def get_install_steps(platform):
         return windows10_steps
     
     return False
+
+def resume_step(platform):
+    if platform == PLATFORM_WINDOWS10:
+        if RESUME_CHOCOLATEY in sys.argv:
+            windows10_steps(resume_chocolatey=True)
+            return True
+    
+    return False
+        

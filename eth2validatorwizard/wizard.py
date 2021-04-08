@@ -4,6 +4,7 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog
 
 from eth2validatorwizard.platforms import get_install_steps, supported_platform, has_su_perm
+from eth2validatorwizard.platforms import resume_step
 
 def run():
     # Main entry point for the wizard.
@@ -20,13 +21,16 @@ def run():
         show_not_su()
         quit()
     
+    # TODO: Detect if installation is already started and resume if needed
+    if resume_step(platform):
+        # We have resumed from a previous step, skip other steps
+        quit()
+
     if not show_welcome():
         # User asked to quit
         quit()
 
     self_update()
-
-    # TODO: Detect if installation is already started and resume if needed
 
     if not explain_overview():
         # User asked to quit
