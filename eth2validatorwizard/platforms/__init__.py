@@ -81,12 +81,12 @@ def has_su_perm(platform):
         except:
             perform_elevation = True
         
-        if perform_elevation:            
+        if perform_elevation:
             pythonpath_env = rf'$env:PYTHONPATH = "{";".join(sys.path)}";'
             target_command = pythonpath_env + sys.executable + ' ' + " ".join(sys.argv)
             encoded_command = base64.b64encode(codecs.encode(target_command, 'utf_16_le'))
             encoded_command = codecs.decode(encoded_command, 'ascii')
-            args = f'-NoExit -NoProfile -EncodedCommand {encoded_command}'
+            args = f'-NoProfile -EncodedCommand {encoded_command}'
             ctypes.windll.shell32.ShellExecuteW(
                 None, 'runas', 'powershell', args, None, 1)
         

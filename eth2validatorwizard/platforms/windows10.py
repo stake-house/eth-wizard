@@ -15,7 +15,9 @@ def installation_steps(*args, **kwargs):
     if 'resume_chocolatey' not in kwargs:
         install_chocolatey()
 
-    install_nssm()
+    if not install_nssm():
+        # We could not install nssm
+        quit()
 
 def install_chocolatey():
     # Install chocolatey to obtain other tools
@@ -45,32 +47,32 @@ def install_chocolatey():
         "& {Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))}"
         ])
 
-    reload_delay = 5
-
-    print(f'We need to reload the session to continue here. Reloading in {reload_delay} seconds.')
-    time.sleep(reload_delay)
-
-    # Refresh or reload environment for access to choco binary
-    pythonpath_env = rf'$env:PYTHONPATH = "{";".join(sys.path)}";'
-    target_command = (
-        pythonpath_env + sys.executable + ' ' + ' '.join(sys.argv) + ' ' + RESUME_CHOCOLATEY)
-    encoded_command = base64.b64encode(codecs.encode(target_command, 'utf_16_le'))
-    encoded_command = codecs.decode(encoded_command, 'ascii')
-    args = f'-NoExit -NoProfile -EncodedCommand {encoded_command}'
-    ctypes.windll.shell32.ShellExecuteW(
-        None, 'runas', 'powershell', args, None, 1)
-    
-    subprocess.run(['exit'])
-    quit()
+    return True
 
 def install_nssm():
     # Install nssm for service management
+
+    # Check to see if choco is installed
+    choco_installed = False
+
+    try:
+        process_result = subprocess.run(['choco', '--version'])
+
+        if process_result.returncode == 0:
+            choco_installed = True
+    except FileNotFoundError:
+        choco_installed = False
+
+    if not choco_installed:
+        print('We could not find choco. You might need to close this '
+            'windows and restart the wizard to continue.')
+        return False
 
     # Check to see if nssm is already installed
     nssm_installed = False
 
     try:
-        process_result = subprocess.run(['nssm'])
+        process_result = subprocess.run(['nssm', '--version'])
 
         if process_result.returncode == 0:
             nssm_installed = True
@@ -84,7 +86,7 @@ def install_nssm():
         return True
     
     subprocess.run([
-        'choco', 'install', 'nssm'])
+        'choco', 'install', '-y', 'nssm'])
     
     return True
     
