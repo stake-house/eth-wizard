@@ -4,11 +4,13 @@ import subprocess
 import re
 import ctypes
 import sys
+import codecs
+import base64
 
 from packaging import version
 
-from eth2validatorwizard.platform.ubuntu import installation_steps as ubuntu_steps
-from eth2validatorwizard.platform.windows10 import installation_steps as windows10_steps
+from eth2validatorwizard.platforms.ubuntu import installation_steps as ubuntu_steps
+from eth2validatorwizard.platforms.windows10 import installation_steps as windows10_steps
 
 PLATFORM_UBUNTU = 'Ubuntu'
 PLATFORM_WINDOWS10 = 'Windows10'
@@ -77,9 +79,14 @@ def has_su_perm(platform):
         except:
             perform_elevation = True
         
-        if perform_elevation:
+        if perform_elevation:            
+            pythonpath_env = rf'$env:PYTHONPATH = "{";".join(sys.path)}";'
+            target_command = pythonpath_env + sys.executable + ' ' + " ".join(sys.argv)
+            encoded_command = base64.b64encode(codecs.encode(target_command, 'utf_16_le'))
+            encoded_command = codecs.decode(encoded_command, 'ascii')
+            args = f'-NoExit -NoProfile -EncodedCommand {encoded_command}'
             ctypes.windll.shell32.ShellExecuteW(
-                None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+                None, 'runas', 'powershell', args, None, 1)
         
         # End the unprivileged process
         quit()

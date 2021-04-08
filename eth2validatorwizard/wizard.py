@@ -3,7 +3,7 @@ from eth2validatorwizard import __version__
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog
 
-from eth2validatorwizard.platform import get_install_steps, supported_platform, has_su_perm
+from eth2validatorwizard.platforms import get_install_steps, supported_platform, has_su_perm
 
 def run():
     # Main entry point for the wizard.
