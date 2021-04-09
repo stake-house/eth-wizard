@@ -568,7 +568,7 @@ Do you want to skip installing the geth binary?
     
     # Check if Geth user or directory already exists
     geth_datadir = Path('/var/lib/goethereum')
-    if geth_datadir.exists and geth_datadir.is_dir():
+    if geth_datadir.is_dir():
         process_result = subprocess.run([
             'du', '-sh', geth_datadir
             ], capture_output=True, text=True)

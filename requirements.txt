@@ -1,3 +1,6 @@
 prompt_toolkit>=3.0.0,<3.1.0
 httpx
 packaging
+
+defusedxml
+python-dateutil

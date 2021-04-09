@@ -59,6 +59,25 @@ BEACONCHA_VALIDATOR_DEPOSITS_API_URL = '/api/v1/validator/{indexOrPubkey}/deposi
 
 ETHEREUM_APT_SOURCE_URL = 'http://ppa.launchpad.net/ethereum/ethereum/ubuntu'
 
+GETH_SERVICE_DISPLAY_NAME = {
+    NETWORK_MAINNET: 'Go Ethereum Client - Geth (Mainnet)',
+    NETWORK_PYRMONT: 'Go Ethereum Client - Geth (Görli)',
+    NETWORK_PRATER: 'Go Ethereum Client - Geth (Görli)'
+}
+
+GNUPG_DOWNLOAD_URL = 'https://www.gnupg.org/download/'
+
+GETH_STORE_BUILDS_URL = 'https://gethstore.blob.core.windows.net/builds'
+GETH_STORE_BUILDS_PARAMS = {
+    'restype': 'container',
+    'comp': 'list',
+    'maxresults': 5000,
+    'prefix': 'geth-'
+}
+GETH_BUILDS_BASE_URL = 'https://gethstore.blob.core.windows.net/builds/'
+
+GETH_WINDOWS_PGP_KEY_ID = '9417309ED2A67EAC'
+
 GETH_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (
 '''
