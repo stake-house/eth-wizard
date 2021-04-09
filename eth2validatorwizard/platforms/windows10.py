@@ -9,12 +9,23 @@ from pathlib import Path
 
 from eth2validatorwizard.constants import *
 
+from eth2validatorwizard.platforms.common import (
+    select_network,
+    select_eth1_fallbacks,
+    input_dialog_default,
+)
+
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog, radiolist_dialog, input_dialog
 
 RESUME_CHOCOLATEY = 'resume_chocolatey'
 
 def installation_steps(*args, **kwargs):
+
+    selected_directory = select_directory()
+    if not selected_directory:
+        # User asked to quit
+        quit()
 
     install_chocolatey()
 
@@ -23,7 +34,17 @@ def installation_steps(*args, **kwargs):
         print('Press enter to quit')
         input()
         quit()
+
+    selected_network = select_network()
+    if not selected_network:
+        # User asked to quit
+        quit()
     
+    selected_eth1_fallbacks = select_eth1_fallbacks(selected_network)
+    if type(selected_eth1_fallbacks) is not list and not selected_eth1_fallbacks:
+        # User asked to quit
+        quit()
+
     print('Press enter to quit')
     input()
 
@@ -117,3 +138,63 @@ def install_nssm():
     
     return True
     
+def select_directory():
+    directory_valid = False
+    selected_directory = None
+    input_canceled = False
+    default_directory = r'c:\ethereum'
+
+    while not directory_valid:
+        not_valid_msg = ''
+        if selected_directory is not None:
+            not_valid_msg = (
+'''
+
+<style bg="red" fg="black">Your last input was <b>an invalid directory</b>. Please make sure to enter a valid
+directory.</style>'''
+            )
+
+        default_input_text = default_directory
+
+        if selected_directory is not None:
+            default_input_text = selected_directory
+
+        selected_directory = input_dialog_default(
+            title='Enter a directory',
+            text=(HTML(
+f'''
+Please enter a directory where ethereum clients and their data will be
+stored:
+
+Ideally you want to select an empty directory that does not contain any
+space or international character in its path. You also want to make sure
+you select a directory on your fast disk that has enough space for ethereum
+data.
+
+If the directory does not exist, we will attempt to create it for you.
+
+* Press the tab key to switch between the controls below{not_valid_msg}
+'''         )),
+            default_input_text=default_input_text).run()
+
+        if not selected_directory:
+            input_canceled = True
+            break
+        
+        directory_valid = directory_validator(selected_directory)
+
+    if input_canceled:
+        # User clicked the cancel button
+        return False
+
+    return Path(selected_directory)
+
+def directory_validator(directory):
+    try:
+        directory_path = Path(directory)
+        directory_path.mkdir(parents=True, exist_ok=True)
+        return directory_path.is_dir()
+    except OSError:
+        return False
+
+    return False
