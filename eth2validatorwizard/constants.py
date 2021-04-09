@@ -77,6 +77,13 @@ GETH_STORE_BUILDS_PARAMS = {
 GETH_BUILDS_BASE_URL = 'https://gethstore.blob.core.windows.net/builds/'
 
 GETH_WINDOWS_PGP_KEY_ID = '9417309ED2A67EAC'
+GETH_ARGUMENTS = {
+    NETWORK_MAINNET: ['--cache', '2048', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof'],
+    NETWORK_PYRMONT: ['--goerli', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof'],
+    NETWORK_PRATER: ['--goerli', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof']
+}
+
+WINDOWS_SERVICE_RUNNING = 'SERVICE_RUNNING'
 
 GETH_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (

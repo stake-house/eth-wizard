@@ -6,6 +6,8 @@ import codecs
 import base64
 import httpx
 import re
+import os
+import shutil
 
 from pathlib import Path
 
@@ -258,7 +260,6 @@ def install_geth(base_directory, network, ports):
     # Check for existing service
     geth_service_exists = False
     geth_service_name = 'geth'
-    geth_service_display_name = GETH_SERVICE_DISPLAY_NAME[network]
 
     service_details = get_service_details(nssm_binary, geth_service_name)
 
@@ -541,17 +542,10 @@ archive after {retry_count} retries.
 
         geth_extracted_binary.parent.rmdir()
     
-    return True
-    
     # Check if Geth user or directory already exists
     geth_datadir = base_directory.joinpath('var', 'lib', 'goethereum')
     if geth_datadir.is_dir():
-        process_result = subprocess.run([
-            'du', '-sh', geth_datadir
-            ], capture_output=True, text=True)
-        
-        process_output = process_result.stdout
-        geth_datadir_size = process_output.split('\t')[0]
+        geth_datadir_size = sizeof_fmt(get_dir_size(geth_datadir))
 
         result = button_dialog(
             title='Geth data directory found',
@@ -578,39 +572,54 @@ Do you want to remove this directory first and start from nothing?
         if result == 1:
             shutil.rmtree(geth_datadir)
 
-    geth_user_exists = False
-    process_result = subprocess.run([
-        'id', '-u', 'goeth'
-    ])
-    geth_user_exists = (process_result.returncode == 0)
-
-    # Setup Geth user and directory
-    if not geth_user_exists:
-        subprocess.run([
-            'useradd', '--no-create-home', '--shell', '/bin/false', 'goeth'])
-    subprocess.run([
-        'mkdir', '-p', geth_datadir])
-    subprocess.run([
-        'chown', '-R', 'goeth:goeth', geth_datadir])
+    # Setup Geth directory
+    geth_datadir.mkdir(parents=True, exist_ok=True)
     
-    # Setup Geth systemd service
-    with open('/etc/systemd/system/' + geth_service_name, 'w') as service_file:
-        service_file.write(GETH_SERVICE_DEFINITION[network])
-    subprocess.run([
-        'systemctl', 'daemon-reload'])
-    subprocess.run([
-        'systemctl', 'start', geth_service_name])
-    subprocess.run([
-        'systemctl', 'enable', geth_service_name])
+    # Setup Geth service
+    log_path = base_directory.joinpath('var', 'log')
+    log_path.mkdir(parents=True, exist_ok=True)
+
+    geth_stdout_log_path = log_path.joinpath('geth-stdout.log')
+    geth_stderr_log_path = log_path.joinpath('geth-stderr.log')
+
+    geth_arguments = GETH_ARGUMENTS[network]
+    geth_arguments.append('--datadir')
+    geth_arguments.append(str(geth_datadir))
+
+    parameters = {
+        'DisplayName': GETH_SERVICE_DISPLAY_NAME[network],
+        'AppRotateFiles': '1',
+        'AppRotateSeconds': '86400',
+        'AppRotateBytes': '10485760',
+        'AppStdout': str(geth_stdout_log_path),
+        'AppStderr': str(geth_stderr_log_path)
+    }
+
+    if not create_service(nssm_binary, geth_service_name, geth_path, geth_arguments, parameters):
+        print('There was an issue creating the geth service. We cannot continue.')
+        return False
+    
+    print('Starting geth service...')
+    process_result = subprocess.run([
+        nssm_binary, 'start', geth_service_name
+    ])
+
+    if process_result.returncode != 0:
+        print('There was an issue starting the geth service. We cannot continue.')
+        return False
+
+    delay = 5
+    print(f'We are giving {delay} seconds for the geth service to start properly.')
+    time.sleep(delay)
     
     # Verify proper Geth service installation
-    service_details = get_systemd_service_details(geth_service_name)
+    service_details = get_service_details(nssm_binary, geth_service_name)
+    if not service_details:
+        print('We could not find the geth service we just created. We cannot continue.')
+        return False
 
     if not (
-        service_details['LoadState'] == 'loaded' and
-        service_details['ActiveState'] == 'active' and
-        service_details['SubState'] == 'running'
-    ):
+        service_details['status'] == WINDOWS_SERVICE_RUNNING):
 
         result = button_dialog(
             title='Geth service not running properly',
@@ -619,17 +628,16 @@ f'''
 The geth service we just created seems to have issues. Here are some
 details found:
 
-Description: {service_details['Description']}
-States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
-UnitFilePreset: {service_details['UnitFilePreset']}
-ExecStart: {service_details['ExecStart']}
-ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
-FragmentPath: {service_details['FragmentPath']}
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
 
 We cannot proceed if the geth service cannot be started properly. Make sure
-to check the logs and fix any issue found there. You can see the logs with:
+to check the logs and fix any issue found there. You can see the logs in:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -638,13 +646,15 @@ $ sudo journalctl -ru {geth_service_name}
 
         print(
 f'''
-To examine your geth service logs, type the following command:
+To examine your geth service logs, inspect the following file:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''
         )
 
         return False
+
+    return True
 
     # Wait a little before checking for Geth syncing since it can be slow to start
     print('We are giving Geth a few seconds to start before testing syncing.')
@@ -957,6 +967,38 @@ Raw result: {response_result}
 
     return True
 
+def create_service(nssm_binary, service_name, binary_path, binary_args, parameters=None):
+    # Create a Windows service using NSSM and configure it
+
+    # Remove it first to make sure it does not exist
+    subprocess.run([
+        nssm_binary, 'remove', service_name, 'confirm'
+    ])
+
+    # Install the service
+    process_result = subprocess.run([
+        nssm_binary, 'install', service_name, binary_path
+        ] + binary_args)
+
+    if process_result.returncode != 0:
+        print(f'Unexpected return code from NSSM when installing a new service. '
+            f'Return code {process_result.returncode}')
+        return False
+
+    # Set all the other parameters
+    if parameters is not None:
+        for param, value in parameters.items():
+            process_result = subprocess.run([
+                nssm_binary, 'set', service_name, param, value
+                ])
+            
+            if process_result.returncode != 0:
+                print(f'Unexpected return code from NSSM when modifying at parameter. '
+                    f'Return code {process_result.returncode}')
+                return False
+    
+    return True
+
 def get_service_details(nssm_binary, service):
     # Return some service details
 
@@ -1099,3 +1141,25 @@ def install_gpg(base_directory):
 
     return True
 
+def get_dir_size(directory):
+    total_size = 0
+    directories = []
+    directories.append(directory)
+
+    while len(directories) > 0:
+        next_dir = directories.pop()
+        with os.scandir(next_dir) as it:
+            for item in it:
+                if item.is_file():
+                    total_size += item.stat().st_size
+                elif item.is_dir():
+                    directories.append(item.path)
+    
+    return total_size
+
+def sizeof_fmt(num, suffix='B'):
+    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+        if abs(num) < 1024.0:
+            return "%3.1f%s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f%s%s" % (num, 'Yi', suffix)
