@@ -83,7 +83,15 @@ def has_su_perm(platform):
         
         if perform_elevation:
             pythonpath_env = rf'$env:PYTHONPATH = "{";".join(sys.path)}";'
-            target_command = pythonpath_env + sys.executable + ' ' + " ".join(sys.argv)
+            encoding_change = (
+                '$OutputEncoding = [console]::InputEncoding = '
+                '[console]::OutputEncoding = New-Object System.Text.UTF8Encoding;'
+            )
+            target_command = (
+                encoding_change + 
+                pythonpath_env +
+                sys.executable + ' ' + " ".join(sys.argv)
+            )
             encoded_command = base64.b64encode(codecs.encode(target_command, 'utf_16_le'))
             encoded_command = codecs.decode(encoded_command, 'ascii')
             args = f'-NoProfile -EncodedCommand {encoded_command}'

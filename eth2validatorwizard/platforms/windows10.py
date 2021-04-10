@@ -8,6 +8,7 @@ import httpx
 import re
 import os
 import shutil
+import json
 
 from pathlib import Path
 
@@ -334,7 +335,7 @@ properly.
         try:
             process_result = subprocess.run([
                 geth_path, 'version'
-                ], capture_output=True, text=True)
+                ], capture_output=True, text=True, encoding='utf8')
             geth_found = True
 
             process_output = process_result.stdout
@@ -654,17 +655,23 @@ To examine your geth service logs, inspect the following file:
 
         return False
 
-    return True
-
-    # Wait a little before checking for Geth syncing since it can be slow to start
-    print('We are giving Geth a few seconds to start before testing syncing.')
-    time.sleep(2)
-    try:
+    # Iterate over the logs and output them for around 30 seconds
+    log_read_index = 0
+    for i in range(6):
         subprocess.run([
-            'journalctl', '-fu', geth_service_name
-        ], timeout=30)
-    except subprocess.TimeoutExpired:
-        pass
+            nssm_binary, 'rotate', geth_service_name
+        ])
+        log_text = ''
+        with open(geth_stderr_log_path, 'r', encoding='utf8') as log_file:
+            log_file.seek(log_read_index)
+            log_text = log_file.read()
+        
+        log_length = len(log_text)
+        log_read_index = log_read_index + log_length
+
+        if log_length > 0:
+            print(log_text)
+        time.sleep(5)
 
     # Verify proper Geth syncing
     local_geth_jsonrpc_url = 'http://127.0.0.1:8545'
@@ -694,9 +701,9 @@ Exception: {exception}
 
 We cannot proceed if the geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
-logs with:
+logs in:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -705,9 +712,9 @@ $ sudo journalctl -ru {geth_service_name}
 
         print(
 f'''
-To examine your geth service logs, type the following command:
+To examine your geth service logs, inspect the following file:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''
         )
 
@@ -729,9 +736,9 @@ Status code: {response.status_code}
 
 We cannot proceed if the geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
-logs with:
+logs in:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -740,9 +747,9 @@ $ sudo journalctl -ru {geth_service_name}
 
         print(
 f'''
-To examine your geth service logs, type the following command:
+To examine your geth service logs, inspect the following file:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''
         )
 
@@ -773,9 +780,9 @@ Response: {json.dumps(response_json)}
 
 We cannot proceed if the geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
-logs with:
+logs in:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''         ),
             buttons=[
                 ('Retry', 1),
@@ -787,9 +794,9 @@ $ sudo journalctl -ru {geth_service_name}
 
             print(
 f'''
-To examine your geth service logs, type the following command:
+To examine your geth service logs, inspect the following file:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''
             )
 
@@ -818,9 +825,9 @@ Exception: {exception}
 
 We cannot proceed if the geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
-logs with:
+logs in:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''             ),
                 buttons=[
                     ('Quit', False)
@@ -829,9 +836,9 @@ $ sudo journalctl -ru {geth_service_name}
 
             print(
 f'''
-To examine your geth service logs, type the following command:
+To examine your geth service logs, inspect the following file:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''
             )
 
@@ -853,10 +860,10 @@ Status code: {response.status_code}
 
 We cannot proceed if the geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
-logs with:
+logs in:
 
-$ sudo journalctl -ru {geth_service_name}
-    '''         ),
+{geth_stderr_log_path}
+'''             ),
                 buttons=[
                     ('Quit', False)
                 ]
@@ -864,9 +871,9 @@ $ sudo journalctl -ru {geth_service_name}
 
             print(
 f'''
-To examine your geth service logs, type the following command:
+To examine your geth service logs, inspect the following file:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''
             )
 
@@ -896,9 +903,9 @@ Response: {json.dumps(response_json)}
 
 We cannot proceed if the geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
-logs with:
+logs in:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -907,9 +914,9 @@ $ sudo journalctl -ru {geth_service_name}
 
         print(
 f'''
-To examine your geth service logs, type the following command:
+To examine your geth service logs, inspect the following file:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''
         )
 
@@ -929,9 +936,9 @@ result field: {json.dumps(response_result)}
 
 We cannot proceed if the geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
-logs with:
+logs in:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -940,9 +947,9 @@ $ sudo journalctl -ru {geth_service_name}
 
         print(
 f'''
-To examine your geth service logs, type the following command:
+To examine your geth service logs, inspect the following file:
 
-$ sudo journalctl -ru {geth_service_name}
+{geth_stderr_log_path}
 '''
         )
 
@@ -1004,7 +1011,7 @@ def get_service_details(nssm_binary, service):
 
     process_result = subprocess.run([
         nssm_binary, 'dump', service
-        ], capture_output=True, text=True)
+        ], capture_output=True, text=True, encoding='utf8')
     
     if process_result.returncode != 0:
         return None
@@ -1028,7 +1035,7 @@ def get_service_details(nssm_binary, service):
     
     process_result = subprocess.run([
         nssm_binary, 'status', service
-        ], capture_output=True, text=True)
+        ], capture_output=True, text=True, encoding='utf8')
     
     if process_result.returncode == 0:
         process_output = process_result.stdout
