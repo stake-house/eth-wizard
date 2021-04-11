@@ -9,6 +9,7 @@ import re
 import os
 import shutil
 import json
+import hashlib
 
 from pathlib import Path
 
@@ -37,7 +38,7 @@ def installation_steps(*args, **kwargs):
 
     selected_ports = {
         'eth1': DEFAULT_GETH_PORT,
-        'eth2_bn': DEFAULT_LIGHTHOUSE_BN_PORT
+        'eth2_bn': DEFAULT_TEKU_BN_PORT
     }
 
     selected_directory = select_directory()
@@ -778,8 +779,10 @@ To examine your geth service logs, inspect the following file:
             title='Unexpected response from Geth',
             text=(
 f'''
-We received an unexpected response from geth HTTP-RPC server. Here are
-some details for this last test we tried to perform:
+We received an unexpected response from geth HTTP-RPC server. This is
+likely because geth has not started syncing yet or because it's taking a
+little longer to find peers. We suggest you wait and retry in a minute.
+Here are some details for this last test we tried to perform:
 
 URL: {local_geth_jsonrpc_url}
 Method: POST
@@ -1356,9 +1359,6 @@ Do you want to skip installing the JRE?
 def install_teku(base_directory, network, ports):
     # Install Teku for the selected network
 
-    if not install_jre(base_directory):
-        return False
-
     nssm_binary = get_nssm_binary()
     if not nssm_binary:
         return False
@@ -1401,28 +1401,26 @@ Do you want to skip installing teku and its beacon node service?
         if result == 1:
             return True
         
-        # User wants to proceed, make sure the lighthouse beacon node service is stopped first
+        # User wants to proceed, make sure the teku beacon node service is stopped first
         subprocess.run([
             nssm_binary, 'stop', teku_bn_service_name])
 
-    # TODO: Finish this step
-    return False
-
     result = button_dialog(
-        title='Lighthouse installation',
+        title='Teku installation',
         text=(
 '''
-This next step will install Lighthouse, an Eth2 client that includes a
-beacon node and a validator client in the same binary.
+This next step will install Teku, an Eth2 client that includes a
+beacon node and a validator client in the same binary distribution.
 
-It will download the official binary from GitHub, verify its PGP signature
-and extract it for easy use.
+It will install AdoptOpenJDK, a Java Runtime Environment, it will download
+the official Teku binary distribution from GitHub, it will verify its
+checksum and it will extract it for easy use.
 
 Once installed locally, it will create a service that will automatically
-start the Lighthouse beacon node on reboot or if it crashes. The beacon
-node will be started and you will slowly start syncing with the Ethereum
-2.0 network. This syncing process can take a few hours or days even with
-good hardware and good internet.
+start the Teku beacon node on reboot or if it crashes. The beacon node will
+be started and you will slowly start syncing with the Ethereum 2.0 network.
+This syncing process can take a few hours or days even with good hardware
+and good internet.
 '''     ),
         buttons=[
             ('Install', True),
@@ -1433,50 +1431,50 @@ good hardware and good internet.
     if not result:
         return result
     
-    # Check if lighthouse is already installed
-    geth_path = base_directory.joinpath('bin', 'geth.exe')
+    if not install_jre(base_directory):
+        return False
 
-    lighthouse_found = False
-    lighthouse_version = 'unknown'
-    lighthouse_location = 'unknown'
+    # Check if teku is already installed
+    teku_path = base_directory.joinpath('bin', 'teku')
+    teku_batch_file = teku_path.joinpath('bin', 'teku.bat')
 
-    try:
-        process_result = subprocess.run([
-            'lighthouse', '--version'
-            ], capture_output=True, text=True)
-        lighthouse_found = True
+    teku_found = False
+    teku_version = 'unknown'
 
-        process_output = process_result.stdout
-        result = re.search(r'Lighthouse (.*?)\n', process_output)
-        if result:
-            lighthouse_version = result.group(1).strip()
-        
-        process_result = subprocess.run([
-            'whereis', 'lighthouse'
-            ], capture_output=True, text=True)
+    java_home = base_directory.joinpath('bin', 'jre')
 
-        process_output = process_result.stdout
-        result = re.search(r'lighthouse: (.*?)\n', process_output)
-        if result:
-            lighthouse_location = result.group(1).strip()
+    if teku_batch_file.is_file():
+        try:
+            env = os.environ.copy()
+            env['JAVA_HOME'] = str(java_home)
 
-    except FileNotFoundError:
-        pass
+            process_result = subprocess.run([
+                teku_batch_file, '--version'
+                ], capture_output=True, text=True, env=env)
+            teku_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'teku/(?P<version>[^/]+)', process_output)
+            if result:
+                teku_version = result.group('version').strip()
+
+        except FileNotFoundError:
+            pass
     
-    install_lighthouse_binary = True
+    install_teku_binary = True
 
-    if lighthouse_found:
+    if teku_found:
         result = button_dialog(
-            title='Lighthouse binary found',
+            title='Teku binary distribution found',
             text=(
 f'''
-The lighthouse binary seems to have already been installed. Here are some
-details found:
+The teku binary distribution seems to have already been installed. Here are
+some details found:
 
-Version: {lighthouse_version}
-Location: {lighthouse_location}
+Version: {teku_version}
+Location: {teku_path}
 
-Do you want to skip installing the lighthouse binary?
+Do you want to skip installing the teku binary distribution?
 '''         ),
             buttons=[
                 ('Skip', 1),
@@ -1488,128 +1486,137 @@ Do you want to skip installing the lighthouse binary?
         if not result:
             return result
         
-        install_lighthouse_binary = (result == 2)
+        install_teku_binary = (result == 2)
     
-    if install_lighthouse_binary:
-        # Getting latest Lighthouse release files
-        lighthouse_gh_release_url = GITHUB_REST_API_URL + LIGHTHOUSE_LATEST_RELEASE
+    if install_teku_binary:
+        # Getting latest Teku release files
+        teku_gh_release_url = GITHUB_REST_API_URL + TEKU_LATEST_RELEASE
         headers = {'Accept': GITHUB_API_VERSION}
         try:
-            response = httpx.get(lighthouse_gh_release_url, headers=headers)
+            response = httpx.get(teku_gh_release_url, headers=headers)
         except httpx.RequestError as exception:
-            print('Cannot connect to Github')
+            print(f'Cannot connect to Github. Exception {exception}')
             return False
 
         if response.status_code != 200:
             # TODO: Better handling for network response issue
-            print('Github returned error code')
+            print(f'Github returned error code. Status code {response.status_code}')
             return False
         
         release_json = response.json()
 
-        if 'assets' not in release_json:
-            # TODO: Better handling on unexpected response structure
+        if 'body' not in release_json:
+            print('Unexpected response from github release. We cannot continue.')
             return False
         
-        binary_asset = None
-        signature_asset = None
+        release_desc = release_json['body']
 
-        for asset in release_json['assets']:
-            if 'name' not in asset:
-                continue
-            if 'browser_download_url' not in asset:
-                continue
+        zip_url = None
+        zip_sha256 = None
+
+        result = re.search(r'\[zip\]\((?P<url>[^\)]+)\)\s*\(\s*sha256\s*:?\s*`(?P<sha256>[^`]+)`\s*\)',
+            release_desc)
+        if result:
+            zip_url = result.group('url')
+            if zip_url is not None:
+                zip_url = zip_url.strip()
+            
+            zip_sha256 = result.group('sha256')
+            if zip_sha256 is not None:
+                zip_sha256 = zip_sha256.strip()
         
-            file_name = asset['name']
-            file_url = asset['browser_download_url']
 
-            if file_name.endswith('x86_64-unknown-linux-gnu.tar.gz'):
-                binary_asset = {
-                    'file_name': file_name,
-                    'file_url': file_url
-                }
-            elif file_name.endswith('x86_64-unknown-linux-gnu.tar.gz.asc'):
-                signature_asset = {
-                    'file_name': file_name,
-                    'file_url': file_url
-                }
-
-        if binary_asset is None or signature_asset is None:
-            # TODO: Better handling of missing asset in latest release
-            print('Could not find binary or signature asset in Github release')
+        if zip_url is None or zip_sha256 is None:
+            # TODO: Better handling of missing zip or checksum in latest release
+            print('Could not find binary distribution zip or checksum in Github release body. '
+                'We cannot continue.')
             return False
         
-        # Downloading latest Lighthouse release files
-        download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
+        # Downloading latest Teku binary distribution archive
+        download_path = base_directory.joinpath('downloads')
         download_path.mkdir(parents=True, exist_ok=True)
 
-        binary_path = Path(download_path, binary_asset['file_name'])
+        url_file_name = urlparse(zip_url).path.split('/')[-1]
+
+        teku_archive_path = download_path.joinpath(url_file_name)
+        teku_archive_hash = hashlib.sha256()
+        if teku_archive_path.is_file():
+            teku_archive_path.unlink()
 
         try:
-            with open(binary_path, 'wb') as binary_file:
-                with httpx.stream('GET', binary_asset['file_url']) as http_stream:
+            with open(teku_archive_path, 'wb') as binary_file:
+                print(f'Downloading teku archive {url_file_name}...')
+                with httpx.stream('GET', zip_url) as http_stream:
+                    if http_stream.status_code != 200:
+                        print(f'Cannot download teku archive {zip_url}.\n'
+                            f'Unexpected status code {http_stream.status_code}')
+                        return False
                     for data in http_stream.iter_bytes():
                         binary_file.write(data)
+                        teku_archive_hash.update(data)
         except httpx.RequestError as exception:
-            print('Exception while downloading Lighthouse binary from Github')
-            return False
-        
-        signature_path = Path(download_path, signature_asset['file_name'])
-
-        try:
-            with open(signature_path, 'wb') as signature_file:
-                with httpx.stream('GET', signature_asset['file_url']) as http_stream:
-                    for data in http_stream.iter_bytes():
-                        signature_file.write(data)
-        except httpx.RequestError as exception:
-            print('Exception while downloading Lighthouse signature from Github')
+            print(f'Exception while downloading teku archive. Exception {exception}')
             return False
 
-        # Install gpg using APT
-        subprocess.run([
-            'apt', '-y', 'update'])
-        subprocess.run([
-            'apt', '-y', 'install', 'gpg'])
-
-        # Verify PGP signature
-        command_line = ['gpg', '--keyserver', 'pool.sks-keyservers.net', '--recv-keys',
-            LIGHTHOUSE_PRIME_PGP_KEY_ID]
-        process_result = subprocess.run(command_line)
-
-        retry_count = 5
-        if process_result.returncode != 0:
-            # GPG failed to download Sigma Prime's PGP key, let's wait and retry a few times
-            retry_index = 0
-            while process_result.returncode != 0 and retry_index < retry_count:
-                retry_index = retry_index + 1
-                print('GPG failed to download the PGP key. We will wait 10 seconds and try again.')
-                time.sleep(10)
-                process_result = subprocess.run(command_line)
-        
-        if process_result.returncode != 0:
-            # TODO: Better handling of failed PGP key download
-            print(
-f'''
-We failed to download the Sigma Prime\'s PGP key to verify the lighthouse
-binary after {retry_count} retries.
-'''
-)
+        # Verify checksum
+        teku_archive_hexdigest = teku_archive_hash.hexdigest()
+        if teku_archive_hexdigest.lower() != zip_sha256.lower():
+            print('Teku archive checksum does not match. We will stop here to protect you.')
             return False
         
-        process_result = subprocess.run([
-            'gpg', '--verify', signature_path])
-        if process_result.returncode != 0:
-            # TODO: Better handling of failed PGP signature
-            print('The lighthouse binary signature is wrong. We\'ll stop here to protect you.')
-            return False
-        
-        # Extracting the Lighthouse binary archive
-        subprocess.run([
-            'tar', 'xvf', binary_path, '--directory', '/usr/local/bin'])
+        # Unzip teku archive
+        archive_members = None
+
+        print(f'Extracting teku archive {url_file_name}...')
+        with ZipFile(teku_archive_path, 'r') as zip_file:
+            archive_members = zip_file.namelist()
+            zip_file.extractall(download_path)
         
         # Remove download leftovers
-        binary_path.unlink()
-        signature_path.unlink()
+        teku_archive_path.unlink()
+
+        if archive_members is None or len(archive_members) == 0:
+            print('No files found in teku archive. We cannot continue.')
+            return False
+        
+        # Move all those extracted files into their final destination
+        if teku_path.is_dir():
+            shutil.rmtree(teku_path)
+        teku_path.mkdir(parents=True, exist_ok=True)
+
+        archive_extracted_dir = download_path.joinpath(Path(archive_members[0]).parts[0])
+
+        with os.scandir(archive_extracted_dir) as it:
+            for diritem in it:
+                shutil.move(diritem.path, teku_path)
+            
+        # Make sure teku was installed properly
+        teku_found = False
+        if teku_batch_file.is_file():
+            try:
+                env = os.environ.copy()
+                env['JAVA_HOME'] = str(java_home)
+
+                process_result = subprocess.run([
+                    teku_batch_file, '--version'
+                    ], capture_output=True, text=True, env=env)
+                teku_found = True
+
+                process_output = process_result.stdout
+                result = re.search(r'teku/(?P<version>[^/]+)', process_output)
+                if result:
+                    teku_version = result.group('version').strip()
+
+            except FileNotFoundError:
+                pass
+    
+        if not teku_found:
+            print(f'We could not find the teku binary distribution from the installed archive '
+                f'in {teku_path}. We cannot continue.')
+            return False
+    
+    # TODO: Finish this step
+    return False
 
     # Check if lighthouse beacon node user or directory already exists
     lighthouse_datadir_bn = Path('/var/lib/lighthouse/beacon')

@@ -775,8 +775,10 @@ $ sudo journalctl -ru {geth_service_name}
             title='Unexpected response from Geth',
             text=(
 f'''
-We received an unexpected response from geth HTTP-RPC server. Here are
-some details for this last test we tried to perform:
+We received an unexpected response from geth HTTP-RPC server. This is
+likely because geth has not started syncing yet or because it's taking a
+little longer to find peers. We suggest you wait and retry in a minute.
+Here are some details for this last test we tried to perform:
 
 URL: {local_geth_jsonrpc_url}
 Method: POST
@@ -1241,7 +1243,7 @@ binary after {retry_count} retries.
             'gpg', '--verify', signature_path])
         if process_result.returncode != 0:
             # TODO: Better handling of failed PGP signature
-            print('The lighthouse binary signature is wrong. We\'ll stop here to protect you.')
+            print('The lighthouse binary signature is wrong. We will stop here to protect you.')
             return False
         
         # Extracting the Lighthouse binary archive

@@ -3,6 +3,7 @@ GITHUB_API_VERSION = 'application/vnd.github.v3+json'
 
 LIGHTHOUSE_LATEST_RELEASE = '/repos/sigp/lighthouse/releases/latest'
 LIGHTHOUSE_PRIME_PGP_KEY_ID = '15E66D941F697E28F49381F426416DC3F30674B0'
+TEKU_LATEST_RELEASE = '/repos/ConsenSys/teku/releases/latest'
 
 ETH2_DEPOSIT_CLI_LATEST_RELEASE = '/repos/ethereum/eth2.0-deposit-cli/releases/latest'
 
@@ -12,6 +13,7 @@ NETWORK_PRATER = 'prater'
 
 DEFAULT_GETH_PORT = 30303
 DEFAULT_LIGHTHOUSE_BN_PORT = 9000
+DEFAULT_TEKU_BN_PORT = 9000
 
 SPEEDTEST_SCRIPT_URL = 'https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py'
 
