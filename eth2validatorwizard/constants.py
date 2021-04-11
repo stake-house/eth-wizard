@@ -85,6 +85,12 @@ GETH_ARGUMENTS = {
 
 WINDOWS_SERVICE_RUNNING = 'SERVICE_RUNNING'
 
+ADOPTOPENJDK_11_API_URL = 'https://api.adoptopenjdk.net/v3/assets/feature_releases/11/ga'
+ADOPTOPENJDK_11_API_PARAMs = {
+    'jvm_impl': 'hotspot',
+    'vendor': 'adoptopenjdk'
+}
+
 GETH_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (
 '''

@@ -43,40 +43,42 @@ def installation_steps(*args, **kwargs):
     selected_directory = select_directory()
     if not selected_directory:
         # User asked to quit
-        print('Press enter to quit')
-        input()
-        quit()
+        quit_install()
 
     selected_network = select_network()
     if not selected_network:
         # User asked to quit
-        print('Press enter to quit')
-        input()
-        quit()
-    
-    install_chocolatey()
+        quit_install()
+
+    if not install_chocolatey():
+        # We could not install chocolatey
+        quit_install()
 
     if not install_nssm():
         # We could not install nssm
-        print('Press enter to quit')
-        input()
-        quit()
+        quit_install()
 
     if not install_geth(selected_directory, selected_network, selected_ports):
         # User asked to quit or error
-        print('Press enter to quit')
-        input()
-        quit()
+        quit_install()
     
-    selected_eth1_fallbacks = select_eth1_fallbacks(selected_network)
+    # Teku does not support fallback yet
+    '''selected_eth1_fallbacks = select_eth1_fallbacks(selected_network)
     if type(selected_eth1_fallbacks) is not list and not selected_eth1_fallbacks:
         # User asked to quit
-        print('Press enter to quit')
-        input()
-        quit()
+        quit_install()'''
+
+    if not install_teku(selected_directory, selected_network, selected_ports):
+        # User asked to quit or error
+        quit_install()
 
     print('Press enter to quit')
     input()
+
+def quit_install():
+    print('Press enter to quit')
+    input()
+    quit()
 
 def install_chocolatey():
     # Install chocolatey to obtain other tools
@@ -229,9 +231,7 @@ def directory_validator(directory):
 
     return False
 
-def install_geth(base_directory, network, ports):
-    # Install geth for the selected network
-
+def get_nssm_binary():
     # Check for nssm install and path
     nssm_path = Path(CHOCOLATEY_DEFAULT_BIN_PATH, 'nssm')
     nssm_binary = 'nssm'
@@ -256,6 +256,15 @@ def install_geth(base_directory, network, ports):
     
     if not nssm_installed:
         print('NSSM is not installed, we cannot continue.')
+        return False
+    
+    return nssm_binary
+
+def install_geth(base_directory, network, ports):
+    # Install geth for the selected network
+
+    nssm_binary = get_nssm_binary()
+    if not nssm_binary:
         return False
 
     # Check for existing service
@@ -1145,6 +1154,931 @@ def install_gpg(base_directory):
     if process_result.returncode != 0:
         print(f'Unexpected return from gpg binary. Return code {process_result.returncode}')
         return False
+
+    return True
+
+def install_jre(base_directory):
+    # Install adoptopenjdk jre
+
+    # Check if jre is already installed
+    jre_path = base_directory.joinpath('bin', 'jre')
+    java_path = jre_path.joinpath('bin', 'java.exe')
+
+    jre_found = False
+    jre_version = 'unknown'
+
+    if java_path.is_file():
+        try:
+            process_result = subprocess.run([
+                java_path, '--version'
+                ], capture_output=True, text=True, encoding='utf8')
+            jre_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'OpenJDK Runtime Environment (.*?)\n', process_output)
+            if result:
+                jre_version = result.group(1).strip()
+
+        except FileNotFoundError:
+            pass
+    
+    install_jre = True
+
+    if jre_found:
+        result = button_dialog(
+            title='JRE found',
+            text=(
+f'''
+The JRE seems to have already been installed. Here are some details found:
+
+Version: {jre_version}
+Location: {jre_path}
+
+Do you want to skip installing the JRE?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        install_jre = (result == 2)
+    
+    if install_jre:
+        windows_builds = []
+
+        try:
+            print('Getting JRE builds...')
+
+            response = httpx.get(ADOPTOPENJDK_11_API_URL, params=ADOPTOPENJDK_11_API_PARAMs)
+
+            if response.status_code != 200:
+                print(f'Cannot connect to JRE builds URL {ADOPTOPENJDK_11_API_URL}.\n'
+                f'Unexpected status code {response.status_code}')
+                return False
+            
+            response_json = response.json()
+
+            if (
+                type(response_json) is not list or
+                len(response_json) == 0 or
+                type(response_json[0]) is not dict or
+                'binaries' not in response_json[0]):
+                print(f'Unexpected response from JRE builds URL {ADOPTOPENJDK_11_API_URL}')
+                return False
+            
+            binaries = response_json[0]['binaries']
+            for binary in binaries:
+                if (
+                    'architecture' not in binary or
+                    'os' not in binary or
+                    'package' not in binary or
+                    'image_type' not in binary or
+                    'updated_at' not in binary):
+                    continue
+                image_type = binary['image_type']
+                architecture = binary['architecture']
+                binary_os = binary['os']
+
+                if not (
+                    binary_os == 'windows' and
+                    architecture == 'x64' and
+                    image_type == 'jre'):
+                    continue
+
+                package = binary['package']
+                updated_at = dateparse(binary['updated_at'])
+
+                if (
+                    'name' not in package or
+                    'checksum' not in package or
+                    'link' not in package):
+                    print(f'Unexpected response from JRE builds URL {ADOPTOPENJDK_11_API_URL} in package')
+                    return False
+                
+                package_name = package['name']
+                package_link = package['link']
+                package_checksum = package['checksum']
+
+                windows_builds.append({
+                    'name': package_name,
+                    'updated_at': updated_at,
+                    'link': package_link,
+                    'checksum': package_checksum
+                })
+
+        except httpx.RequestError as exception:
+            print(f'Cannot connect to JRE builds URL {ADOPTOPENJDK_11_API_URL}.\nException {exception}')
+            return False
+
+        if len(windows_builds) <= 0:
+            print('No JRE builds found on adoptopenjdk.net. We cannot continue.')
+            return False
+        
+        # Download latest JRE build and its signature
+        windows_builds.sort(key=lambda x: (x['updated_at'], x['name']), reverse=True)
+        latest_build = windows_builds[0]
+
+        download_path = base_directory.joinpath('downloads')
+        download_path.mkdir(parents=True, exist_ok=True)
+
+        jre_archive_path = download_path.joinpath(latest_build['name'])
+        if jre_archive_path.is_file():
+            jre_archive_path.unlink()
+
+        try:
+            with open(jre_archive_path, 'wb') as binary_file:
+                print(f'Downloading JRE archive {latest_build["name"]}...')
+                with httpx.stream('GET', latest_build['link']) as http_stream:
+                    if http_stream.status_code != 200:
+                        print(f'Cannot download JRE archive {latest_build["link"]}.\n'
+                            f'Unexpected status code {http_stream.status_code}')
+                        return False
+                    for data in http_stream.iter_bytes():
+                        binary_file.write(data)
+        except httpx.RequestError as exception:
+            print(f'Exception while downloading JRE archive. Exception {exception}')
+            return False
+        
+        # Unzip JRE archive
+        archive_members = None
+
+        print(f'Extracting JRE archive {latest_build["name"]}...')
+        with ZipFile(jre_archive_path, 'r') as zip_file:
+            archive_members = zip_file.namelist()
+            zip_file.extractall(download_path)
+        
+        # Remove download leftovers
+        jre_archive_path.unlink()
+
+        if archive_members is None or len(archive_members) == 0:
+            print('No files found in JRE archive. We cannot continue.')
+            return False
+        
+        # Move all those extracted files into their final destination
+        if jre_path.is_dir():
+            shutil.rmtree(jre_path)
+        jre_path.mkdir(parents=True, exist_ok=True)
+
+        archive_extracted_dir = download_path.joinpath(Path(archive_members[0]).parts[0])
+
+        with os.scandir(archive_extracted_dir) as it:
+            for diritem in it:
+                shutil.move(diritem.path, jre_path)
+            
+        # Make sure jre was installed properly
+        jre_found = False
+        try:
+            process_result = subprocess.run([
+                java_path, '--version'
+                ], capture_output=True, text=True, encoding='utf8')
+            jre_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'OpenJDK Runtime Environment (.*?)\n', process_output)
+            if result:
+                jre_version = result.group(1).strip()
+
+        except FileNotFoundError:
+            pass
+    
+        if not jre_found:
+            print(f'We could not find the java binary from the installed JRE in {java_path}. '
+                f'We cannot continue.')
+            return False
+    
+    return True
+
+def install_teku(base_directory, network, ports):
+    # Install Teku for the selected network
+
+    if not install_jre(base_directory):
+        return False
+
+    nssm_binary = get_nssm_binary()
+    if not nssm_binary:
+        return False
+
+    # Check for existing service
+    teku_bn_service_exists = False
+    teku_bn_service_name = 'tekubeacon'
+
+    service_details = get_service_details(nssm_binary, teku_bn_service_name)
+
+    if service_details is not None:
+        teku_bn_service_exists = True
+    
+    if teku_bn_service_exists:
+        result = button_dialog(
+            title='Teku beacon node service found',
+            text=(
+f'''
+The teku beacon node service seems to have already been created. Here are
+some details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+Do you want to skip installing teku and its beacon node service?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            return True
+        
+        # User wants to proceed, make sure the lighthouse beacon node service is stopped first
+        subprocess.run([
+            nssm_binary, 'stop', teku_bn_service_name])
+
+    # TODO: Finish this step
+    return False
+
+    result = button_dialog(
+        title='Lighthouse installation',
+        text=(
+'''
+This next step will install Lighthouse, an Eth2 client that includes a
+beacon node and a validator client in the same binary.
+
+It will download the official binary from GitHub, verify its PGP signature
+and extract it for easy use.
+
+Once installed locally, it will create a service that will automatically
+start the Lighthouse beacon node on reboot or if it crashes. The beacon
+node will be started and you will slowly start syncing with the Ethereum
+2.0 network. This syncing process can take a few hours or days even with
+good hardware and good internet.
+'''     ),
+        buttons=[
+            ('Install', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+    
+    # Check if lighthouse is already installed
+    geth_path = base_directory.joinpath('bin', 'geth.exe')
+
+    lighthouse_found = False
+    lighthouse_version = 'unknown'
+    lighthouse_location = 'unknown'
+
+    try:
+        process_result = subprocess.run([
+            'lighthouse', '--version'
+            ], capture_output=True, text=True)
+        lighthouse_found = True
+
+        process_output = process_result.stdout
+        result = re.search(r'Lighthouse (.*?)\n', process_output)
+        if result:
+            lighthouse_version = result.group(1).strip()
+        
+        process_result = subprocess.run([
+            'whereis', 'lighthouse'
+            ], capture_output=True, text=True)
+
+        process_output = process_result.stdout
+        result = re.search(r'lighthouse: (.*?)\n', process_output)
+        if result:
+            lighthouse_location = result.group(1).strip()
+
+    except FileNotFoundError:
+        pass
+    
+    install_lighthouse_binary = True
+
+    if lighthouse_found:
+        result = button_dialog(
+            title='Lighthouse binary found',
+            text=(
+f'''
+The lighthouse binary seems to have already been installed. Here are some
+details found:
+
+Version: {lighthouse_version}
+Location: {lighthouse_location}
+
+Do you want to skip installing the lighthouse binary?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        install_lighthouse_binary = (result == 2)
+    
+    if install_lighthouse_binary:
+        # Getting latest Lighthouse release files
+        lighthouse_gh_release_url = GITHUB_REST_API_URL + LIGHTHOUSE_LATEST_RELEASE
+        headers = {'Accept': GITHUB_API_VERSION}
+        try:
+            response = httpx.get(lighthouse_gh_release_url, headers=headers)
+        except httpx.RequestError as exception:
+            print('Cannot connect to Github')
+            return False
+
+        if response.status_code != 200:
+            # TODO: Better handling for network response issue
+            print('Github returned error code')
+            return False
+        
+        release_json = response.json()
+
+        if 'assets' not in release_json:
+            # TODO: Better handling on unexpected response structure
+            return False
+        
+        binary_asset = None
+        signature_asset = None
+
+        for asset in release_json['assets']:
+            if 'name' not in asset:
+                continue
+            if 'browser_download_url' not in asset:
+                continue
+        
+            file_name = asset['name']
+            file_url = asset['browser_download_url']
+
+            if file_name.endswith('x86_64-unknown-linux-gnu.tar.gz'):
+                binary_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+            elif file_name.endswith('x86_64-unknown-linux-gnu.tar.gz.asc'):
+                signature_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+
+        if binary_asset is None or signature_asset is None:
+            # TODO: Better handling of missing asset in latest release
+            print('Could not find binary or signature asset in Github release')
+            return False
+        
+        # Downloading latest Lighthouse release files
+        download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
+        download_path.mkdir(parents=True, exist_ok=True)
+
+        binary_path = Path(download_path, binary_asset['file_name'])
+
+        try:
+            with open(binary_path, 'wb') as binary_file:
+                with httpx.stream('GET', binary_asset['file_url']) as http_stream:
+                    for data in http_stream.iter_bytes():
+                        binary_file.write(data)
+        except httpx.RequestError as exception:
+            print('Exception while downloading Lighthouse binary from Github')
+            return False
+        
+        signature_path = Path(download_path, signature_asset['file_name'])
+
+        try:
+            with open(signature_path, 'wb') as signature_file:
+                with httpx.stream('GET', signature_asset['file_url']) as http_stream:
+                    for data in http_stream.iter_bytes():
+                        signature_file.write(data)
+        except httpx.RequestError as exception:
+            print('Exception while downloading Lighthouse signature from Github')
+            return False
+
+        # Install gpg using APT
+        subprocess.run([
+            'apt', '-y', 'update'])
+        subprocess.run([
+            'apt', '-y', 'install', 'gpg'])
+
+        # Verify PGP signature
+        command_line = ['gpg', '--keyserver', 'pool.sks-keyservers.net', '--recv-keys',
+            LIGHTHOUSE_PRIME_PGP_KEY_ID]
+        process_result = subprocess.run(command_line)
+
+        retry_count = 5
+        if process_result.returncode != 0:
+            # GPG failed to download Sigma Prime's PGP key, let's wait and retry a few times
+            retry_index = 0
+            while process_result.returncode != 0 and retry_index < retry_count:
+                retry_index = retry_index + 1
+                print('GPG failed to download the PGP key. We will wait 10 seconds and try again.')
+                time.sleep(10)
+                process_result = subprocess.run(command_line)
+        
+        if process_result.returncode != 0:
+            # TODO: Better handling of failed PGP key download
+            print(
+f'''
+We failed to download the Sigma Prime\'s PGP key to verify the lighthouse
+binary after {retry_count} retries.
+'''
+)
+            return False
+        
+        process_result = subprocess.run([
+            'gpg', '--verify', signature_path])
+        if process_result.returncode != 0:
+            # TODO: Better handling of failed PGP signature
+            print('The lighthouse binary signature is wrong. We\'ll stop here to protect you.')
+            return False
+        
+        # Extracting the Lighthouse binary archive
+        subprocess.run([
+            'tar', 'xvf', binary_path, '--directory', '/usr/local/bin'])
+        
+        # Remove download leftovers
+        binary_path.unlink()
+        signature_path.unlink()
+
+    # Check if lighthouse beacon node user or directory already exists
+    lighthouse_datadir_bn = Path('/var/lib/lighthouse/beacon')
+    if lighthouse_datadir_bn.exists() and lighthouse_datadir_bn.is_dir():
+        process_result = subprocess.run([
+            'du', '-sh', lighthouse_datadir_bn
+            ], capture_output=True, text=True)
+        
+        process_output = process_result.stdout
+        lighthouse_datadir_bn_size = process_output.split('\t')[0]
+
+        result = button_dialog(
+            title='Lighthouse beacon node data directory found',
+            text=(
+f'''
+An existing lighthouse beacon node data directory has been found. Here are
+some details found:
+
+Location: {lighthouse_datadir_bn}
+Size: {lighthouse_datadir_bn_size}
+
+Do you want to remove this directory first and start from nothing?
+'''         ),
+            buttons=[
+                ('Remove', 1),
+                ('Keep', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            shutil.rmtree(lighthouse_datadir_bn)
+
+    lighthouse_bn_user_exists = False
+    process_result = subprocess.run([
+        'id', '-u', 'lighthousebeacon'
+    ])
+    lighthouse_bn_user_exists = (process_result.returncode == 0)
+
+    # Setup Lighthouse beacon node user and directory
+    if not lighthouse_bn_user_exists:
+        subprocess.run([
+            'useradd', '--no-create-home', '--shell', '/bin/false', 'lighthousebeacon'])
+    subprocess.run([
+        'mkdir', '-p', '/var/lib/lighthouse/beacon'])
+    subprocess.run([
+        'chown', '-R', 'lighthousebeacon:lighthousebeacon', '/var/lib/lighthouse/beacon'])
+    subprocess.run([
+        'chmod', '700', '/var/lib/lighthouse/beacon'])
+
+    # Setup Lighthouse beacon node systemd service
+    service_definition = LIGHTHOUSE_BN_SERVICE_DEFINITION[network]
+
+    eth1_endpoints = ['http://127.0.0.1:8545'] + eth1_fallbacks
+    service_definition = service_definition.format(eth1endpoints=','.join(eth1_endpoints))
+
+    with open('/etc/systemd/system/' + lighthouse_bn_service_name, 'w') as service_file:
+        service_file.write(service_definition)
+    subprocess.run([
+        'systemctl', 'daemon-reload'])
+    subprocess.run([
+        'systemctl', 'start', lighthouse_bn_service_name])
+    subprocess.run([
+        'systemctl', 'enable', lighthouse_bn_service_name])
+    
+    print(
+'''
+We are giving the lighthouse beacon node a few seconds to start before testing
+it.
+
+You might see some error and warn messages about your eth1 node not being in
+sync, being far behind or about the beacon node being unable to connect to any
+eth1 node. Those message are normal to see while your eth1 client is syncing.
+'''
+)
+    time.sleep(6)
+    try:
+        subprocess.run([
+            'journalctl', '-fu', lighthouse_bn_service_name
+        ], timeout=30)
+    except subprocess.TimeoutExpired:
+        pass
+
+    # Check if the Lighthouse beacon node service is still running
+    service_details = get_systemd_service_details(lighthouse_bn_service_name)
+
+    if not (
+        service_details['LoadState'] == 'loaded' and
+        service_details['ActiveState'] == 'active' and
+        service_details['SubState'] == 'running'
+    ):
+
+        result = button_dialog(
+            title='Lighthouse beacon node service not running properly',
+            text=(
+f'''
+The lighthouse beacon node service we just created seems to have issues.
+Here are some details found:
+
+Description: {service_details['Description']}
+States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+UnitFilePreset: {service_details['UnitFilePreset']}
+ExecStart: {service_details['ExecStart']}
+ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
+FragmentPath: {service_details['FragmentPath']}
+
+We cannot proceed if the lighthouse beacon node service cannot be started
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+        )
+
+        return False
+
+    # Verify proper Lighthouse beacon node installation and syncing
+    local_lighthouse_bn_http_base = 'http://127.0.0.1:5052'
+    
+    lighthouse_bn_version_query = '/eth/v1/node/version'
+    lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_version_query
+    headers = {
+        'accept': 'application/json'
+    }
+    try:
+        response = httpx.get(lighthouse_bn_query_url, headers=headers)
+    except httpx.RequestError as exception:
+        result = button_dialog(
+            title='Cannot connect to Lighthouse beacon node',
+            text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Exception: {exception}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+        )
+
+        return False
+
+    if response.status_code != 200:
+        result = button_dialog(
+            title='Cannot connect to Lighthouse beacon node',
+            text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Status code: {response.status_code}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+        )
+
+        return False
+    
+    # Verify proper Lighthouse beacon node syncing
+    lighthouse_bn_syncing_query = '/eth/v1/node/syncing'
+    lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_syncing_query
+    headers = {
+        'accept': 'application/json'
+    }
+    try:
+        response = httpx.get(lighthouse_bn_query_url, headers=headers)
+    except httpx.RequestError as exception:
+        button_dialog(
+            title='Cannot connect to Lighthouse beacon node',
+            text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Exception: {exception}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+        )
+
+        return False
+
+    if response.status_code != 200:
+        button_dialog(
+            title='Cannot connect to Lighthouse beacon node',
+            text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Status code: {response.status_code}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+        )
+
+        return False
+    
+    response_json = response.json()
+
+    retry_index = 0
+    retry_count = 5
+
+    while (
+        'data' not in response_json or
+        'is_syncing' not in response_json['data'] or
+        not response_json['data']['is_syncing']
+    ) and retry_index < retry_count:
+        result = button_dialog(
+            title='Unexpected response from Lighthouse beacon node',
+            text=(
+f'''
+We received an unexpected response from the lighthouse beacon node HTTP
+server. Here are some details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Response: {json.dumps(response_json)}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''         ),
+            buttons=[
+                ('Retry', 1),
+                ('Quit', False)
+            ]
+        ).run()
+        
+        if not result:
+
+            print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+            )
+
+            return False
+        
+        retry_index = retry_index + 1
+
+        # Wait a little before the next retry
+        time.sleep(5)
+
+        try:
+            response = httpx.get(lighthouse_bn_query_url, headers=headers)
+        except httpx.RequestError as exception:
+            button_dialog(
+                title='Cannot connect to Lighthouse beacon node',
+                text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Exception: {exception}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+    '''         ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+            )
+
+            return False
+
+        if response.status_code != 200:
+            button_dialog(
+                title='Cannot connect to Lighthouse beacon node',
+                text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Status code: {response.status_code}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+    '''         ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+            )
+
+            return False
+        
+        response_json = response.json()
+    
+    if (
+        'data' not in response_json or
+        'is_syncing' not in response_json['data'] or
+        not response_json['data']['is_syncing']
+    ):
+        # We could not get a proper result from the Lighthouse beacon node after all those retries
+        result = button_dialog(
+            title='Unexpected response from Lighthouse beacon node',
+            text=(
+f'''
+After a few retries, we still received an unexpected response from the
+lighthouse beacon node HTTP server. Here are some details for this last
+test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Response: {json.dumps(response_json)}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+        )
+
+        return False
+
+    # TODO: Using async and prompt_toolkit asyncio loop to display syncing values updating
+    # in realtime for a few seconds
+
+    print(
+f'''
+The lighthouse beacon node is currently syncing properly.
+
+Head slot: {response_json['data'].get('head_slot', 'unknown')}
+Sync distance: {response_json['data'].get('sync_distance', 'unknown')}
+
+Raw data: {response_json['data']}
+''' )
+    time.sleep(5)
 
     return True
 
