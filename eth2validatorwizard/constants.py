@@ -93,6 +93,18 @@ ADOPTOPENJDK_11_API_PARAMs = {
     'vendor': 'adoptopenjdk'
 }
 
+TEKU_BN_SERVICE_DISPLAY_NAME = {
+    NETWORK_MAINNET: 'Teku Eth2 Client Beacon Node (Mainnet)',
+    NETWORK_PYRMONT: 'Teku Eth2 Client Beacon Node (Pyrmont)',
+    NETWORK_PRATER: 'Teku Eth2 Client Beacon Node (Prater)'
+}
+
+TEKU_BN_ARGUMENTS = {
+    NETWORK_MAINNET: ['--network=mainnet', '--eth1-endpoint=http://localhost:8545', '--metrics-enabled', '--rest-api-enabled'],
+    NETWORK_PYRMONT: ['--network=pyrmont', '--eth1-endpoint=http://localhost:8545', '--metrics-enabled', '--rest-api-enabled'],
+    NETWORK_PRATER: ['--network=prater', '--eth1-endpoint=http://localhost:8545', '--metrics-enabled', '--rest-api-enabled']
+}
+
 GETH_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (
 '''

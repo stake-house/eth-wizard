@@ -1557,7 +1557,10 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
             text=(
 f'''
 We received an unexpected response from the lighthouse beacon node HTTP
-server. Here are some details for this last test we tried to perform:
+server. This is likely because lighthouse has not started syncing yet or
+because it's taking a little longer to find peers. We suggest you wait and
+retry in a minute. Here are some details for this last test we tried to
+perform:
 
 URL: {lighthouse_bn_query_url}
 Method: GET

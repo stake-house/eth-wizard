@@ -21,6 +21,8 @@ from dateutil.parser import parse as dateparse
 
 from zipfile import ZipFile
 
+from collections.abc import Collection
+
 from eth2validatorwizard.constants import *
 
 from eth2validatorwizard.platforms.common import (
@@ -553,7 +555,7 @@ archive after {retry_count} retries.
 
         geth_extracted_binary.parent.rmdir()
     
-    # Check if Geth user or directory already exists
+    # Check if Geth directory already exists
     geth_datadir = base_directory.joinpath('var', 'lib', 'goethereum')
     if geth_datadir.is_dir():
         geth_datadir_size = sizeof_fmt(get_dir_size(geth_datadir))
@@ -590,8 +592,8 @@ Do you want to remove this directory first and start from nothing?
     log_path = base_directory.joinpath('var', 'log')
     log_path.mkdir(parents=True, exist_ok=True)
 
-    geth_stdout_log_path = log_path.joinpath('geth-stdout.log')
-    geth_stderr_log_path = log_path.joinpath('geth-stderr.log')
+    geth_stdout_log_path = log_path.joinpath('geth-service-stdout.log')
+    geth_stderr_log_path = log_path.joinpath('geth-service-stderr.log')
 
     geth_arguments = GETH_ARGUMENTS[network]
     geth_arguments.append('--datadir')
@@ -675,9 +677,9 @@ To examine your geth service logs, inspect the following file:
         with open(geth_stderr_log_path, 'r', encoding='utf8') as log_file:
             log_file.seek(log_read_index)
             log_text = log_file.read()
+            log_read_index = log_file.tell()
         
         log_length = len(log_text)
-        log_read_index = log_read_index + log_length
 
         if log_length > 0:
             print(log_text)
@@ -989,7 +991,12 @@ Raw result: {response_result}
 def create_service(nssm_binary, service_name, binary_path, binary_args, parameters=None):
     # Create a Windows service using NSSM and configure it
 
-    # Remove it first to make sure it does not exist
+    # Stop the service first if it exists
+    subprocess.run([
+        nssm_binary, 'stop', service_name
+    ])
+
+    # Remove the service to make sure it does not exist
     subprocess.run([
         nssm_binary, 'remove', service_name, 'confirm'
     ])
@@ -1007,9 +1014,17 @@ def create_service(nssm_binary, service_name, binary_path, binary_args, paramete
     # Set all the other parameters
     if parameters is not None:
         for param, value in parameters.items():
-            process_result = subprocess.run([
-                nssm_binary, 'set', service_name, param, value
-                ])
+            if type(value) is str:
+                process_result = subprocess.run([
+                    nssm_binary, 'set', service_name, param, value
+                    ])
+            elif isinstance(value, Collection):
+                process_result = subprocess.run([
+                    nssm_binary, 'set', service_name, param
+                    ] + list(value))
+            else:
+                print(f'Unexpected parameter value {value} for parameter {param}.')
+                return False
             
             if process_result.returncode != 0:
                 print(f'Unexpected return code from NSSM when modifying at parameter. '
@@ -1614,29 +1629,21 @@ Do you want to skip installing the teku binary distribution?
             print(f'We could not find the teku binary distribution from the installed archive '
                 f'in {teku_path}. We cannot continue.')
             return False
-    
-    # TODO: Finish this step
-    return False
 
-    # Check if lighthouse beacon node user or directory already exists
-    lighthouse_datadir_bn = Path('/var/lib/lighthouse/beacon')
-    if lighthouse_datadir_bn.exists() and lighthouse_datadir_bn.is_dir():
-        process_result = subprocess.run([
-            'du', '-sh', lighthouse_datadir_bn
-            ], capture_output=True, text=True)
-        
-        process_output = process_result.stdout
-        lighthouse_datadir_bn_size = process_output.split('\t')[0]
+    # Check if teku directory already exists
+    teku_datadir = base_directory.joinpath('var', 'lib', 'teku')
+    if teku_datadir.is_dir():
+        teku_datadir_size = sizeof_fmt(get_dir_size(teku_datadir))
 
         result = button_dialog(
-            title='Lighthouse beacon node data directory found',
+            title='Teku data directory found',
             text=(
 f'''
-An existing lighthouse beacon node data directory has been found. Here are
-some details found:
+An existing teku data directory has been found. Here are some
+details found:
 
-Location: {lighthouse_datadir_bn}
-Size: {lighthouse_datadir_bn_size}
+Location: {teku_datadir}
+Size: {teku_datadir_size}
 
 Do you want to remove this directory first and start from nothing?
 '''         ),
@@ -1651,86 +1658,146 @@ Do you want to remove this directory first and start from nothing?
             return result
         
         if result == 1:
-            shutil.rmtree(lighthouse_datadir_bn)
+            shutil.rmtree(teku_datadir)
 
-    lighthouse_bn_user_exists = False
-    process_result = subprocess.run([
-        'id', '-u', 'lighthousebeacon'
-    ])
-    lighthouse_bn_user_exists = (process_result.returncode == 0)
-
-    # Setup Lighthouse beacon node user and directory
-    if not lighthouse_bn_user_exists:
-        subprocess.run([
-            'useradd', '--no-create-home', '--shell', '/bin/false', 'lighthousebeacon'])
-    subprocess.run([
-        'mkdir', '-p', '/var/lib/lighthouse/beacon'])
-    subprocess.run([
-        'chown', '-R', 'lighthousebeacon:lighthousebeacon', '/var/lib/lighthouse/beacon'])
-    subprocess.run([
-        'chmod', '700', '/var/lib/lighthouse/beacon'])
-
-    # Setup Lighthouse beacon node systemd service
-    service_definition = LIGHTHOUSE_BN_SERVICE_DEFINITION[network]
-
-    eth1_endpoints = ['http://127.0.0.1:8545'] + eth1_fallbacks
-    service_definition = service_definition.format(eth1endpoints=','.join(eth1_endpoints))
-
-    with open('/etc/systemd/system/' + lighthouse_bn_service_name, 'w') as service_file:
-        service_file.write(service_definition)
-    subprocess.run([
-        'systemctl', 'daemon-reload'])
-    subprocess.run([
-        'systemctl', 'start', lighthouse_bn_service_name])
-    subprocess.run([
-        'systemctl', 'enable', lighthouse_bn_service_name])
+    # Setup teku directory
+    teku_datadir.mkdir(parents=True, exist_ok=True)
     
-    print(
-'''
-We are giving the lighthouse beacon node a few seconds to start before testing
-it.
+    # Setup teku service
+    log_path = base_directory.joinpath('var', 'log')
+    log_path.mkdir(parents=True, exist_ok=True)
 
-You might see some error and warn messages about your eth1 node not being in
-sync, being far behind or about the beacon node being unable to connect to any
-eth1 node. Those message are normal to see while your eth1 client is syncing.
-'''
-)
-    time.sleep(6)
-    try:
-        subprocess.run([
-            'journalctl', '-fu', lighthouse_bn_service_name
-        ], timeout=30)
-    except subprocess.TimeoutExpired:
-        pass
+    heap_dump_path = base_directory.joinpath('var', 'dump', 'teku', 'bn')
+    heap_dump_path.mkdir(parents=True, exist_ok=True)
 
-    # Check if the Lighthouse beacon node service is still running
-    service_details = get_systemd_service_details(lighthouse_bn_service_name)
+    teku_bn_stdout_log_path = log_path.joinpath('teku-bn-service-stdout.log')
+    teku_bn_stderr_log_path = log_path.joinpath('teku-bn-service-stderr.log')
+
+    teku_bn_arguments = TEKU_BN_ARGUMENTS[network]
+    teku_bn_arguments.append('--data-path=' + str(teku_datadir))
+
+    parameters = {
+        'DisplayName': TEKU_BN_SERVICE_DISPLAY_NAME[network],
+        'AppRotateFiles': '1',
+        'AppRotateSeconds': '86400',
+        'AppRotateBytes': '10485760',
+        'AppStdout': str(teku_bn_stdout_log_path),
+        'AppStderr': str(teku_bn_stderr_log_path),
+        'AppEnvironmentExtra': [
+            'JAVA_HOME=' + str(java_home),
+            'JAVA_OPTS=-Xmx3g',
+            'TEKU_OPTS=-XX:HeapDumpPath=' + str(heap_dump_path)
+        ]
+    }
+
+    if not create_service(nssm_binary, teku_bn_service_name, teku_batch_file, teku_bn_arguments,
+        parameters):
+        print('There was an issue creating the teku beacon node service. We cannot continue.')
+        return False
+
+    print('Starting teku beacon node service...')
+    process_result = subprocess.run([
+        nssm_binary, 'start', teku_bn_service_name
+    ])
+
+    if process_result.returncode != 0:
+        print('There was an issue starting the teku beacon node service. We cannot continue.')
+        return False
+
+    delay = 10
+    print(f'We are giving {delay} seconds for the teku beacon node service to start properly.')
+    time.sleep(delay)
+
+    # Verify proper Teku service installation
+    service_details = get_service_details(nssm_binary, teku_bn_service_name)
+    if not service_details:
+        print('We could not find the teku beacon node service we just created. '
+            'We cannot continue.')
+        return False
 
     if not (
-        service_details['LoadState'] == 'loaded' and
-        service_details['ActiveState'] == 'active' and
-        service_details['SubState'] == 'running'
-    ):
+        service_details['status'] == WINDOWS_SERVICE_RUNNING):
 
         result = button_dialog(
-            title='Lighthouse beacon node service not running properly',
+            title='Teku beacon node service not running properly',
             text=(
 f'''
-The lighthouse beacon node service we just created seems to have issues.
-Here are some details found:
+The teku beacon node service we just created seems to have issues. Here are
+some details found:
 
-Description: {service_details['Description']}
-States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
-UnitFilePreset: {service_details['UnitFilePreset']}
-ExecStart: {service_details['ExecStart']}
-ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
-FragmentPath: {service_details['FragmentPath']}
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
 
-We cannot proceed if the lighthouse beacon node service cannot be started
+We cannot proceed if the teku beacon node service cannot be started
+properly. Make sure to check the logs and fix any issue found there.
+You can see the logs in:
+
+{teku_bn_stdout_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your teku beacon node service logs, inspect the following file:
+
+{teku_bn_stdout_log_path}
+'''
+        )
+
+        return False
+
+    # Iterate over the logs and output them for around 30 seconds
+    log_read_index = 0
+    for i in range(6):
+        subprocess.run([
+            nssm_binary, 'rotate', teku_bn_service_name
+        ])
+        log_text = ''
+        with open(teku_bn_stdout_log_path, 'r', encoding='utf8') as log_file:
+            log_file.seek(log_read_index)
+            log_text = log_file.read()
+            log_read_index = log_file.tell()
+        
+        log_length = len(log_text)
+
+        if log_length > 0:
+            print(log_text)
+        time.sleep(5)
+
+    # Verify proper Teku beacon node installation and syncing
+    local_teku_bn_http_base = 'http://127.0.0.1:5051'
+    
+    teku_bn_version_query = '/eth/v1/node/version'
+    teku_bn_query_url = local_teku_bn_http_base + teku_bn_version_query
+    headers = {
+        'accept': 'application/json'
+    }
+    try:
+        response = httpx.get(teku_bn_query_url, headers=headers)
+    except httpx.RequestError as exception:
+        result = button_dialog(
+            title='Cannot connect to Teku beacon node',
+            text=(
+f'''
+We could not connect to teku beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {teku_bn_query_url}
+Method: GET
+Headers: {headers}
+Exception: {exception}
+
+We cannot proceed if the teku beacon node HTTP server is not responding
 properly. Make sure to check the logs and fix any issue found there. You
-can see the logs with:
+can see the logs in:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+{teku_bn_stdout_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -1739,55 +1806,9 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
         print(
 f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
+To examine your teku beacon node service logs, inspect the following file:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-'''
-        )
-
-        return False
-
-    # Verify proper Lighthouse beacon node installation and syncing
-    local_lighthouse_bn_http_base = 'http://127.0.0.1:5052'
-    
-    lighthouse_bn_version_query = '/eth/v1/node/version'
-    lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_version_query
-    headers = {
-        'accept': 'application/json'
-    }
-    try:
-        response = httpx.get(lighthouse_bn_query_url, headers=headers)
-    except httpx.RequestError as exception:
-        result = button_dialog(
-            title='Cannot connect to Lighthouse beacon node',
-            text=(
-f'''
-We could not connect to lighthouse beacon node HTTP server. Here are some
-details for this last test we tried to perform:
-
-URL: {lighthouse_bn_query_url}
-Method: GET
-Headers: {headers}
-Exception: {exception}
-
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
-
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-'''         ),
-            buttons=[
-                ('Quit', False)
-            ]
-        ).run()
-
-        print(
-f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
-
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+{teku_bn_stdout_log_path}
 '''
         )
 
@@ -1795,22 +1816,22 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
     if response.status_code != 200:
         result = button_dialog(
-            title='Cannot connect to Lighthouse beacon node',
+            title='Cannot connect to Teku beacon node',
             text=(
 f'''
-We could not connect to lighthouse beacon node HTTP server. Here are some
+We could not connect to teku beacon node HTTP server. Here are some
 details for this last test we tried to perform:
 
-URL: {lighthouse_bn_query_url}
+URL: {teku_bn_query_url}
 Method: GET
 Headers: {headers}
 Status code: {response.status_code}
 
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
+We cannot proceed if the teku beacon node HTTP server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+{teku_bn_stdout_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -1819,41 +1840,40 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
         print(
 f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
+To examine your teku beacon node service logs, inspect the following file:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+{teku_bn_stdout_log_path}
 '''
         )
 
         return False
     
-    # Verify proper Lighthouse beacon node syncing
-    lighthouse_bn_syncing_query = '/eth/v1/node/syncing'
-    lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_syncing_query
+    # Verify proper Teku beacon node syncing
+    teku_bn_syncing_query = '/eth/v1/node/syncing'
+    teku_bn_query_url = local_teku_bn_http_base + teku_bn_syncing_query
     headers = {
         'accept': 'application/json'
     }
     try:
-        response = httpx.get(lighthouse_bn_query_url, headers=headers)
+        response = httpx.get(teku_bn_query_url, headers=headers)
     except httpx.RequestError as exception:
         button_dialog(
-            title='Cannot connect to Lighthouse beacon node',
+            title='Cannot connect to Teku beacon node',
             text=(
 f'''
-We could not connect to lighthouse beacon node HTTP server. Here are some
+We could not connect to teku beacon node HTTP server. Here are some
 details for this last test we tried to perform:
 
-URL: {lighthouse_bn_query_url}
+URL: {teku_bn_query_url}
 Method: GET
 Headers: {headers}
 Exception: {exception}
 
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
+We cannot proceed if the teku beacon node HTTP server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+{teku_bn_stdout_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -1862,10 +1882,9 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
         print(
 f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
+To examine your teku beacon node service logs, inspect the following file:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+{teku_bn_stdout_log_path}
 '''
         )
 
@@ -1873,22 +1892,22 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
     if response.status_code != 200:
         button_dialog(
-            title='Cannot connect to Lighthouse beacon node',
+            title='Cannot connect to Teku beacon node',
             text=(
 f'''
-We could not connect to lighthouse beacon node HTTP server. Here are some
+We could not connect to teku beacon node HTTP server. Here are some
 details for this last test we tried to perform:
 
-URL: {lighthouse_bn_query_url}
+URL: {teku_bn_query_url}
 Method: GET
 Headers: {headers}
 Status code: {response.status_code}
 
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
+We cannot proceed if the teku beacon node HTTP server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+{teku_bn_stdout_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -1897,10 +1916,9 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
         print(
 f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
+To examine your teku beacon node service logs, inspect the following file:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+{teku_bn_stdout_log_path}
 '''
         )
 
@@ -1917,22 +1935,24 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
         not response_json['data']['is_syncing']
     ) and retry_index < retry_count:
         result = button_dialog(
-            title='Unexpected response from Lighthouse beacon node',
+            title='Unexpected response from Teku beacon node',
             text=(
 f'''
-We received an unexpected response from the lighthouse beacon node HTTP
-server. Here are some details for this last test we tried to perform:
+We received an unexpected response from the teku beacon node HTTP server.
+This is likely because teku has not started syncing yet or because it's
+taking a little longer to find peers. We suggest you wait and retry in a
+minute. Here are some details for this last test we tried to perform:
 
-URL: {lighthouse_bn_query_url}
+URL: {teku_bn_query_url}
 Method: GET
 Headers: {headers}
 Response: {json.dumps(response_json)}
 
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
+We cannot proceed if the teku beacon node HTTP server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+{teku_bn_stdout_log_path}
 '''         ),
             buttons=[
                 ('Retry', 1),
@@ -1944,10 +1964,9 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
             print(
 f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
+To examine your teku beacon node service logs, inspect the following file:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+{teku_bn_stdout_log_path}
 '''
             )
 
@@ -1959,26 +1978,26 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
         time.sleep(5)
 
         try:
-            response = httpx.get(lighthouse_bn_query_url, headers=headers)
+            response = httpx.get(teku_bn_query_url, headers=headers)
         except httpx.RequestError as exception:
             button_dialog(
-                title='Cannot connect to Lighthouse beacon node',
+                title='Cannot connect to Teku beacon node',
                 text=(
 f'''
-We could not connect to lighthouse beacon node HTTP server. Here are some
+We could not connect to teku beacon node HTTP server. Here are some
 details for this last test we tried to perform:
 
-URL: {lighthouse_bn_query_url}
+URL: {teku_bn_query_url}
 Method: GET
 Headers: {headers}
 Exception: {exception}
 
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
+We cannot proceed if the teku beacon node HTTP server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-    '''         ),
+{teku_bn_stdout_log_path}
+'''          ),
                 buttons=[
                     ('Quit', False)
                 ]
@@ -1986,10 +2005,9 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
             print(
 f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
+To examine your teku beacon node service logs, inspect the following file:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+{teku_bn_stdout_log_path}
 '''
             )
 
@@ -1997,23 +2015,23 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
         if response.status_code != 200:
             button_dialog(
-                title='Cannot connect to Lighthouse beacon node',
+                title='Cannot connect to Teku beacon node',
                 text=(
 f'''
-We could not connect to lighthouse beacon node HTTP server. Here are some
+We could not connect to teku beacon node HTTP server. Here are some
 details for this last test we tried to perform:
 
-URL: {lighthouse_bn_query_url}
+URL: {teku_bn_query_url}
 Method: GET
 Headers: {headers}
 Status code: {response.status_code}
 
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
+We cannot proceed if the teku beacon node HTTP server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-    '''         ),
+{teku_bn_stdout_log_path}
+'''          ),
                 buttons=[
                     ('Quit', False)
                 ]
@@ -2021,10 +2039,9 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
             print(
 f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
+To examine your teku beacon node service logs, inspect the following file:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+{teku_bn_stdout_log_path}
 '''
             )
 
@@ -2037,25 +2054,25 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
         'is_syncing' not in response_json['data'] or
         not response_json['data']['is_syncing']
     ):
-        # We could not get a proper result from the Lighthouse beacon node after all those retries
+        # We could not get a proper result from the Teku beacon node after all those retries
         result = button_dialog(
-            title='Unexpected response from Lighthouse beacon node',
+            title='Unexpected response from Teku beacon node',
             text=(
 f'''
 After a few retries, we still received an unexpected response from the
-lighthouse beacon node HTTP server. Here are some details for this last
-test we tried to perform:
+teku beacon node HTTP server. Here are some details for this last test we
+tried to perform:
 
-URL: {lighthouse_bn_query_url}
+URL: {teku_bn_query_url}
 Method: GET
 Headers: {headers}
 Response: {json.dumps(response_json)}
 
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
+We cannot proceed if the teku beacon node HTTP server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+{teku_bn_stdout_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -2064,10 +2081,9 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
         print(
 f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
+To examine your teku beacon node service logs, inspect the following file:
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+{teku_bn_stdout_log_path}
 '''
         )
 
@@ -2078,7 +2094,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
     print(
 f'''
-The lighthouse beacon node is currently syncing properly.
+The teku beacon node is currently syncing properly.
 
 Head slot: {response_json['data'].get('head_slot', 'unknown')}
 Sync distance: {response_json['data'].get('sync_distance', 'unknown')}
