@@ -1737,6 +1737,28 @@ Do you want to remove this directory first and start from nothing?
     if not (
         service_details['status'] == WINDOWS_SERVICE_RUNNING):
 
+        # Check for evidence of wrong password file
+        if teku_stderr_log_path.is_file():
+            log_part = ''
+            with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
+                log_part = log_file.read(1024)
+            result = re.search(r'Failed to decrypt', log_part)
+            if result:
+                subprocess.run([
+                    nssm_binary, 'stop', teku_service_name])
+                
+                print(
+f'''
+Your password file contains the wrong password. Teku cannot be started. You
+might need to generate your keys again or fix your password file. We cannot
+continue.
+
+Your password files are the .txt files in:
+
+{keys['validator_keys_path']}
+'''             )
+                return False
+
         result = button_dialog(
             title='Teku service not running properly',
             text=(
@@ -1777,21 +1799,32 @@ To examine your teku service logs, inspect the following files:
         return False
 
     # Iterate over the logs and output them for around 30 seconds
-    log_read_index = 0
+    out_log_read_index = 0
+    err_log_read_index = 0
     for i in range(6):
         subprocess.run([
             nssm_binary, 'rotate', teku_service_name
         ])
-        log_text = ''
+        out_log_text = ''
         with open(teku_stdout_log_path, 'r', encoding='utf8') as log_file:
-            log_file.seek(log_read_index)
-            log_text = log_file.read()
-            log_read_index = log_file.tell()
+            log_file.seek(out_log_read_index)
+            out_log_text = log_file.read()
+            out_log_read_index = log_file.tell()
         
-        log_length = len(log_text)
+        err_log_text = ''
+        with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
+            log_file.seek(err_log_read_index)
+            err_log_text = log_file.read()
+            err_log_read_index = log_file.tell()
+        
+        out_log_length = len(out_log_text)
+        if out_log_length > 0:
+            print(out_log_text)
 
-        if log_length > 0:
-            print(log_text)
+        err_log_length = len(err_log_text)
+        if err_log_length > 0:
+            print(err_log_text)
+
         time.sleep(5)
 
     # Verify proper Teku installation and syncing
@@ -1805,6 +1838,29 @@ To examine your teku service logs, inspect the following files:
     try:
         response = httpx.get(teku_query_url, headers=headers)
     except httpx.RequestError as exception:
+
+        # Check for evidence of wrong password file
+        if teku_stderr_log_path.is_file():
+            log_part = ''
+            with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
+                log_part = log_file.read(1024)
+            result = re.search(r'Failed to decrypt', log_part)
+            if result:
+                subprocess.run([
+                    nssm_binary, 'stop', teku_service_name])
+                
+                print(
+f'''
+Your password file contains the wrong password. Teku cannot be started. You
+might need to generate your keys again or fix your password file. We cannot
+continue.
+
+Your password files are the .txt files in:
+
+{keys['validator_keys_path']}
+'''             )
+                return False
+
         result = button_dialog(
             title='Cannot connect to Teku',
             text=(
