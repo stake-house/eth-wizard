@@ -1674,8 +1674,6 @@ Do you want to remove this directory first and start from nothing?
 
     # Setup teku directory
     teku_datadir.mkdir(parents=True, exist_ok=True)
-    
-    # TODO: Dry run Teku to test for correct password
 
     # Setup teku service
     log_path = base_directory.joinpath('var', 'log')
