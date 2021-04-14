@@ -29,6 +29,7 @@ from eth2validatorwizard.platforms.common import (
     select_network,
     select_eth1_fallbacks,
     input_dialog_default,
+    search_for_generated_keys
 )
 
 from prompt_toolkit.formatted_text import HTML
@@ -65,6 +66,11 @@ def installation_steps(*args, **kwargs):
         # User asked to quit or error
         quit_install()
     
+    generated_keys = generate_keys(selected_directory, selected_network)
+    if not generated_keys:
+        # User asked to quit or error
+        quit_install()
+
     # Teku does not support fallback yet
     '''selected_eth1_fallbacks = select_eth1_fallbacks(selected_network)
     if type(selected_eth1_fallbacks) is not list and not selected_eth1_fallbacks:
@@ -2104,6 +2110,367 @@ Raw data: {response_json['data']}
     time.sleep(5)
 
     return True
+
+def generate_keys(base_directory, network):
+    # Generate validator keys for the selected network
+
+    # Check if there are keys already created
+    keys_path = base_directory.joinpath('var', 'lib', 'eth2', 'keys')
+    
+    # Check if there are keys already created
+    generated_keys = search_for_generated_keys(keys_path)
+    if (
+        generated_keys['deposit_data_path'] is not None or
+        len(generated_keys['keystore_paths']) > 0 or
+        len(generated_keys['password_paths']) > 0
+    ):
+        result = button_dialog(
+            title='Validator keys already created',
+            text=(
+f'''
+It seems like validator keys have already been created. Here are some
+details found:
+
+Number of keystores: {len(generated_keys['keystore_paths'])}
+Number of associated password files: {len(generated_keys['password_paths'])}
+Deposit data file: {generated_keys['deposit_data_path']}
+Location: {keys_path}
+
+Do you want to skip generating new keys? Generating new keys will destroy
+all previously generated keys and deposit data file.
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Generate', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            return generated_keys
+
+    currency = NETWORK_CURRENCY[network]
+
+    result = button_dialog(
+        title='Generating keys',
+        text=(HTML(
+f'''
+This next step will generate the keys needed to be a validator.
+
+It will download the official eth2.0-deposit-cli binary from GitHub,
+verify its SHA256 checksum, extract it and start it.
+
+The eth2.0-deposit-cli tool is executed in an interactive way where you
+have to answer a few questions. It will help you create a mnemonic from
+which all your keys will be derived from. The mnemonic is the ultimate key.
+It is <style bg="red" fg="black"><b>VERY IMPORTANT</b></style> to securely and privately store your mnemonic. It can
+be used to recreate your validator keys and eventually withdraw your funds.
+
+When asked how many validators you wish to run, remember that you will have
+to do a 32 {currency} deposit for each validator.
+'''     )),
+        buttons=[
+            ('Generate', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+    
+    result = button_dialog(
+        title='CAUTION',
+        text=(HTML(
+f'''
+<style bg="red" fg="black">If the <b>mnemonic</b> you are about to create is lost or stolen, you will also
+lose your funds.</style>
+'''     )),
+        buttons=[
+            ('Understood', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+    
+    # Check if eth2.0-deposit-cli is already installed
+    eth2_deposit_cli_binary = base_directory.joinpath('bin', 'deposit.exe')
+
+    eth2_deposit_found = False
+
+    if eth2_deposit_cli_binary.is_file():
+        try:
+            process_result = subprocess.run([
+                eth2_deposit_cli_binary, '--help'
+                ], capture_output=True, text=True)
+            eth2_deposit_found = True
+
+            # TODO: Validate the output of deposit --help to make sure it's fine? Maybe?
+            # process_output = process_result.stdout
+
+        except FileNotFoundError:
+            pass
+    
+    install_eth2_deposit_binary = True
+
+    if eth2_deposit_found:
+        result = button_dialog(
+            title='eth2.0-deposit-cli binary found',
+            text=(
+f'''
+The eth2.0-deposit-cli binary seems to have already been installed. Here
+are some details found:
+
+Location: {eth2_deposit_cli_binary}
+
+Do you want to skip installing the eth2.0-deposit-cli binary?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        install_eth2_deposit_binary = (result == 2)
+
+    if install_eth2_deposit_binary:
+        # Getting latest eth2.0-deposit-cli release files
+        eth2_cli_gh_release_url = GITHUB_REST_API_URL + ETH2_DEPOSIT_CLI_LATEST_RELEASE
+        headers = {'Accept': GITHUB_API_VERSION}
+        try:
+            response = httpx.get(eth2_cli_gh_release_url, headers=headers)
+        except httpx.RequestError as exception:
+            # TODO: Better handling for network response issue
+            print(
+f'Cannot get latest eth2.0-deposit-cli release from Github. Exception {exception}'
+            )
+            return False
+
+        if response.status_code != 200:
+            # TODO: Better handling for network response issue
+            print(
+f'Cannot get latest eth2.0-deposit-cli release from Github. Error code {response.status_code}'
+            )
+            return False
+        
+        release_json = response.json()
+
+        if 'assets' not in release_json:
+            # TODO: Better handling on unexpected response structure
+            print('Unexpected response from Github API.')
+            return False
+        
+        binary_asset = None
+        checksum_asset = None
+
+        for asset in release_json['assets']:
+            if 'name' not in asset:
+                continue
+            if 'browser_download_url' not in asset:
+                continue
+        
+            file_name = asset['name']
+            file_url = asset['browser_download_url']
+
+            if file_name.endswith('windows-amd64.zip'):
+                binary_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+            elif file_name.endswith('windows-amd64.sha256'):
+                checksum_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+        
+        if binary_asset is None:
+            # TODO: Better handling of missing binary in latest release
+            print('No eth2.0-deposit-cli binary found in Github release')
+            return False
+        
+        checksum_path = None
+
+        if checksum_asset is None:
+            # TODO: Better handling of missing checksum in latest release
+            print('Warning: No eth2.0-deposit-cli checksum found in Github release')
+        
+        # Downloading latest eth2.0-deposit-cli release files
+        download_path = base_directory.joinpath('downloads')
+        download_path.mkdir(parents=True, exist_ok=True)
+
+        binary_path = Path(download_path, binary_asset['file_name'])
+        binary_hash = hashlib.sha256()
+
+        if binary_path.is_file():
+            binary_path.unlink()
+
+        try:
+            with open(binary_path, 'wb') as binary_file:
+                print(f'Downloading eth2.0-deposit-cli binary {binary_asset["file_name"]}...')
+                with httpx.stream('GET', binary_asset['file_url']) as http_stream:
+                    if http_stream.status_code != 200:
+                        print(f'Cannot download eth2.0-deposit-cli binary from Github '
+                            f'{binary_asset["file_url"]}.\nUnexpected status code '
+                            f'{http_stream.status_code}')
+                        return False
+                    for data in http_stream.iter_bytes():
+                        binary_file.write(data)
+                        binary_hash.update(data)
+        except httpx.RequestError as exception:
+            print(f'Exception while downloading eth2.0-deposit-cli binary from Github. '
+                f'Exception {exception}')
+            return False
+
+        if checksum_asset is not None:
+            binary_hexdigest = binary_hash.hexdigest()
+
+            checksum_path = Path(download_path, checksum_asset['file_name'])
+
+            if checksum_path.is_file():
+                checksum_path.unlink()
+
+            try:
+                with open(checksum_path, 'wb') as signature_file:
+                    print(f'Downloading eth2.0-deposit-cli checksum {checksum_asset["file_name"]}...')
+                    with httpx.stream('GET', checksum_asset['file_url']) as http_stream:
+                        if http_stream.status_code != 200:
+                            print(f'Cannot download eth2.0-deposit-cli checksum from Github '
+                                f'{checksum_asset["file_url"]}.\nUnexpected status code '
+                                f'{http_stream.status_code}')
+                            return False
+                        for data in http_stream.iter_bytes():
+                            signature_file.write(data)
+            except httpx.RequestError as exception:
+                print(f'Exception while downloading eth2.0-deposit-cli checksum from Github. '
+                    f'Exception {exception}')
+                return False
+
+            # Verify SHA256 signature
+            print('Verifying eth2.0-deposit-cli checksum...')
+            checksum_value = ''
+            with open(checksum_path, 'r', encoding='utf_16_le') as signature_file:
+                checksum_value = signature_file.read(1024).strip()
+            
+            # Remove download leftovers
+            checksum_path.unlink()
+
+            # Remove BOM
+            if checksum_value.startswith('\ufeff'):
+                checksum_value = checksum_value[1:]
+            if binary_hexdigest != checksum_value:
+                # TODO: Better handling of failed SHA256 checksum
+                print('SHA256 checksum failed on eth2.0-deposit-cli binary from Github. '
+                    'We will stop here to protect you.')
+                return False
+        
+        # Unzip eth2.0-deposit-cli archive
+        bin_path = base_directory.joinpath('bin')
+        bin_path.mkdir(parents=True, exist_ok=True)
+
+        deposit_extracted_binary = None
+
+        print(f'Extracting eth2.0-deposit-cli binary {binary_asset["file_name"]}...')
+        with ZipFile(binary_path, 'r') as zip_file:
+            for name in zip_file.namelist():
+                if name.endswith('deposit.exe'):
+                    deposit_extracted_binary = Path(zip_file.extract(name, download_path))
+        
+        # Remove download leftovers
+        binary_path.unlink()
+
+        if deposit_extracted_binary is None:
+            print('The eth2.0-deposit-cli binary was not found in the archive. '
+                'We cannot continue.')
+            return False
+
+        # Move deposit binary back into bin directory
+        target_deposit_binary_path = bin_path.joinpath('deposit.exe')
+        if target_deposit_binary_path.is_file():
+            target_deposit_binary_path.unlink()
+        
+        deposit_extracted_binary.rename(target_deposit_binary_path)
+
+        deposit_extracted_binary.parent.rmdir()
+
+    # Clean potential leftover keys
+    if keys_path.is_dir():
+        shutil.rmtree(keys_path)
+    keys_path.mkdir(parents=True, exist_ok=True)
+    
+    # Launch eth2.0-deposit-cli
+    print('Generating keys with eth2.0-deposit-cli binary...')
+    subprocess.run([
+        eth2_deposit_cli_binary, 'new-mnemonic', '--chain', network, '--folder', keys_path],
+        cwd=keys_path)
+
+    # Clean up eth2.0-deposit-cli binary
+    eth2_deposit_cli_binary.unlink()
+
+    # Reorganize generated files to move them up a directory
+    validator_keys_path = keys_path.joinpath('validator_keys')
+    if validator_keys_path.is_dir():
+        with os.scandir(validator_keys_path) as it:
+            for entry in it:
+                if not entry.is_file():
+                    continue
+                target_path = keys_path.joinpath(entry.name)
+                os.rename(entry.path, target_path)
+        
+        validator_keys_path.rmdir()
+
+    # Verify the generated keys
+    generated_keys = search_for_generated_keys(keys_path)
+    
+    if generated_keys['deposit_data_path'] is None or len(generated_keys['keystore_paths']) == 0:
+        # TODO: Better handling of no keys generated
+        print('No key has been generated with the eth2.0-deposit-cli tool. We cannot continue.')
+        return False
+    
+    # Generate password files
+    keystore_password = input_dialog(
+        title='Enter your keystore password',
+        text=(
+f'''
+Please enter the password you just used to create your keystore with the
+eth2.0-deposit-cli tool:
+
+The password will be stored in a text file so that Teku can access your
+validator keys when starting.
+
+* Press the tab key to switch between the controls below
+'''     ),
+        password=True).run()
+
+    if not keystore_password:
+        return False
+
+    with os.scandir(keys_path) as it:
+        for entry in it:
+            if not entry.is_file():
+                continue
+            if not entry.name.startswith('keystore'):
+                continue
+            if not entry.name.endswith('.json'):
+                continue
+
+            entry_path = Path(entry.path)
+            target_file = keys_path.joinpath(entry_path.stem + '.txt')
+            with open(target_file, 'w', encoding='utf8') as password_file:
+                password_file.write(keystore_password)
+
+    generated_keys = search_for_generated_keys(keys_path)
+
+    # TODO: Change ACL to protect keys directory
+
+    return generated_keys
 
 def get_dir_size(directory):
     total_size = 0

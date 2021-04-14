@@ -1,5 +1,6 @@
 import httpx
 import json
+import os
 
 from urllib.parse import urlparse
 
@@ -316,3 +317,31 @@ def input_dialog_default(
     )
 
     return _create_app(dialog, style)
+
+def search_for_generated_keys(validator_keys_path):
+    # Search for keys generated with the eth2.0-deposit-cli binary
+
+    deposit_data_path = None
+    keystore_paths = []
+    password_paths = []
+
+    if validator_keys_path.is_dir():
+        with os.scandir(validator_keys_path) as dir_it:
+            for entry in dir_it:
+                name = entry.name
+                if name.startswith('.') or not entry.is_file():
+                    continue
+
+                if name.startswith('deposit_data'):
+                    deposit_data_path = entry.path
+                elif name.startswith('keystore') and name.endswith('.json'):
+                    keystore_paths.append(entry.path)
+                elif name.startswith('keystore') and name.endswith('.txt'):
+                    password_paths.append(entry.path)
+    
+    return {
+        'validator_keys_path': validator_keys_path,
+        'deposit_data_path': deposit_data_path,
+        'keystore_paths': keystore_paths,
+        'password_paths': password_paths
+    }

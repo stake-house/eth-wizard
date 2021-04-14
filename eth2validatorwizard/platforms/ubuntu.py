@@ -15,6 +15,7 @@ from eth2validatorwizard.constants import *
 from eth2validatorwizard.platforms.common import (
     select_network,
     select_eth1_fallbacks,
+    search_for_generated_keys
 )
 
 from prompt_toolkit.formatted_text import HTML
@@ -2037,29 +2038,6 @@ f'Cannot get latest eth2.0-deposit-cli release from Github. Error code {response
         return False
 
     return generated_keys
-
-def search_for_generated_keys(validator_keys_path):
-    # Search for keys generated with the eth2.0-deposit-cli binary
-
-    deposit_data_path = None
-    keystore_paths = []
-
-    if validator_keys_path.exists() and validator_keys_path.is_dir():
-        with os.scandir(validator_keys_path) as dir_it:
-            for entry in dir_it:
-                if entry.name.startswith('.') or not entry.is_file():
-                    continue
-
-                if entry.name.startswith('deposit_data'):
-                    deposit_data_path = entry.path
-                elif entry.name.startswith('keystore'):
-                    keystore_paths.append(entry.path)
-    
-    return {
-        'validator_keys_path': validator_keys_path,
-        'deposit_data_path': deposit_data_path,
-        'keystore_paths': keystore_paths
-    }
 
 def install_lighthouse_validator(network, keys):
     # Import keystore(s) and configure the Lighthouse validator client
