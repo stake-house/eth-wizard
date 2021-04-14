@@ -77,7 +77,7 @@ def installation_steps(*args, **kwargs):
         # User asked to quit
         quit_install()'''
 
-    if not install_teku(selected_directory, selected_network, selected_ports):
+    if not install_teku(selected_directory, selected_network, generated_keys, selected_ports):
         # User asked to quit or error
         quit_install()
 
@@ -600,6 +600,11 @@ Do you want to remove this directory first and start from nothing?
 
     geth_stdout_log_path = log_path.joinpath('geth-service-stdout.log')
     geth_stderr_log_path = log_path.joinpath('geth-service-stderr.log')
+
+    if geth_stdout_log_path.is_file():
+        geth_stdout_log_path.unlink()
+    if geth_stderr_log_path.is_file():
+        geth_stderr_log_path.unlink()
 
     geth_arguments = GETH_ARGUMENTS[network]
     geth_arguments.append('--datadir')
@@ -1377,7 +1382,7 @@ Do you want to skip installing the JRE?
     
     return True
 
-def install_teku(base_directory, network, ports):
+def install_teku(base_directory, network, keys, ports):
     # Install Teku for the selected network
 
     nssm_binary = get_nssm_binary()
@@ -1385,21 +1390,21 @@ def install_teku(base_directory, network, ports):
         return False
 
     # Check for existing service
-    teku_bn_service_exists = False
-    teku_bn_service_name = 'tekubeacon'
+    teku_service_exists = False
+    teku_service_name = 'teku'
 
-    service_details = get_service_details(nssm_binary, teku_bn_service_name)
+    service_details = get_service_details(nssm_binary, teku_service_name)
 
     if service_details is not None:
-        teku_bn_service_exists = True
+        teku_service_exists = True
     
-    if teku_bn_service_exists:
+    if teku_service_exists:
         result = button_dialog(
-            title='Teku beacon node service found',
+            title='Teku service found',
             text=(
 f'''
-The teku beacon node service seems to have already been created. Here are
-some details found:
+The teku service seems to have already been created. Here are some details
+found:
 
 Display name: {service_details['parameters'].get('DisplayName')}
 Status: {service_details['status']}
@@ -1407,7 +1412,7 @@ Binary: {service_details['install']}
 App parameters: {service_details['parameters'].get('AppParameters')}
 App directory: {service_details['parameters'].get('AppDirectory')}
 
-Do you want to skip installing teku and its beacon node service?
+Do you want to skip installing teku and its service?
 '''         ),
             buttons=[
                 ('Skip', 1),
@@ -1422,9 +1427,9 @@ Do you want to skip installing teku and its beacon node service?
         if result == 1:
             return True
         
-        # User wants to proceed, make sure the teku beacon node service is stopped first
+        # User wants to proceed, make sure the teku service is stopped first
         subprocess.run([
-            nssm_binary, 'stop', teku_bn_service_name])
+            nssm_binary, 'stop', teku_service_name])
 
     result = button_dialog(
         title='Teku installation',
@@ -1438,10 +1443,11 @@ the official Teku binary distribution from GitHub, it will verify its
 checksum and it will extract it for easy use.
 
 Once installed locally, it will create a service that will automatically
-start the Teku beacon node on reboot or if it crashes. The beacon node will
-be started and you will slowly start syncing with the Ethereum 2.0 network.
-This syncing process can take a few hours or days even with good hardware
-and good internet.
+start Teku on reboot or if it crashes. The Teku client will be started and
+you will slowly start syncing with the Ethereum 2.0 network. This syncing
+process can take a few hours or days even with good hardware and good
+internet. The Teku client will automatically start validating once syncing
+is completed and your validator(s) are activated.
 '''     ),
         buttons=[
             ('Install', True),
@@ -1669,55 +1675,64 @@ Do you want to remove this directory first and start from nothing?
     # Setup teku directory
     teku_datadir.mkdir(parents=True, exist_ok=True)
     
+    # TODO: Dry run Teku to test for correct password
+
     # Setup teku service
     log_path = base_directory.joinpath('var', 'log')
     log_path.mkdir(parents=True, exist_ok=True)
 
-    heap_dump_path = base_directory.joinpath('var', 'dump', 'teku', 'bn')
+    heap_dump_path = base_directory.joinpath('var', 'dump', 'teku')
     heap_dump_path.mkdir(parents=True, exist_ok=True)
 
-    teku_bn_stdout_log_path = log_path.joinpath('teku-bn-service-stdout.log')
-    teku_bn_stderr_log_path = log_path.joinpath('teku-bn-service-stderr.log')
+    teku_stdout_log_path = log_path.joinpath('teku-service-stdout.log')
+    teku_stderr_log_path = log_path.joinpath('teku-service-stderr.log')
 
-    teku_bn_arguments = TEKU_BN_ARGUMENTS[network]
-    teku_bn_arguments.append('--data-path=' + str(teku_datadir))
+    if teku_stdout_log_path.is_file():
+        teku_stdout_log_path.unlink()
+    if teku_stderr_log_path.is_file():
+        teku_stderr_log_path.unlink()
+
+    teku_arguments = TEKU_ARGUMENTS[network]
+    teku_arguments.append('--data-path=' + str(teku_datadir))
+    teku_arguments.append('--validator-keys=' + str(keys['validator_keys_path']) +
+        ';' + str(keys['validator_keys_path']))
 
     parameters = {
-        'DisplayName': TEKU_BN_SERVICE_DISPLAY_NAME[network],
+        'DisplayName': TEKU_SERVICE_DISPLAY_NAME[network],
         'AppRotateFiles': '1',
         'AppRotateSeconds': '86400',
         'AppRotateBytes': '10485760',
-        'AppStdout': str(teku_bn_stdout_log_path),
-        'AppStderr': str(teku_bn_stderr_log_path),
+        'AppStdout': str(teku_stdout_log_path),
+        'AppStderr': str(teku_stderr_log_path),
         'AppEnvironmentExtra': [
             'JAVA_HOME=' + str(java_home),
-            'JAVA_OPTS=-Xmx3g',
+            'JAVA_OPTS=-Xmx4g',
             'TEKU_OPTS=-XX:HeapDumpPath=' + str(heap_dump_path)
         ]
     }
 
-    if not create_service(nssm_binary, teku_bn_service_name, teku_batch_file, teku_bn_arguments,
+    if not create_service(nssm_binary, teku_service_name, teku_batch_file, teku_arguments,
         parameters):
-        print('There was an issue creating the teku beacon node service. We cannot continue.')
+        print('There was an issue creating the teku service. We cannot continue.')
         return False
 
-    print('Starting teku beacon node service...')
+    print('Starting teku service...')
     process_result = subprocess.run([
-        nssm_binary, 'start', teku_bn_service_name
+        nssm_binary, 'start', teku_service_name
     ])
 
     if process_result.returncode != 0:
-        print('There was an issue starting the teku beacon node service. We cannot continue.')
+        print('There was an issue starting the teku service. We cannot continue.')
         return False
 
     delay = 10
-    print(f'We are giving {delay} seconds for the teku beacon node service to start properly.')
+    print(f'We are giving {delay} seconds for the teku service to start properly.')
     time.sleep(delay)
 
     # Verify proper Teku service installation
-    service_details = get_service_details(nssm_binary, teku_bn_service_name)
+    service_details = get_service_details(nssm_binary, teku_service_name)
     if not service_details:
-        print('We could not find the teku beacon node service we just created. '
+        print('We could not find the teku service we just created. '
             'We cannot continue.')
         return False
 
@@ -1725,11 +1740,11 @@ Do you want to remove this directory first and start from nothing?
         service_details['status'] == WINDOWS_SERVICE_RUNNING):
 
         result = button_dialog(
-            title='Teku beacon node service not running properly',
+            title='Teku service not running properly',
             text=(
 f'''
-The teku beacon node service we just created seems to have issues. Here are
-some details found:
+The teku service we just created seems to have issues. Here are some
+details found:
 
 Display name: {service_details['parameters'].get('DisplayName')}
 Status: {service_details['status']}
@@ -1737,22 +1752,27 @@ Binary: {service_details['install']}
 App parameters: {service_details['parameters'].get('AppParameters')}
 App directory: {service_details['parameters'].get('AppDirectory')}
 
-We cannot proceed if the teku beacon node service cannot be started
-properly. Make sure to check the logs and fix any issue found there.
-You can see the logs in:
+We cannot proceed if the teku service cannot be started properly. Make sure
+to check the logs and fix any issue found there. You can see the logs in:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
             ]
         ).run()
 
+        # Stop the service to prevent indefinite restart attempts
+        subprocess.run([
+            nssm_binary, 'stop', teku_service_name])
+
         print(
 f'''
-To examine your teku beacon node service logs, inspect the following file:
+To examine your teku service logs, inspect the following files:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''
         )
 
@@ -1762,10 +1782,10 @@ To examine your teku beacon node service logs, inspect the following file:
     log_read_index = 0
     for i in range(6):
         subprocess.run([
-            nssm_binary, 'rotate', teku_bn_service_name
+            nssm_binary, 'rotate', teku_service_name
         ])
         log_text = ''
-        with open(teku_bn_stdout_log_path, 'r', encoding='utf8') as log_file:
+        with open(teku_stdout_log_path, 'r', encoding='utf8') as log_file:
             log_file.seek(log_read_index)
             log_text = log_file.read()
             log_read_index = log_file.tell()
@@ -1776,34 +1796,35 @@ To examine your teku beacon node service logs, inspect the following file:
             print(log_text)
         time.sleep(5)
 
-    # Verify proper Teku beacon node installation and syncing
-    local_teku_bn_http_base = 'http://127.0.0.1:5051'
+    # Verify proper Teku installation and syncing
+    local_teku_http_base = 'http://127.0.0.1:5051'
     
-    teku_bn_version_query = '/eth/v1/node/version'
-    teku_bn_query_url = local_teku_bn_http_base + teku_bn_version_query
+    teku_version_query = '/eth/v1/node/version'
+    teku_query_url = local_teku_http_base + teku_version_query
     headers = {
         'accept': 'application/json'
     }
     try:
-        response = httpx.get(teku_bn_query_url, headers=headers)
+        response = httpx.get(teku_query_url, headers=headers)
     except httpx.RequestError as exception:
         result = button_dialog(
-            title='Cannot connect to Teku beacon node',
+            title='Cannot connect to Teku',
             text=(
 f'''
-We could not connect to teku beacon node HTTP server. Here are some
-details for this last test we tried to perform:
+We could not connect to teku HTTP server. Here are some details for this
+last test we tried to perform:
 
-URL: {teku_bn_query_url}
+URL: {teku_query_url}
 Method: GET
 Headers: {headers}
 Exception: {exception}
 
-We cannot proceed if the teku beacon node HTTP server is not responding
-properly. Make sure to check the logs and fix any issue found there. You
-can see the logs in:
+We cannot proceed if the teku HTTP server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -1812,9 +1833,10 @@ can see the logs in:
 
         print(
 f'''
-To examine your teku beacon node service logs, inspect the following file:
+To examine your teku service logs, inspect the following files:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''
         )
 
@@ -1822,22 +1844,23 @@ To examine your teku beacon node service logs, inspect the following file:
 
     if response.status_code != 200:
         result = button_dialog(
-            title='Cannot connect to Teku beacon node',
+            title='Cannot connect to Teku',
             text=(
 f'''
-We could not connect to teku beacon node HTTP server. Here are some
-details for this last test we tried to perform:
+We could not connect to teku HTTP server. Here are some details for this
+last test we tried to perform:
 
-URL: {teku_bn_query_url}
+URL: {teku_query_url}
 Method: GET
 Headers: {headers}
 Status code: {response.status_code}
 
-We cannot proceed if the teku beacon node HTTP server is not responding
-properly. Make sure to check the logs and fix any issue found there. You
-can see the logs in:
+We cannot proceed if the teku HTTP server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -1846,40 +1869,42 @@ can see the logs in:
 
         print(
 f'''
-To examine your teku beacon node service logs, inspect the following file:
+To examine your teku service logs, inspect the following files:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''
         )
 
         return False
     
-    # Verify proper Teku beacon node syncing
-    teku_bn_syncing_query = '/eth/v1/node/syncing'
-    teku_bn_query_url = local_teku_bn_http_base + teku_bn_syncing_query
+    # Verify proper Teku syncing
+    teku_syncing_query = '/eth/v1/node/syncing'
+    teku_query_url = local_teku_http_base + teku_syncing_query
     headers = {
         'accept': 'application/json'
     }
     try:
-        response = httpx.get(teku_bn_query_url, headers=headers)
+        response = httpx.get(teku_query_url, headers=headers)
     except httpx.RequestError as exception:
         button_dialog(
-            title='Cannot connect to Teku beacon node',
+            title='Cannot connect to Teku',
             text=(
 f'''
-We could not connect to teku beacon node HTTP server. Here are some
-details for this last test we tried to perform:
+We could not connect to teku HTTP server. Here are some details for this
+last test we tried to perform:
 
-URL: {teku_bn_query_url}
+URL: {teku_query_url}
 Method: GET
 Headers: {headers}
 Exception: {exception}
 
-We cannot proceed if the teku beacon node HTTP server is not responding
-properly. Make sure to check the logs and fix any issue found there. You
-can see the logs in:
+We cannot proceed if the teku HTTP server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -1888,9 +1913,10 @@ can see the logs in:
 
         print(
 f'''
-To examine your teku beacon node service logs, inspect the following file:
+To examine your teku service logs, inspect the following files:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''
         )
 
@@ -1898,22 +1924,23 @@ To examine your teku beacon node service logs, inspect the following file:
 
     if response.status_code != 200:
         button_dialog(
-            title='Cannot connect to Teku beacon node',
+            title='Cannot connect to Teku',
             text=(
 f'''
-We could not connect to teku beacon node HTTP server. Here are some
-details for this last test we tried to perform:
+We could not connect to teku HTTP server. Here are some details for this
+last test we tried to perform:
 
-URL: {teku_bn_query_url}
+URL: {teku_query_url}
 Method: GET
 Headers: {headers}
 Status code: {response.status_code}
 
-We cannot proceed if the teku beacon node HTTP server is not responding
-properly. Make sure to check the logs and fix any issue found there. You
-can see the logs in:
+We cannot proceed if the teku HTTP server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -1922,9 +1949,10 @@ can see the logs in:
 
         print(
 f'''
-To examine your teku beacon node service logs, inspect the following file:
+To examine your teku service logs, inspect the following files:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''
         )
 
@@ -1941,24 +1969,25 @@ To examine your teku beacon node service logs, inspect the following file:
         not response_json['data']['is_syncing']
     ) and retry_index < retry_count:
         result = button_dialog(
-            title='Unexpected response from Teku beacon node',
+            title='Unexpected response from Teku',
             text=(
 f'''
-We received an unexpected response from the teku beacon node HTTP server.
-This is likely because teku has not started syncing yet or because it's
-taking a little longer to find peers. We suggest you wait and retry in a
-minute. Here are some details for this last test we tried to perform:
+We received an unexpected response from the teku HTTP server. This is
+likely because teku has not started syncing yet or because it's taking a
+little longer to find peers. We suggest you wait and retry in a minute.
+Here are some details for this last test we tried to perform:
 
-URL: {teku_bn_query_url}
+URL: {teku_query_url}
 Method: GET
 Headers: {headers}
 Response: {json.dumps(response_json)}
 
-We cannot proceed if the teku beacon node HTTP server is not responding
-properly. Make sure to check the logs and fix any issue found there. You
-can see the logs in:
+We cannot proceed if the teku HTTP server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''         ),
             buttons=[
                 ('Retry', 1),
@@ -1970,9 +1999,10 @@ can see the logs in:
 
             print(
 f'''
-To examine your teku beacon node service logs, inspect the following file:
+To examine your teku service logs, inspect the following files:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''
             )
 
@@ -1984,25 +2014,26 @@ To examine your teku beacon node service logs, inspect the following file:
         time.sleep(5)
 
         try:
-            response = httpx.get(teku_bn_query_url, headers=headers)
+            response = httpx.get(teku_query_url, headers=headers)
         except httpx.RequestError as exception:
             button_dialog(
-                title='Cannot connect to Teku beacon node',
+                title='Cannot connect to Teku',
                 text=(
 f'''
-We could not connect to teku beacon node HTTP server. Here are some
-details for this last test we tried to perform:
+We could not connect to teku HTTP server. Here are some details for this
+last test we tried to perform:
 
-URL: {teku_bn_query_url}
+URL: {teku_query_url}
 Method: GET
 Headers: {headers}
 Exception: {exception}
 
-We cannot proceed if the teku beacon node HTTP server is not responding
-properly. Make sure to check the logs and fix any issue found there. You
-can see the logs in:
+We cannot proceed if the teku HTTP server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''          ),
                 buttons=[
                     ('Quit', False)
@@ -2011,9 +2042,10 @@ can see the logs in:
 
             print(
 f'''
-To examine your teku beacon node service logs, inspect the following file:
+To examine your teku service logs, inspect the following files:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''
             )
 
@@ -2021,22 +2053,23 @@ To examine your teku beacon node service logs, inspect the following file:
 
         if response.status_code != 200:
             button_dialog(
-                title='Cannot connect to Teku beacon node',
+                title='Cannot connect to Teku',
                 text=(
 f'''
-We could not connect to teku beacon node HTTP server. Here are some
-details for this last test we tried to perform:
+We could not connect to teku HTTP server. Here are some details for this
+last test we tried to perform:
 
-URL: {teku_bn_query_url}
+URL: {teku_query_url}
 Method: GET
 Headers: {headers}
 Status code: {response.status_code}
 
-We cannot proceed if the teku beacon node HTTP server is not responding
-properly. Make sure to check the logs and fix any issue found there. You
-can see the logs in:
+We cannot proceed if the teku HTTP server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''          ),
                 buttons=[
                     ('Quit', False)
@@ -2045,9 +2078,10 @@ can see the logs in:
 
             print(
 f'''
-To examine your teku beacon node service logs, inspect the following file:
+To examine your teku service logs, inspect the following files:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''
             )
 
@@ -2060,25 +2094,26 @@ To examine your teku beacon node service logs, inspect the following file:
         'is_syncing' not in response_json['data'] or
         not response_json['data']['is_syncing']
     ):
-        # We could not get a proper result from the Teku beacon node after all those retries
+        # We could not get a proper result from the Teku after all those retries
         result = button_dialog(
-            title='Unexpected response from Teku beacon node',
+            title='Unexpected response from Teku',
             text=(
 f'''
 After a few retries, we still received an unexpected response from the
-teku beacon node HTTP server. Here are some details for this last test we
-tried to perform:
+teku HTTP server. Here are some details for this last test we tried to
+perform:
 
-URL: {teku_bn_query_url}
+URL: {teku_query_url}
 Method: GET
 Headers: {headers}
 Response: {json.dumps(response_json)}
 
-We cannot proceed if the teku beacon node HTTP server is not responding
-properly. Make sure to check the logs and fix any issue found there. You
-can see the logs in:
+We cannot proceed if the teku HTTP server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -2087,9 +2122,10 @@ can see the logs in:
 
         print(
 f'''
-To examine your teku beacon node service logs, inspect the following file:
+To examine your teku service logs, inspect the following files:
 
-{teku_bn_stdout_log_path}
+{teku_stdout_log_path}
+{teku_stderr_log_path}
 '''
         )
 
@@ -2100,7 +2136,7 @@ To examine your teku beacon node service logs, inspect the following file:
 
     print(
 f'''
-The teku beacon node is currently syncing properly.
+Teku is currently syncing properly.
 
 Head slot: {response_json['data'].get('head_slot', 'unknown')}
 Sync distance: {response_json['data'].get('sync_distance', 'unknown')}
@@ -2116,11 +2152,26 @@ def generate_keys(base_directory, network):
 
     # Check if there are keys already created
     keys_path = base_directory.joinpath('var', 'lib', 'eth2', 'keys')
-    
+
+    # Ensure we currently have ACL permission to read from the keys path
+    if keys_path.is_dir():
+        subprocess.run([
+            'icacls', keys_path, '/inheritancelevel:e'
+        ])
+
     # Check if there are keys already created
+    deposit_data_directory = base_directory.joinpath('var', 'lib', 'eth2', 'deposit')
+    target_deposit_data_path = deposit_data_directory.joinpath('deposit_data.json')
+
     generated_keys = search_for_generated_keys(keys_path)
+
+    deposit_data_file = 'unknown'
+    if target_deposit_data_path.is_file():
+        deposit_data_file = target_deposit_data_path
+    elif generated_keys['deposit_data_path'] is not None:
+        deposit_data_file = generated_keys['deposit_data_path']
+    
     if (
-        generated_keys['deposit_data_path'] is not None or
         len(generated_keys['keystore_paths']) > 0 or
         len(generated_keys['password_paths']) > 0
     ):
@@ -2133,7 +2184,7 @@ details found:
 
 Number of keystores: {len(generated_keys['keystore_paths'])}
 Number of associated password files: {len(generated_keys['password_paths'])}
-Deposit data file: {generated_keys['deposit_data_path']}
+Deposit data file: {deposit_data_file}
 Location: {keys_path}
 
 Do you want to skip generating new keys? Generating new keys will destroy
@@ -2434,6 +2485,13 @@ f'Cannot get latest eth2.0-deposit-cli release from Github. Error code {response
         print('No key has been generated with the eth2.0-deposit-cli tool. We cannot continue.')
         return False
     
+    # Move deposit data file outside of keys directory
+    if deposit_data_directory.is_dir():
+        shutil.rmtree(deposit_data_directory)
+    deposit_data_directory.mkdir(parents=True, exist_ok=True)
+    
+    os.rename(generated_keys['deposit_data_path'], target_deposit_data_path)
+
     # Generate password files
     keystore_password = input_dialog(
         title='Enter your keystore password',

@@ -86,6 +86,7 @@ GETH_ARGUMENTS = {
 }
 
 WINDOWS_SERVICE_RUNNING = 'SERVICE_RUNNING'
+WINDOWS_SERVICE_START_PENDING = 'SERVICE_START_PENDING'
 
 ADOPTOPENJDK_11_API_URL = 'https://api.adoptopenjdk.net/v3/assets/feature_releases/11/ga'
 ADOPTOPENJDK_11_API_PARAMs = {
@@ -93,13 +94,13 @@ ADOPTOPENJDK_11_API_PARAMs = {
     'vendor': 'adoptopenjdk'
 }
 
-TEKU_BN_SERVICE_DISPLAY_NAME = {
-    NETWORK_MAINNET: 'Teku Eth2 Client Beacon Node (Mainnet)',
-    NETWORK_PYRMONT: 'Teku Eth2 Client Beacon Node (Pyrmont)',
-    NETWORK_PRATER: 'Teku Eth2 Client Beacon Node (Prater)'
+TEKU_SERVICE_DISPLAY_NAME = {
+    NETWORK_MAINNET: 'Teku Eth2 Client (Mainnet)',
+    NETWORK_PYRMONT: 'Teku Eth2 Client (Pyrmont)',
+    NETWORK_PRATER: 'Teku Eth2 Client (Prater)'
 }
 
-TEKU_BN_ARGUMENTS = {
+TEKU_ARGUMENTS = {
     NETWORK_MAINNET: ['--network=mainnet', '--eth1-endpoint=http://localhost:8545', '--metrics-enabled', '--rest-api-enabled'],
     NETWORK_PYRMONT: ['--network=pyrmont', '--eth1-endpoint=http://localhost:8545', '--metrics-enabled', '--rest-api-enabled'],
     NETWORK_PRATER: ['--network=prater', '--eth1-endpoint=http://localhost:8545', '--metrics-enabled', '--rest-api-enabled']

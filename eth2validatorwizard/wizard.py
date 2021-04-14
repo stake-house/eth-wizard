@@ -107,8 +107,8 @@ validator on an Ethereum 2.0 network.
 * Consolidate 32 ETH for each active validator you want (You can have
 a large amount of active validators using a single machine and this setup)
 * Install an Eth1 client and let it synchronize
-* Install an Eth2 beacon node and let it synchronize
 * Generate your validator(s) keys
+* Install an Eth2 beacon node and let it synchronize
 * Install an Eth2 validator client and import your key(s)
 * Perform the 32 ETH deposit for each validator
 * Wait for your validator(s) to become active (can take a few hours/days)
