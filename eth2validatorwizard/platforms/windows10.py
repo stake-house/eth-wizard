@@ -2443,7 +2443,8 @@ Please enter the password you just used to create your keystore with the
 eth2.0-deposit-cli tool:
 
 The password will be stored in a text file so that Teku can access your
-validator keys when starting.
+validator keys when starting. Permissions will be changed so that only
+the local system account can access the keys and the password file.
 
 * Press the tab key to switch between the controls below
 '''     ),
@@ -2468,7 +2469,14 @@ validator keys when starting.
 
     generated_keys = search_for_generated_keys(keys_path)
 
-    # TODO: Change ACL to protect keys directory
+    # Change ACL to protect keys directory
+    subprocess.run([
+        'icacls', keys_path, '/grant', 'SYSTEM:F', '/t'
+    ])
+
+    subprocess.run([
+        'icacls', keys_path, '/inheritancelevel:r'
+    ])
 
     return generated_keys
 
