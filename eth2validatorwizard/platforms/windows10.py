@@ -190,7 +190,7 @@ def install_nssm():
             'choco', 'install', '-y', 'nssm'])
     except FileNotFoundError:
         subprocess.run([
-            choco_path, 'install', '-y', 'nssm'])
+            str(choco_path), 'install', '-y', 'nssm'])
     
     return True
     
