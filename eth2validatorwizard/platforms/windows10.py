@@ -29,7 +29,10 @@ from eth2validatorwizard.platforms.common import (
     select_network,
     select_eth1_fallbacks,
     input_dialog_default,
-    search_for_generated_keys
+    search_for_generated_keys,
+    get_bc_validator_deposits,
+    show_whats_next,
+    show_public_keys
 )
 
 from prompt_toolkit.formatted_text import HTML
@@ -43,6 +46,8 @@ def installation_steps(*args, **kwargs):
         'eth1': DEFAULT_GETH_PORT,
         'eth2_bn': DEFAULT_TEKU_BN_PORT
     }
+
+    # TODO: Check time synchronization and configure it if needed
 
     selected_directory = select_directory()
     if not selected_directory:
@@ -80,9 +85,19 @@ def installation_steps(*args, **kwargs):
     if not install_teku(selected_directory, selected_network, generated_keys, selected_ports):
         # User asked to quit or error
         quit_install()
+    
+    public_keys = initiate_deposit(selected_directory, selected_network, generated_keys)
+    if not public_keys:
+        # User asked to quit or error
+        quit()
 
-    print('Press enter to quit')
-    input()
+    # TODO: Monitoring setup
+
+    show_whats_next(selected_network, generated_keys, public_keys)
+
+    show_public_keys(selected_network, generated_keys, public_keys)
+
+    quit_install()
 
 def quit_install():
     print('Press enter to quit')
@@ -2591,6 +2606,156 @@ the local system account can access the keys and the password file.
     ])
 
     return generated_keys
+
+def initiate_deposit(base_directory, network, keys):
+    # Initiate and explain the deposit on launchpad
+
+    launchpad_url = LAUNCHPAD_URLS[network]
+    currency = NETWORK_CURRENCY[network]
+
+    # Find the deposit file
+    deposit_file_path = base_directory.joinpath('var', 'lib', 'eth2', 'deposit',
+        'deposit_data.json')
+    if not deposit_file_path.is_file():
+        print(f'We could not find the deposit data file in {deposit_file_path}')
+        return False
+
+    # TODO: Create an alternative way to easily obtain the deposit file with a simple HTTP server
+
+    result = button_dialog(
+        title='Deposit on the launchpad',
+        text=(
+f'''
+This next step is to perform the 32 {currency} deposit(s) on the launchpad. In
+order to do this deposit, you will need your deposit file which was created
+during the key generation step. Your deposit file can be found in
+
+{deposit_file_path}
+
+On the Eth2 Launchpad website, you will be asked a few questions and it
+will explain some of the risks and mitigation strategies. Make sure to read
+everything carefully and make sure you understand it all. When you are
+ready, go to the following URL in your browser:
+
+{launchpad_url}
+
+When you are done with the deposit(s), click the "I'm done" button below.
+'''     ),
+        buttons=[
+            ('I\'m done', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+
+    public_keys = []
+
+    with open(deposit_file_path, 'r', encoding='utf8') as deposit_data_file:
+        deposit_data = json.loads(deposit_data_file.read(204800))
+        
+        for validator_data in deposit_data:
+            if 'pubkey' not in validator_data:
+                continue
+            public_key = validator_data['pubkey']
+            public_keys.append('0x' + public_key)
+    
+    if len(public_keys) == 0:
+        # TODO: Better handling of no public keys in deposit data file
+        print('No public key(s) found in the deposit file.')
+        return False
+
+    # Verify that the deposit was done correctly using beaconcha.in API
+    validator_deposits = get_bc_validator_deposits(network, public_keys)
+
+    if type(validator_deposits) is not list and not validator_deposits:
+        # TODO: Better handling of unability to get validator(s) deposits from beaconcha.in
+        print('Unability to get validator(s) deposits from beaconcha.in')
+        return False
+
+    while len(validator_deposits) == 0:
+        # beaconcha.in does not see any validator with the public keys we generated
+
+        result = button_dialog(
+            title='No deposit found',
+            text=(
+f'''
+No deposit has been found on the beaconcha.in website for the validator
+keys that you generated. In order to become an active validator, you need
+to do a 32 {currency} deposit for each validator you created. In order to do
+this deposit, you will need your deposit file which was created during the
+key generation step. Your deposit file can be found in
+
+{deposit_file_path}
+
+To perform the deposit(s), go to the following URL in your browser:
+
+{launchpad_url}
+
+When you are done with the deposit(s), click the "I'm done" button below.
+Note that it can take a few minutes before beaconcha.in sees your
+deposit(s).
+'''     ),
+            buttons=[
+                ('I\'m done', True),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+
+        validator_deposits = get_bc_validator_deposits(network, public_keys)
+
+        if type(validator_deposits) is not list and not validator_deposits:
+            # TODO: Better handling of unability to get validator(s) deposits from beaconcha.in
+            print('Unability to get validator(s) deposits from beaconcha.in')
+            return False
+    
+    # Check if all the deposit(s) were done for each validator
+    while len(validator_deposits) < len(public_keys):
+
+        result = button_dialog(
+            title='Missing deposit(s)',
+            text=(
+f'''
+Only {len(validator_deposits)} deposit(s) has been found for your {len(public_keys)} validators on the
+beaconcha.in website. In order to become an active validator, you need
+to do a 32 {currency} deposit for each validator you created. In order to do
+this deposit, you will need your deposit file which was created during the
+key generation step. Your deposit file can be found in
+
+{deposit_file_path}
+
+To perform the deposit(s), go to the following URL in your browser:
+
+{launchpad_url}
+
+When you are done with the deposit(s), click the "I'm done" button below.
+Note that it can take a few minutes before beaconcha.in sees your
+deposit(s).
+'''     ),
+            buttons=[
+                ('I\'m done', True),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+
+        validator_deposits = get_bc_validator_deposits(network, public_keys)
+
+        if type(validator_deposits) is not list and not validator_deposits:
+            # TODO: Better handling of unability to get validator(s) deposits from beaconcha.in
+            print('Unability to get validator(s) deposits from beaconcha.in')
+            return False
+
+    # Clean up deposit data file
+    deposit_file_path.unlink()
+    
+    return public_keys
 
 def get_dir_size(directory):
     total_size = 0

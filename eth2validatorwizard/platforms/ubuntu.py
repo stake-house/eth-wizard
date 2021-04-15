@@ -15,7 +15,10 @@ from eth2validatorwizard.constants import *
 from eth2validatorwizard.platforms.common import (
     select_network,
     select_eth1_fallbacks,
-    search_for_generated_keys
+    search_for_generated_keys,
+    get_bc_validator_deposits,
+    show_whats_next,
+    show_public_keys
 )
 
 from prompt_toolkit.formatted_text import HTML
@@ -2445,115 +2448,3 @@ deposit(s).
     os.unlink(keys['deposit_data_path'])
     
     return public_keys
-
-def get_bc_validator_deposits(network, public_keys):
-    # Return the validator deposits from the beaconcha.in API
-
-    pubkey_arg = ','.join(public_keys)
-    bc_api_query_url = (BEACONCHA_IN_URLS[network] +
-        BEACONCHA_VALIDATOR_DEPOSITS_API_URL.format(indexOrPubkey=pubkey_arg))
-    headers = {'accept': 'application/json'}
-
-    keep_retrying = True
-
-    retry_index = 0
-    retry_count = 5
-    retry_delay = 30
-
-    while keep_retrying and retry_index < retry_count:
-        try:
-            response = httpx.get(bc_api_query_url, headers=headers)
-        except httpx.RequestError as exception:
-            print(f'Exception {exception} when trying to get {bc_api_query_url}')
-
-            retry_index = retry_index + 1
-            print(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
-            time.sleep(retry_delay)
-            continue
-
-        if response.status_code != 200:
-            print(f'Error code {response.status_code} when trying to get {bc_api_query_url}')
-            
-            retry_index = retry_index + 1
-            print(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
-            time.sleep(retry_delay)
-            continue
-        
-        response_json = response.json()
-
-        if (
-            'status' not in response_json or
-            response_json['status'] != 'OK' or
-            'data' not in response_json
-            ):
-            print(f'Unexpected response data or structure from {bc_api_query_url}: {response_json}')
-            
-            retry_index = retry_index + 1
-            print(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
-            time.sleep(retry_delay)
-            continue
-        
-        keep_retrying = False
-    
-    if keep_retrying:
-        print(f'We failed to get the validator deposits from the beaconcha.in API after '
-            '{retry_count} retries.')
-        return False
-    
-    validator_deposits = response_json['data']
-    # beaconcha.in API does not return a list for a single validator so
-    # we make it a list for ease of use
-    if type(validator_deposits) is not list:
-        validator_deposits = [validator_deposits]
-
-    return validator_deposits
-
-def show_whats_next(network, keys, public_keys):
-    # Show what's next including wait time
-
-    beaconcha_in_url = BEACONCHA_IN_URLS[network]
-
-    button_dialog(
-        title='Installation completed',
-        text=(
-f'''
-You just completed all the steps needed to become an active validator on
-the {network.capitalize()} Ethereum 2.0 network. You created {len(keys['keystore_paths'])} validator(s)
-that will soon be activated.
-
-You can monitor your activation period and all the details about your
-validator(s) on the beaconcha.in website at the following URL:
-
-{beaconcha_in_url}
-
-If you have any question or if you need additional support, make sure
-to get in touch with the ethstaker community on:
-
-* Discord: discord.gg/e84CFep
-* Reddit: reddit.com/r/ethstaker
-'''     ),
-        buttons=[
-            ('Quit', False)
-        ]
-    ).run()
-
-def show_public_keys(network, keys, public_keys):
-    beaconcha_in_url = BEACONCHA_IN_URLS[network]
-
-    newline = '\n'
-
-    print(
-f'''
-Eth2 Validator Wizard completed!
-
-Network: {network.capitalize()}
-Number of validator(s): {len(keys['keystore_paths'])}
-
-Make sure to note or save your public keys somewhere. Your validator public
-key(s) are:
-{newline.join(public_keys)}
-
-Make sure to check the beaconcha.in website for more details about your
-validator(s):
-{beaconcha_in_url}
-''' )
