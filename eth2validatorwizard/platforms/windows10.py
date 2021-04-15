@@ -643,10 +643,6 @@ Do you want to remove this directory first and start from nothing?
         str(nssm_binary), 'start', geth_service_name
     ])
 
-    if process_result.returncode != 0:
-        print('There was an issue starting the geth service. We cannot continue.')
-        return False
-
     delay = 15
     print(f'We are giving {delay} seconds for the geth service to start properly.')
     time.sleep(delay)
@@ -1733,10 +1729,6 @@ Do you want to remove this directory first and start from nothing?
     process_result = subprocess.run([
         str(nssm_binary), 'start', teku_service_name
     ])
-
-    if process_result.returncode != 0:
-        print('There was an issue starting the teku service. We cannot continue.')
-        return False
 
     delay = 15
     print(f'We are giving {delay} seconds for the teku service to start properly.')
