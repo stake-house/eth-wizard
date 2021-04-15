@@ -25,12 +25,14 @@ The eth2-validator-wizard is not ready to be used in the real world yet. It is s
 You can use something like this in a terminal, to start the wizard:
 
 ```
-wget https://github.com/remyroy/eth2-validator-wizard/releases/download/v0.6/eth2validatorwizard-0.6.pyz && sudo python3 eth2validatorwizard-0.6.pyz
+wget https://github.com/remyroy/eth2-validator-wizard/releases/download/v0.6.1/eth2validatorwizard-0.6.1.pyz && sudo python3 eth2validatorwizard-0.6.1.pyz
 ```
 
 ### On Windows 10
 
-Download and run [the installer](https://github.com/remyroy/eth2-validator-wizard/releases/download/v0.6/eth2validatorwizard-0.6.exe)
+Please note that some antivirus software might detect the wizard binary as a threat and delete it or prevent its execution.
+
+Download and run [the wizard binary](https://github.com/remyroy/eth2-validator-wizard/releases/download/v0.6.1/eth2validatorwizard-0.6.1.exe)
 
 ## Support
 
