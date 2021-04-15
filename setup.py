@@ -98,11 +98,80 @@ class Bundle(Command):
             'gpg', '--default-key', '6EEC4CD326C4BBC79F51F55AE68A0CC47982CB5F', '--sign',
             '--armor', '--output', bundle_sign_path, '--detach-sig', bundle_path
         ])
+
+class BundleWin(Command):
+    ''' Create a Windows bundle for release
+    '''
+    description = 'create a Windows bundle for release'
+
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        project_path = Path(os.getcwd())
+        src_package_path = Path(project_path, 'eth2validatorwizard')
+
+        # Create and clean the build dir
+        build_path = Path(project_path, 'build')
+        if build_path.is_dir():
+            shutil.rmtree(build_path)
+        build_path.mkdir(parents=True, exist_ok=True)
+
+        # Write spec
+        build_spec = build_path.joinpath('build.spec')
+        with open(build_spec, 'w', encoding='utf8') as spec_file:
+            spec_file.write(
+fr'''
+block_cipher = None
+
+a = Analysis(['..\\eth2validatorwizard\\__main__.py'],
+             pathex=[{repr(str(project_path))}],
+             binaries=[],
+             datas=[],
+             hiddenimports=[],
+             hookspath=[],
+             runtime_hooks=[],
+             excludes=[],
+             win_no_prefer_redirects=False,
+             win_private_assemblies=False,
+             cipher=block_cipher,
+             noarchive=False)
+pyz = PYZ(a.pure, a.zipped_data,
+             cipher=block_cipher)
+exe = EXE(pyz,
+          a.scripts,
+          a.binaries,
+          a.zipfiles,
+          a.datas,
+          [],
+          name='eth2validatorwizard-{version}',
+          debug=False,
+          bootloader_ignore_signals=False,
+          strip=False,
+          upx=True,
+          upx_exclude=[],
+          runtime_tmpdir=None,
+          console=True , uac_admin=True)
+'''     )
+
+        # Build from spec
+        env = os.environ.copy()
+        env['PYTHONHASHSEED'] = '49'
+
+        subprocess.run([
+            'pyinstaller', str(build_spec)
+        ], env=env, cwd=str(project_path))
    
 if __name__ == "__main__":
     setuptools.setup(
         version=version,
         cmdclass={
-            'bundle': Bundle
+            'bundle': Bundle,
+            'bundlewin': BundleWin
         }
     )

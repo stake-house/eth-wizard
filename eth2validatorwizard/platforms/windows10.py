@@ -150,7 +150,7 @@ def install_nssm():
         
     except FileNotFoundError:
         try:
-            process_result = subprocess.run([nssm_path, '--version'])
+            process_result = subprocess.run([str(nssm_path), '--version'])
 
             if process_result.returncode == 0:
                 nssm_installed = True
@@ -173,7 +173,7 @@ def install_nssm():
             choco_installed = True
     except FileNotFoundError:
         try:
-            process_result = subprocess.run([choco_path, '--version'])
+            process_result = subprocess.run([str(choco_path), '--version'])
 
             if process_result.returncode == 0:
                 choco_installed = True
@@ -270,7 +270,7 @@ def get_nssm_binary():
         
     except FileNotFoundError:
         try:
-            process_result = subprocess.run([nssm_path, '--version'])
+            process_result = subprocess.run([str(nssm_path), '--version'])
 
             if process_result.returncode == 0:
                 nssm_installed = True
@@ -331,7 +331,7 @@ Do you want to skip installing geth and its service?
         
         # User wants to proceed, make sure the geth service is stopped first
         subprocess.run([
-            nssm_binary, 'stop', geth_service_name])
+            str(nssm_binary), 'stop', geth_service_name])
 
     result = button_dialog(
         title='Geth installation',
@@ -367,7 +367,7 @@ properly.
     if geth_path.is_file():
         try:
             process_result = subprocess.run([
-                geth_path, 'version'
+                str(geth_path), 'version'
                 ], capture_output=True, text=True, encoding='utf8')
             geth_found = True
 
@@ -515,8 +515,8 @@ Do you want to skip installing the geth binary?
 
         print('Downloading geth Windows Builder PGP key...')
 
-        command_line = [gpg_binary_path, '--keyserver', 'pool.sks-keyservers.net', '--recv-keys',
-            GETH_WINDOWS_PGP_KEY_ID]
+        command_line = [str(gpg_binary_path), '--keyserver', 'pool.sks-keyservers.net',
+            '--recv-keys', GETH_WINDOWS_PGP_KEY_ID]
         process_result = subprocess.run(command_line)
 
         retry_count = 5
@@ -540,7 +540,7 @@ archive after {retry_count} retries.
             return False
         
         process_result = subprocess.run([
-            gpg_binary_path, '--verify', geth_archive_sig_path])
+            str(gpg_binary_path), '--verify', str(geth_archive_sig_path)])
         if process_result.returncode != 0:
             # TODO: Better handling of failed PGP signature
             print('The geth archive signature is wrong. We\'ll stop here to protect you.')
@@ -640,14 +640,14 @@ Do you want to remove this directory first and start from nothing?
     
     print('Starting geth service...')
     process_result = subprocess.run([
-        nssm_binary, 'start', geth_service_name
+        str(nssm_binary), 'start', geth_service_name
     ])
 
     if process_result.returncode != 0:
         print('There was an issue starting the geth service. We cannot continue.')
         return False
 
-    delay = 5
+    delay = 15
     print(f'We are giving {delay} seconds for the geth service to start properly.')
     time.sleep(delay)
     
@@ -697,7 +697,7 @@ To examine your geth service logs, inspect the following file:
     log_read_index = 0
     for i in range(6):
         subprocess.run([
-            nssm_binary, 'rotate', geth_service_name
+            str(nssm_binary), 'rotate', geth_service_name
         ])
         log_text = ''
         with open(geth_stderr_log_path, 'r', encoding='utf8') as log_file:
@@ -1019,17 +1019,17 @@ def create_service(nssm_binary, service_name, binary_path, binary_args, paramete
 
     # Stop the service first if it exists
     subprocess.run([
-        nssm_binary, 'stop', service_name
+        str(nssm_binary), 'stop', service_name
     ])
 
     # Remove the service to make sure it does not exist
     subprocess.run([
-        nssm_binary, 'remove', service_name, 'confirm'
+        str(nssm_binary), 'remove', service_name, 'confirm'
     ])
 
     # Install the service
     process_result = subprocess.run([
-        nssm_binary, 'install', service_name, binary_path
+        str(nssm_binary), 'install', service_name, str(binary_path)
         ] + binary_args)
 
     if process_result.returncode != 0:
@@ -1042,11 +1042,11 @@ def create_service(nssm_binary, service_name, binary_path, binary_args, paramete
         for param, value in parameters.items():
             if type(value) is str:
                 process_result = subprocess.run([
-                    nssm_binary, 'set', service_name, param, value
+                    str(nssm_binary), 'set', service_name, param, value
                     ])
             elif isinstance(value, Collection):
                 process_result = subprocess.run([
-                    nssm_binary, 'set', service_name, param
+                    str(nssm_binary), 'set', service_name, param
                     ] + list(value))
             else:
                 print(f'Unexpected parameter value {value} for parameter {param}.')
@@ -1063,7 +1063,7 @@ def get_service_details(nssm_binary, service):
     # Return some service details
 
     process_result = subprocess.run([
-        nssm_binary, 'dump', service
+        str(nssm_binary), 'dump', service
         ], capture_output=True, text=True, encoding='utf8')
     
     if process_result.returncode != 0:
@@ -1087,7 +1087,7 @@ def get_service_details(nssm_binary, service):
             service_details['parameters'][param] = value
     
     process_result = subprocess.run([
-        nssm_binary, 'status', service
+        str(nssm_binary), 'status', service
         ], capture_output=True, text=True, encoding='utf8')
     
     if process_result.returncode == 0:
@@ -1115,7 +1115,7 @@ def install_gpg(base_directory):
 
     if gpg_binary_path.is_file():
         process_result = subprocess.run([
-            gpg_binary_path, '--version'
+            str(gpg_binary_path), '--version'
         ])
 
         if process_result.returncode == 0:
@@ -1177,7 +1177,7 @@ def install_gpg(base_directory):
     print('Installing GNUPG...')
 
     process_result = subprocess.run([
-        download_installer_path, '/S', '/D=' + str(base_directory)
+        str(download_installer_path), '/S', '/D=' + str(base_directory)
     ])
 
     if process_result.returncode != 0:
@@ -1192,7 +1192,7 @@ def install_gpg(base_directory):
         return False
     
     process_result = subprocess.run([
-        gpg_binary_path, '--version'
+        str(gpg_binary_path), '--version'
     ])
 
     if process_result.returncode != 0:
@@ -1214,7 +1214,7 @@ def install_jre(base_directory):
     if java_path.is_file():
         try:
             process_result = subprocess.run([
-                java_path, '--version'
+                str(java_path), '--version'
                 ], capture_output=True, text=True, encoding='utf8')
             jre_found = True
 
@@ -1378,7 +1378,7 @@ Do you want to skip installing the JRE?
         jre_found = False
         try:
             process_result = subprocess.run([
-                java_path, '--version'
+                str(java_path), '--version'
                 ], capture_output=True, text=True, encoding='utf8')
             jre_found = True
 
@@ -1444,7 +1444,7 @@ Do you want to skip installing teku and its service?
         
         # User wants to proceed, make sure the teku service is stopped first
         subprocess.run([
-            nssm_binary, 'stop', teku_service_name])
+            str(nssm_binary), 'stop', teku_service_name])
 
     result = button_dialog(
         title='Teku installation',
@@ -1491,7 +1491,7 @@ is completed and your validator(s) are activated.
             env['JAVA_HOME'] = str(java_home)
 
             process_result = subprocess.run([
-                teku_batch_file, '--version'
+                str(teku_batch_file), '--version'
                 ], capture_output=True, text=True, env=env)
             teku_found = True
 
@@ -1640,7 +1640,7 @@ Do you want to skip installing the teku binary distribution?
                 env['JAVA_HOME'] = str(java_home)
 
                 process_result = subprocess.run([
-                    teku_batch_file, '--version'
+                    str(teku_batch_file), '--version'
                     ], capture_output=True, text=True, env=env)
                 teku_found = True
 
@@ -1731,14 +1731,14 @@ Do you want to remove this directory first and start from nothing?
 
     print('Starting teku service...')
     process_result = subprocess.run([
-        nssm_binary, 'start', teku_service_name
+        str(nssm_binary), 'start', teku_service_name
     ])
 
     if process_result.returncode != 0:
         print('There was an issue starting the teku service. We cannot continue.')
         return False
 
-    delay = 10
+    delay = 15
     print(f'We are giving {delay} seconds for the teku service to start properly.')
     time.sleep(delay)
 
@@ -1760,7 +1760,7 @@ Do you want to remove this directory first and start from nothing?
             result = re.search(r'Failed to decrypt', log_part)
             if result:
                 subprocess.run([
-                    nssm_binary, 'stop', teku_service_name])
+                    str(nssm_binary), 'stop', teku_service_name])
                 
                 print(
 f'''
@@ -1800,7 +1800,7 @@ to check the logs and fix any issue found there. You can see the logs in:
 
         # Stop the service to prevent indefinite restart attempts
         subprocess.run([
-            nssm_binary, 'stop', teku_service_name])
+            str(nssm_binary), 'stop', teku_service_name])
 
         print(
 f'''
@@ -1818,7 +1818,7 @@ To examine your teku service logs, inspect the following files:
     err_log_read_index = 0
     for i in range(6):
         subprocess.run([
-            nssm_binary, 'rotate', teku_service_name
+            str(nssm_binary), 'rotate', teku_service_name
         ])
         out_log_text = ''
         with open(teku_stdout_log_path, 'r', encoding='utf8') as log_file:
@@ -1862,7 +1862,7 @@ To examine your teku service logs, inspect the following files:
             result = re.search(r'Failed to decrypt', log_part)
             if result:
                 subprocess.run([
-                    nssm_binary, 'stop', teku_service_name])
+                    str(nssm_binary), 'stop', teku_service_name])
                 
                 print(
 f'''
@@ -2225,7 +2225,7 @@ def generate_keys(base_directory, network):
     # Ensure we currently have ACL permission to read from the keys path
     if keys_path.is_dir():
         subprocess.run([
-            'icacls', keys_path, '/inheritancelevel:e'
+            'icacls', str(keys_path), '/inheritancelevel:e'
         ])
 
     # Check if there are keys already created
@@ -2325,7 +2325,7 @@ lose your funds.</style>
     if eth2_deposit_cli_binary.is_file():
         try:
             process_result = subprocess.run([
-                eth2_deposit_cli_binary, '--help'
+                str(eth2_deposit_cli_binary), '--help'
                 ], capture_output=True, text=True)
             eth2_deposit_found = True
 
@@ -2528,7 +2528,7 @@ f'Cannot get latest eth2.0-deposit-cli release from Github. Error code {response
     # Launch eth2.0-deposit-cli
     print('Generating keys with eth2.0-deposit-cli binary...')
     subprocess.run([
-        eth2_deposit_cli_binary, 'new-mnemonic', '--chain', network, '--folder', keys_path],
+        str(eth2_deposit_cli_binary), 'new-mnemonic', '--chain', network, '--folder', str(keys_path)],
         cwd=keys_path)
 
     # Clean up eth2.0-deposit-cli binary
@@ -2598,11 +2598,11 @@ the local system account can access the keys and the password file.
 
     # Change ACL to protect keys directory
     subprocess.run([
-        'icacls', keys_path, '/grant', 'SYSTEM:F', '/t'
+        'icacls', str(keys_path), '/grant', 'SYSTEM:F', '/t'
     ])
 
     subprocess.run([
-        'icacls', keys_path, '/inheritancelevel:r'
+        'icacls', str(keys_path), '/inheritancelevel:r'
     ])
 
     return generated_keys
