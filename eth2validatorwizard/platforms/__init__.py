@@ -99,7 +99,7 @@ def has_su_perm(platform):
                 None, 'runas', 'powershell', args, None, 1)
         
         # End the unprivileged process
-        quit()
+        sys.exit()
     
     return False
 
