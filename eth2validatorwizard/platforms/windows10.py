@@ -89,7 +89,7 @@ def installation_steps(*args, **kwargs):
     public_keys = initiate_deposit(selected_directory, selected_network, generated_keys)
     if not public_keys:
         # User asked to quit or error
-        quit()
+        quit_install()
 
     # TODO: Monitoring setup
 
@@ -102,7 +102,7 @@ def installation_steps(*args, **kwargs):
 def quit_install():
     print('Press enter to quit')
     input()
-    quit()
+    sys.exit()
 
 def install_chocolatey():
     # Install chocolatey to obtain other tools
