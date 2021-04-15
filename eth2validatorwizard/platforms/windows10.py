@@ -525,7 +525,7 @@ archive after {retry_count} retries.
             return False
         
         process_result = subprocess.run([
-            'gpg', '--verify', geth_archive_sig_path])
+            gpg_binary_path, '--verify', geth_archive_sig_path])
         if process_result.returncode != 0:
             # TODO: Better handling of failed PGP signature
             print('The geth archive signature is wrong. We\'ll stop here to protect you.')
