@@ -1,9 +1,6 @@
 import subprocess
 import time
-import ctypes
 import sys
-import codecs
-import base64
 import httpx
 import re
 import os
