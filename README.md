@@ -11,6 +11,7 @@ The eth2-validator-wizard is not ready to be used in the real world yet. It is s
 * Minimal
 * Mostly automated
 * For Ubuntu 20.04 using Lighthouse and Geth
+* For Windows 10 using Teku and Geth
 * No prerequisite needed
 * Internally simple to read, understand and modify
 * Interruptible and resumable
@@ -19,11 +20,17 @@ The eth2-validator-wizard is not ready to be used in the real world yet. It is s
 
 ## How to use
 
-This procedure is going to evolve over time. For now, you can use something like this in a terminal, on Ubuntu 20.04, to test and start the wizard:
+### On Ubuntu 20.04
+
+You can use something like this in a terminal, to start the wizard:
 
 ```
-wget https://github.com/remyroy/eth2-validator-wizard/releases/download/v0.5/eth2validatorwizard-0.5.pyz && sudo python3 eth2validatorwizard-0.5.pyz
+wget https://github.com/remyroy/eth2-validator-wizard/releases/download/v0.6/eth2validatorwizard-0.6.pyz && sudo python3 eth2validatorwizard-0.6.pyz
 ```
+
+### On Windows 10
+
+Download and run [the installer](https://github.com/remyroy/eth2-validator-wizard/releases/download/v0.6/eth2validatorwizard-0.6.exe)
 
 ## Support
 
