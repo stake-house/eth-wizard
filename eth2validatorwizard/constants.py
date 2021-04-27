@@ -101,9 +101,9 @@ TEKU_SERVICE_DISPLAY_NAME = {
 }
 
 TEKU_ARGUMENTS = {
-    NETWORK_MAINNET: ['--network=mainnet', '--eth1-endpoint=http://localhost:8545', '--metrics-enabled', '--rest-api-enabled'],
-    NETWORK_PYRMONT: ['--network=pyrmont', '--eth1-endpoint=http://localhost:8545', '--metrics-enabled', '--rest-api-enabled'],
-    NETWORK_PRATER: ['--network=prater', '--eth1-endpoint=http://localhost:8545', '--metrics-enabled', '--rest-api-enabled']
+    NETWORK_MAINNET: ['--network=mainnet', '--metrics-enabled', '--rest-api-enabled'],
+    NETWORK_PYRMONT: ['--network=pyrmont', '--metrics-enabled', '--rest-api-enabled'],
+    NETWORK_PRATER: ['--network=prater', '--metrics-enabled', '--rest-api-enabled']
 }
 
 GETH_SERVICE_DEFINITION = {

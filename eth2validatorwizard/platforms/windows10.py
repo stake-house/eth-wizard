@@ -73,12 +73,6 @@ def installation_steps(*args, **kwargs):
         # User asked to quit or error
         quit_install()
 
-    # Teku does not support fallback yet
-    '''selected_eth1_fallbacks = select_eth1_fallbacks(selected_network)
-    if type(selected_eth1_fallbacks) is not list and not selected_eth1_fallbacks:
-        # User asked to quit
-        quit_install()'''
-
     if not install_teku(selected_directory, selected_network, generated_keys, selected_ports):
         # User asked to quit or error
         quit_install()
@@ -1680,6 +1674,11 @@ Do you want to remove this directory first and start from nothing?
         if result == 1:
             shutil.rmtree(teku_datadir)
 
+    # Setup and get eth1 fallbacks from user
+    eth1_fallbacks = select_eth1_fallbacks(network)
+    if type(eth1_fallbacks) is not list and not eth1_fallbacks:
+        return False
+
     # Setup teku directory
     teku_datadir.mkdir(parents=True, exist_ok=True)
 
@@ -1698,7 +1697,10 @@ Do you want to remove this directory first and start from nothing?
     if teku_stderr_log_path.is_file():
         teku_stderr_log_path.unlink()
 
+    eth1_endpoints = ['http://127.0.0.1:8545'] + eth1_fallbacks
+
     teku_arguments = TEKU_ARGUMENTS[network]
+    teku_arguments.append('--eth1-endpoints=' + ','.join(eth1_endpoints))
     teku_arguments.append('--data-path=' + str(teku_datadir))
     teku_arguments.append('--validator-keys=' + str(keys['validator_keys_path']) +
         ';' + str(keys['validator_keys_path']))
@@ -2606,7 +2608,9 @@ def initiate_deposit(base_directory, network, keys):
     deposit_file_path = base_directory.joinpath('var', 'lib', 'eth2', 'deposit',
         'deposit_data.json')
     if not deposit_file_path.is_file():
-        print(f'We could not find the deposit data file in {deposit_file_path}')
+        print(f'We could not find the deposit data file in {deposit_file_path} . If you already '
+            f'performed your deposit on the launchpad, you should be good. If not, there was '
+            f'an issue somewhere during the installation.')
         return False
 
     # TODO: Create an alternative way to easily obtain the deposit file with a simple HTTP server
