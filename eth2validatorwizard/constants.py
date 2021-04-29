@@ -4,6 +4,7 @@ GITHUB_API_VERSION = 'application/vnd.github.v3+json'
 LIGHTHOUSE_LATEST_RELEASE = '/repos/sigp/lighthouse/releases/latest'
 LIGHTHOUSE_PRIME_PGP_KEY_ID = '15E66D941F697E28F49381F426416DC3F30674B0'
 TEKU_LATEST_RELEASE = '/repos/ConsenSys/teku/releases/latest'
+PROMETHEUS_LATEST_RELEASE = '/repos/prometheus/prometheus/releases/latest'
 
 ETH2_DEPOSIT_CLI_LATEST_RELEASE = '/repos/ethereum/eth2.0-deposit-cli/releases/latest'
 
@@ -105,6 +106,40 @@ TEKU_ARGUMENTS = {
     NETWORK_PYRMONT: ['--network=pyrmont', '--metrics-enabled', '--rest-api-enabled'],
     NETWORK_PRATER: ['--network=prater', '--metrics-enabled', '--rest-api-enabled']
 }
+
+PROMETHEUS_CONFIG_WINDOWS = (
+'''
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first.rules"
+  # - "second.rules"
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+  - job_name: geth
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /debug/metrics/prometheus
+    scheme: http
+    static_configs:
+      - targets: ['localhost:6060']
+  - job_name: teku
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets: ['localhost:8008']
+'''
+)
+
+PROMETHEUS_ARGUMENTS = ['--web.listen-address="127.0.0.1:9090"']
+
+PROMETHEUS_SERVICE_DISPLAY_NAME = 'Prometheus systems monitoring'
 
 GETH_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (

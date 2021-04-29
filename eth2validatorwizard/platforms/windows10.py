@@ -12,6 +12,8 @@ from pathlib import Path
 
 from urllib.parse import urljoin, urlparse
 
+from datetime import datetime
+
 from defusedxml import ElementTree
 
 from dateutil.parser import parse as dateparse
@@ -76,13 +78,15 @@ def installation_steps(*args, **kwargs):
     if not install_teku(selected_directory, selected_network, generated_keys, selected_ports):
         # User asked to quit or error
         quit_install()
+
+    if not install_monitoring(selected_directory):
+        # User asked to quit or error
+        quit_install()
     
     public_keys = initiate_deposit(selected_directory, selected_network, generated_keys)
     if not public_keys:
         # User asked to quit or error
         quit_install()
-
-    # TODO: Monitoring setup
 
     show_whats_next(selected_network, generated_keys, public_keys)
 
@@ -1643,6 +1647,8 @@ Do you want to skip installing the teku binary distribution?
             print(f'We could not find the teku binary distribution from the installed archive '
                 f'in {teku_path}. We cannot continue.')
             return False
+        else:
+            print(f'Teku version {teku_version} installed.')
 
     # Check if teku directory already exists
     teku_datadir = base_directory.joinpath('var', 'lib', 'teku')
@@ -2750,6 +2756,666 @@ deposit(s).
     
     return public_keys
 
+def install_monitoring(base_directory):
+    # TODO: Improve this dialog text
+    result = button_dialog(
+        title='Monitoring installation',
+        text=(
+'''
+This next step is optional but recommended. It will install Prometheus,
+Grafana and Windows Exporter so you can easily monitor your machine's
+resources, Geth, Teku and your validator(s).
+
+It will download the official Prometheus binary distribution from GitHub,
+it will download the official Grafana binary distribution from GitHub and
+it will download the official Windows Exporter binary distribution from
+GitHub.
+
+Once installed locally, it will create a service that will automatically
+start Prometheus, Grafana and Windows Exporter on reboot or if they crash.
+'''     ),
+        buttons=[
+            ('Install', 1),
+            ('Skip', 2),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if result == 2:
+        return True
+
+    if not result:
+        return result
+    
+    if not install_prometheus(base_directory):
+        return False
+    
+    # TODO: Install Grafana
+    # TODO: Install Windows Exporter
+    
+    return True
+
+def install_prometheus(base_directory):
+    # Install Prometheus as a service
+
+    nssm_binary = get_nssm_binary()
+    if not nssm_binary:
+        return False
+
+    # Check for existing service
+    prometheus_service_exists = False
+    prometheus_service_name = 'prometheus'
+
+    service_details = get_service_details(nssm_binary, prometheus_service_name)
+
+    if service_details is not None:
+        prometheus_service_exists = True
+    
+    if prometheus_service_exists:
+        result = button_dialog(
+            title='Prometheus service found',
+            text=(
+f'''
+The prometheus service seems to have already been created. Here are some
+details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+Do you want to skip installing prometheus and its service?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            return True
+        
+        # User wants to proceed, make sure the prometheus service is stopped first
+        subprocess.run([
+            str(nssm_binary), 'stop', prometheus_service_name])
+
+    # Check if prometheus is already installed
+    prometheus_path = base_directory.joinpath('bin', 'prometheus')
+    prometheus_binary_file = prometheus_path.joinpath('prometheus.exe')
+
+    prometheus_found = False
+    prometheus_version = 'unknown'
+
+    if prometheus_binary_file.is_file():
+        try:
+            process_result = subprocess.run([
+                str(prometheus_binary_file), '--version'
+                ], capture_output=True, text=True)
+            prometheus_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'prometheus, version (?P<version>[^ ]+)', process_output)
+            if result:
+                prometheus_version = result.group('version').strip()
+
+        except FileNotFoundError:
+            pass
+    
+    install_prometheus_binary = True
+
+    if prometheus_found:
+        result = button_dialog(
+            title='Prometheus binary distribution found',
+            text=(
+f'''
+The prometheus binary distribution seems to have already been installed.
+Here are some details found:
+
+Version: {prometheus_version}
+Location: {prometheus_path}
+
+Do you want to skip installing the prometheus binary distribution?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        install_prometheus_binary = (result == 2)
+    
+    if install_prometheus_binary:
+        # Getting latest Prometheus release files
+        prometheus_gh_release_url = GITHUB_REST_API_URL + PROMETHEUS_LATEST_RELEASE
+        headers = {'Accept': GITHUB_API_VERSION}
+        try:
+            response = httpx.get(prometheus_gh_release_url, headers=headers)
+        except httpx.RequestError as exception:
+            print(f'Cannot connect to Github. Exception {exception}')
+            return False
+
+        if response.status_code != 200:
+            # TODO: Better handling for network response issue
+            print(f'Github returned error code. Status code {response.status_code}')
+            return False
+        
+        release_json = response.json()
+
+        if 'assets' not in release_json:
+            # TODO: Better handling on unexpected response structure
+            print('Unexpected response from Github API.')
+            return False
+        
+        binary_asset = None
+
+        for asset in release_json['assets']:
+            if 'name' not in asset:
+                continue
+            if 'browser_download_url' not in asset:
+                continue
+        
+            file_name = asset['name']
+            file_url = asset['browser_download_url']
+
+            if file_name.endswith('windows-amd64.zip'):
+                binary_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+                break
+        
+        if binary_asset is None:
+            # TODO: Better handling of missing binary in latest release
+            print('No prometheus binary distribution found in Github release')
+            return False
+        
+        # Downloading latest Prometheus binary distribution archive
+        download_path = base_directory.joinpath('downloads')
+        download_path.mkdir(parents=True, exist_ok=True)
+
+        url_file_name = binary_asset['file_name']
+        zip_url = binary_asset['file_url']
+
+        prometheus_archive_path = download_path.joinpath(url_file_name)
+        prometheus_archive_hash = hashlib.sha256()
+        if prometheus_archive_path.is_file():
+            prometheus_archive_path.unlink()
+
+        try:
+            with open(prometheus_archive_path, 'wb') as binary_file:
+                print(f'Downloading prometheus archive {url_file_name}...')
+                with httpx.stream('GET', zip_url) as http_stream:
+                    if http_stream.status_code != 200:
+                        print(f'Cannot download prometheus archive {zip_url}.\n'
+                            f'Unexpected status code {http_stream.status_code}')
+                        return False
+                    for data in http_stream.iter_bytes():
+                        binary_file.write(data)
+                        prometheus_archive_hash.update(data)
+        except httpx.RequestError as exception:
+            print(f'Exception while downloading prometheus archive. Exception {exception}')
+            return False
+        
+        # Unzip prometheus archive
+        archive_members = None
+
+        print(f'Extracting prometheus archive {url_file_name}...')
+        with ZipFile(prometheus_archive_path, 'r') as zip_file:
+            archive_members = zip_file.namelist()
+            zip_file.extractall(download_path)
+        
+        # Remove download leftovers
+        prometheus_archive_path.unlink()
+
+        if archive_members is None or len(archive_members) == 0:
+            print('No files found in prometheus archive. We cannot continue.')
+            return False
+        
+        # Move all those extracted files into their final destination
+        if prometheus_path.is_dir():
+            shutil.rmtree(prometheus_path)
+        prometheus_path.mkdir(parents=True, exist_ok=True)
+
+        archive_extracted_dir = download_path.joinpath(Path(archive_members[0]).parts[0])
+
+        with os.scandir(archive_extracted_dir) as it:
+            for diritem in it:
+                shutil.move(diritem.path, prometheus_path)
+            
+        # Make sure prometheus was installed properly
+        prometheus_found = False
+        if prometheus_binary_file.is_file():
+            try:
+                process_result = subprocess.run([
+                    str(prometheus_binary_file), '--version'
+                    ], capture_output=True, text=True)
+                prometheus_found = True
+
+                process_output = process_result.stdout
+                result = re.search(r'prometheus, version (?P<version>[^ ]+)', process_output)
+                if result:
+                    prometheus_version = result.group('version').strip()
+
+            except FileNotFoundError:
+                pass
+    
+        if not prometheus_found:
+            print(f'We could not find the prometheus binary distribution from the installed '
+                f'archive in {prometheus_path}. We cannot continue.')
+            return False
+        else:
+            print(f'Prometheus version {prometheus_version} installed.')
+
+    # Check if prometheus directory already exists
+    prometheus_datadir = base_directory.joinpath('var', 'lib', 'prometheus')
+    if prometheus_datadir.is_dir():
+        prometheus_datadir_size = sizeof_fmt(get_dir_size(prometheus_datadir))
+
+        result = button_dialog(
+            title='Prometheus data directory found',
+            text=(
+f'''
+An existing prometheus data directory has been found. Here are some details
+found:
+
+Location: {prometheus_datadir}
+Size: {prometheus_datadir_size}
+
+Do you want to remove this directory first and start from nothing?
+'''         ),
+            buttons=[
+                ('Remove', 1),
+                ('Keep', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            shutil.rmtree(prometheus_datadir)
+
+    # Setup prometheus directory
+    prometheus_datadir.mkdir(parents=True, exist_ok=True)
+
+    # Setup prometheus config file
+    prometheus_config_path = base_directory.joinpath('etc', 'prometheus')
+    if not prometheus_config_path.is_dir():
+        prometheus_config_path.mkdir(parents=True, exist_ok=True)
+    
+    prometheus_config_file = prometheus_config_path.joinpath('prometheus.yml')
+    if prometheus_config_file.is_file():
+        prometheus_config_file.unlink()
+    
+    with open(str(prometheus_config_file), 'w', encoding='utf8') as config_file:
+        config_file.write(PROMETHEUS_CONFIG_WINDOWS)
+
+    # Setup prometheus service
+    log_path = base_directory.joinpath('var', 'log')
+    log_path.mkdir(parents=True, exist_ok=True)
+
+    prometheus_stdout_log_path = log_path.joinpath('prometheus-service-stdout.log')
+    prometheus_stderr_log_path = log_path.joinpath('prometheus-service-stderr.log')
+
+    if prometheus_stdout_log_path.is_file():
+        prometheus_stdout_log_path.unlink()
+    if prometheus_stderr_log_path.is_file():
+        prometheus_stderr_log_path.unlink()
+
+    prometheus_arguments = PROMETHEUS_ARGUMENTS
+    prometheus_arguments.append('--config.file="' + str(prometheus_config_file) + '"')
+    prometheus_arguments.append('--storage.tsdb.path="' + str(prometheus_datadir) + '"')
+
+    parameters = {
+        'DisplayName': PROMETHEUS_SERVICE_DISPLAY_NAME,
+        'AppRotateFiles': '1',
+        'AppRotateSeconds': '86400',
+        'AppRotateBytes': '10485760',
+        'AppStdout': str(prometheus_stdout_log_path),
+        'AppStderr': str(prometheus_stderr_log_path)
+    }
+
+    if not create_service(nssm_binary, prometheus_service_name, prometheus_binary_file,
+        prometheus_arguments, parameters):
+        print('There was an issue creating the prometheus service. We cannot continue.')
+        return False
+
+    print('Starting prometheus service...')
+    process_result = subprocess.run([
+        str(nssm_binary), 'start', prometheus_service_name
+    ])
+
+    delay = 15
+    print(f'We are giving {delay} seconds for the prometheus service to start properly.')
+    time.sleep(delay)
+
+    # Verify proper Prometheus service installation
+    service_details = get_service_details(nssm_binary, prometheus_service_name)
+    if not service_details:
+        print('We could not find the prometheus service we just created. '
+            'We cannot continue.')
+        return False
+
+    if not (
+        service_details['status'] == WINDOWS_SERVICE_RUNNING):
+
+        result = button_dialog(
+            title='Prometheus service not running properly',
+            text=(
+f'''
+The prometheus service we just created seems to have issues. Here are some
+details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+We cannot proceed if the prometheus service cannot be started properly.
+Make sure to check the logs and fix any issue found there. You can see the
+logs in:
+
+{prometheus_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        # Stop the service to prevent indefinite restart attempts
+        subprocess.run([
+            str(nssm_binary), 'stop', prometheus_service_name])
+
+        print(
+f'''
+To examine your prometheus service logs, inspect the following file:
+
+{prometheus_stderr_log_path}
+'''
+        )
+
+        return False
+
+    # Iterate over the logs and output them for around 10 seconds
+    err_log_read_index = 0
+    for i in range(2):
+        subprocess.run([
+            str(nssm_binary), 'rotate', prometheus_service_name
+        ])
+        err_log_text = ''
+        with open(prometheus_stderr_log_path, 'r', encoding='utf8') as log_file:
+            log_file.seek(err_log_read_index)
+            err_log_text = log_file.read()
+            err_log_read_index = log_file.tell()
+
+        err_log_length = len(err_log_text)
+        if err_log_length > 0:
+            print(err_log_text)
+
+        time.sleep(5)
+
+    # Do a simple query on Prometheus to see if it's working properly
+    local_prometheus_query_url = 'http://localhost:9090/api/v1/query'
+    params = {
+        'query': 'promhttp_metric_handler_requests_total',
+        'time': datetime.now().timestamp()
+    }
+    try:
+        response = httpx.get(local_prometheus_query_url, params=params)
+    except httpx.RequestError as exception:
+        result = button_dialog(
+            title='Cannot connect to Prometheus',
+            text=(
+f'''
+We could not connect to prometheus server. Here are some details for this
+last test we tried to perform:
+
+URL: {local_prometheus_query_url}
+Method: GET
+Parameters: {json.dumps(params)}
+Exception: {exception}
+
+We cannot proceed if the prometheus server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
+
+{prometheus_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your prometheus service logs, inspect the following file:
+
+{prometheus_stderr_log_path}
+'''
+        )
+
+        return False
+
+    if response.status_code != 200:
+        result = button_dialog(
+            title='Cannot connect to Prometheus',
+            text=(
+f'''
+We could not connect to prometheus server. Here are some details for this
+last test we tried to perform:
+
+URL: {local_prometheus_query_url}
+Method: GET
+Parameters: {json.dumps(params)}
+Status code: {response.status_code}
+
+We cannot proceed if the prometheus server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
+
+{prometheus_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your prometheus service logs, inspect the following file:
+
+{prometheus_stderr_log_path}
+'''
+        )
+
+        return False
+    
+    response_json = response.json()
+
+    retry_index = 0
+    retry_count = 5
+
+    while (
+        not response_json or
+        'status' not in response_json or
+        response_json['status'] != 'success'
+    ) and retry_index < retry_count:
+        result = button_dialog(
+            title='Unexpected response from Prometheus',
+            text=(
+f'''
+We received an unexpected response from the prometheus server. Here are
+some details for this last test we tried to perform:
+
+URL: {local_prometheus_query_url}
+Method: GET
+Parameters: {json.dumps(params)}
+Response: {json.dumps(response_json)}
+
+We cannot proceed if the prometheus server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
+
+{prometheus_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Retry', 1),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+
+            print(
+f'''
+To examine your prometheus service logs, inspect the following file:
+
+{prometheus_stderr_log_path}
+'''
+            )
+
+            return False
+        
+        retry_index = retry_index + 1
+
+        # Wait a little before the next retry
+        time.sleep(5)
+
+        params = {
+        'query': 'promhttp_metric_handler_requests_total',
+        'time': datetime.now().timestamp()
+        }
+        try:
+            response = httpx.get(local_prometheus_query_url, params=params)
+        except httpx.RequestError as exception:
+            result = button_dialog(
+                title='Cannot connect to Prometheus',
+                text=(
+f'''
+We could not connect to prometheus server. Here are some details for this
+last test we tried to perform:
+
+URL: {local_prometheus_query_url}
+Method: GET
+Parameters: {json.dumps(params)}
+Exception: {exception}
+
+We cannot proceed if the prometheus server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
+
+{prometheus_stderr_log_path}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            print(
+f'''
+To examine your prometheus service logs, inspect the following file:
+
+{prometheus_stderr_log_path}
+'''
+            )
+
+            return False
+
+        if response.status_code != 200:
+            result = button_dialog(
+                title='Cannot connect to Prometheus',
+                text=(
+f'''
+We could not connect to prometheus server. Here are some details for this
+last test we tried to perform:
+
+URL: {local_prometheus_query_url}
+Method: GET
+Parameters: {json.dumps(params)}
+Status code: {response.status_code}
+
+We cannot proceed if the prometheus server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
+
+{prometheus_stderr_log_path}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            print(
+f'''
+To examine your prometheus service logs, inspect the following file:
+
+{prometheus_stderr_log_path}
+'''
+            )
+
+            return False
+
+        response_json = response.json()
+
+    if (
+        not response_json or
+        'status' not in response_json or
+        response_json['status'] != 'success'
+    ):
+        # We could not get a proper result from Prometheus after all those retries
+        result = button_dialog(
+            title='Unexpected response from Prometheus',
+            text=(
+f'''
+After a few retries, we still received an unexpected response from the
+prometheus server. Here are some details for this last test we tried to
+perform:
+
+URL: {local_prometheus_query_url}
+Method: GET
+Parameters: {json.dumps(params)}
+Response: {json.dumps(response_json)}
+
+We cannot proceed if the prometheus server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
+
+{prometheus_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your prometheus service logs, inspect the following file:
+
+{prometheus_stderr_log_path}
+'''
+        )
+
+        return False
+
+    print(
+f'''
+Prometheus is installed and working properly.
+''' )
+    time.sleep(5)
+
+    return True
+
 def get_dir_size(directory):
     total_size = 0
     directories = []
@@ -2767,6 +3433,8 @@ def get_dir_size(directory):
     return total_size
 
 def sizeof_fmt(num, suffix='B'):
+    if num == 0:
+        return 'Empty'
     for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
         if abs(num) < 1024.0:
             return "%3.1f%s%s" % (num, unit, suffix)
