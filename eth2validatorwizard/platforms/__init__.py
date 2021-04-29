@@ -88,7 +88,7 @@ def has_su_perm(platform):
                 '[console]::OutputEncoding = New-Object System.Text.UTF8Encoding;'
             )
             target_command = (
-                encoding_change + 
+                encoding_change +
                 pythonpath_env +
                 sys.executable + ' ' + " ".join(sys.argv)
             )

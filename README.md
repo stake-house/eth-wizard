@@ -1,6 +1,8 @@
 # eth2-validator-wizard
 An Eth2 validator installation wizard meant to guide anyone through the different steps to become a fully functional validator on the Ethereum 2.0 network. It will install and configure all the software needed to become a validator.
 
+This project is part of [the larger StakeHouse community](https://github.com/stake-house/stakehouse).
+
 ## Disclaimer
 
 The eth2-validator-wizard is not ready to be used in the real world yet. It is still in development and it is subject to radical changes. It can still have major and important issues. DO NOT USE UNLESS YOU KNOW WHAT YOU ARE DOING! This disclaimer will be removed once we believe it is ready for the general population.
