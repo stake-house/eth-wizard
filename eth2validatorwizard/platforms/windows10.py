@@ -7,6 +7,7 @@ import os
 import shutil
 import json
 import hashlib
+import winreg
 
 from pathlib import Path
 
@@ -2790,8 +2791,10 @@ start Prometheus, Grafana and Windows Exporter on reboot or if they crash.
     if not install_prometheus(base_directory):
         return False
     
+    if not install_windows_exporter(base_directory):
+        return False
+
     # TODO: Install Grafana
-    # TODO: Install Windows Exporter
     
     return True
 
@@ -3415,6 +3418,199 @@ Prometheus is installed and working properly.
     time.sleep(5)
 
     return True
+
+def install_windows_exporter(base_directory):
+    # Install Windows Exporter as a service
+
+    nssm_binary = get_nssm_binary()
+    if not nssm_binary:
+        return False
+
+    # Check for existing service
+    we_service_exists = False
+    we_service_name = 'windows_exporter'
+
+    service_details = get_service_details(nssm_binary, we_service_name)
+
+    if service_details is not None:
+        we_service_exists = True
+    
+    if we_service_exists:
+        result = button_dialog(
+            title='Windows Exporter service found',
+            text=(
+f'''
+The windows exporter service seems to have already been created. Here are
+some details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+
+Do you want to skip installing windows exporter and its service?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            return True
+        
+        # User wants to proceed, make sure the windows exporter service is stopped first
+        subprocess.run([
+            str(nssm_binary), 'stop', we_service_name])
+
+    # Check if windows exporter is already installed
+    we_found = False
+    we_version = 'unknown'
+    we_uninstall_command = None
+
+    try:
+        we_uninstall_key = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' + '\\' + WINDOWS_EXPORTER_GUID
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, we_uninstall_key) as key:
+            we_found = True
+
+            we_version = winreg.QueryValueEx(key, 'DisplayVersion')
+            we_uninstall_command = winreg.QueryValueEx(key, 'UninstallString')
+        
+        if we_version:
+            we_version = we_version[0]
+        if we_uninstall_command:
+            we_uninstall_command = we_uninstall_command[0]
+        
+    except OSError as exception:
+        we_found = False
+    
+    install_we = True
+
+    if we_found:
+        result = button_dialog(
+            title='Windows Exporter found',
+            text=(
+f'''
+Windows exporter seems to have already been installed. Here are some
+details found:
+
+Version: {we_version}
+
+Do you want to skip installing windows exporter?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        install_we = (result == 2)
+
+    if install_we:
+        # Uninstalling Windows Exporter first if found
+        if we_found and we_uninstall_command is not None:
+            print('Uninstalling Windows Exporter...')
+            process_result = subprocess.run([
+                'msiexec', '/x', WINDOWS_EXPORTER_GUID, '/qn'
+            ])
+
+            if process_result.returncode != 0:
+                print(f'Unexpected return code from msiexec when uninstalling windows exporter. '
+                    f'Return code {process_result.returncode}')
+                return False
+        
+        # Getting latest Windows Exporter release files
+        we_gh_release_url = GITHUB_REST_API_URL + WINDOWS_EXPORTER_LATEST_RELEASE
+        headers = {'Accept': GITHUB_API_VERSION}
+        try:
+            response = httpx.get(we_gh_release_url, headers=headers)
+        except httpx.RequestError as exception:
+            print(f'Cannot connect to Github. Exception {exception}')
+            return False
+
+        if response.status_code != 200:
+            # TODO: Better handling for network response issue
+            print(f'Github returned error code. Status code {response.status_code}')
+            return False
+        
+        release_json = response.json()
+
+        if 'assets' not in release_json:
+            # TODO: Better handling on unexpected response structure
+            print('Unexpected response from Github API.')
+            return False
+        
+        binary_asset = None
+
+        for asset in release_json['assets']:
+            if 'name' not in asset:
+                continue
+            if 'browser_download_url' not in asset:
+                continue
+        
+            file_name = asset['name']
+            file_url = asset['browser_download_url']
+
+            if file_name.endswith('amd64.msi'):
+                binary_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+                break
+        
+        if binary_asset is None:
+            # TODO: Better handling of missing binary in latest release
+            print('No windows exporter installer found in Github release')
+            return False
+        
+        # Downloading latest Windows Exporter binary distribution archive
+        download_path = base_directory.joinpath('downloads')
+        download_path.mkdir(parents=True, exist_ok=True)
+
+        url_file_name = binary_asset['file_name']
+        installer_url = binary_asset['file_url']
+
+        we_installer_path = download_path.joinpath(url_file_name)
+
+        try:
+            with open(we_installer_path, 'wb') as binary_file:
+                print(f'Downloading windows exporter installer {url_file_name}...')
+                with httpx.stream('GET', installer_url) as http_stream:
+                    if http_stream.status_code != 200:
+                        print(f'Cannot download windows exporter installer {installer_url}.\n'
+                            f'Unexpected status code {http_stream.status_code}')
+                        return False
+                    for data in http_stream.iter_bytes():
+                        binary_file.write(data)
+        except httpx.RequestError as exception:
+            print(f'Exception while downloading windows exporter installer. Exception {exception}')
+            return False
+
+        # Installing Windows Exporter
+        print(f'Installing windows exporter using {url_file_name} ...')
+        process_result = subprocess.run([
+            'msiexec', '/i', str(we_installer_path), 'ENABLED_COLLECTORS=[defaults],time',
+            'LISTEN_ADDR=127.0.0.1', '/qn'
+        ])
+
+        # Remove download leftovers
+        we_installer_path.unlink()
+
+        if process_result.returncode != 0:
+            print(f'Unexpected return code from msiexec when installing windows exporter. '
+                f'Return code {process_result.returncode}')
+            return False
+
+    # TODO: Finish step
+    return True
+
+    # TODO: Test Windows Exporter to see if we can read some metrics
 
 def get_dir_size(directory):
     total_size = 0

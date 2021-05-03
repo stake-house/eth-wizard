@@ -5,6 +5,7 @@ LIGHTHOUSE_LATEST_RELEASE = '/repos/sigp/lighthouse/releases/latest'
 LIGHTHOUSE_PRIME_PGP_KEY_ID = '15E66D941F697E28F49381F426416DC3F30674B0'
 TEKU_LATEST_RELEASE = '/repos/ConsenSys/teku/releases/latest'
 PROMETHEUS_LATEST_RELEASE = '/repos/prometheus/prometheus/releases/latest'
+WINDOWS_EXPORTER_LATEST_RELEASE = '/repos/prometheus-community/windows_exporter/releases/latest'
 
 ETH2_DEPOSIT_CLI_LATEST_RELEASE = '/repos/ethereum/eth2.0-deposit-cli/releases/latest'
 
@@ -139,7 +140,9 @@ scrape_configs:
 
 PROMETHEUS_ARGUMENTS = ['--web.listen-address="127.0.0.1:9090"']
 
-PROMETHEUS_SERVICE_DISPLAY_NAME = 'Prometheus systems monitoring'
+PROMETHEUS_SERVICE_DISPLAY_NAME = 'Prometheus - Systems Monitoring'
+
+WINDOWS_EXPORTER_GUID = '{D6F05276-350B-4E3B-A608-19D8B00A8396}'
 
 GETH_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (
