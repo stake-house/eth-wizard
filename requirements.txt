@@ -4,3 +4,4 @@ packaging
 
 defusedxml
 python-dateutil
+beautifulsoup4

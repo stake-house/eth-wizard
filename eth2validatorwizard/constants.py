@@ -148,6 +148,11 @@ PROMETHEUS_SERVICE_DISPLAY_NAME = 'Prometheus - Systems Monitoring'
 
 WINDOWS_EXPORTER_GUID = '{D6F05276-350B-4E3B-A608-19D8B00A8396}'
 
+GRAFANA_DOWNLOAD_URL = 'https://grafana.com/grafana/download'
+GRAFANA_WINDOWS_PARAM = {
+    'platform': 'windows'
+}
+
 GETH_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (
 '''

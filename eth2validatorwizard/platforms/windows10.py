@@ -19,6 +19,8 @@ from defusedxml import ElementTree
 
 from dateutil.parser import parse as dateparse
 
+from bs4 import BeautifulSoup
+
 from zipfile import ZipFile
 
 from collections.abc import Collection
@@ -2793,8 +2795,9 @@ start Prometheus, Grafana and Windows Exporter on reboot or if they crash.
     
     if not install_windows_exporter(base_directory):
         return False
-
-    # TODO: Install Grafana
+    
+    if not install_grafana(base_directory):
+        return False
     
     return True
 
@@ -3839,6 +3842,265 @@ Windows Exporter is installed and working properly.
 ''' )
     time.sleep(5)
 
+    return True
+
+def install_grafana(base_directory):
+    # Install Grafana as a service
+
+    nssm_binary = get_nssm_binary()
+    if not nssm_binary:
+        return False
+
+    # Check for existing service
+    grafana_service_exists = False
+    grafana_service_name = 'grafana'
+
+    service_details = get_service_details(nssm_binary, grafana_service_name)
+
+    if service_details is not None:
+        grafana_service_exists = True
+    
+    if grafana_service_exists:
+        result = button_dialog(
+            title='Grafana service found',
+            text=(
+f'''
+The grafana service seems to have already been created. Here are some
+details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+Do you want to skip installing grafana and its service?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            return True
+        
+        # User wants to proceed, make sure the grafana service is stopped first
+        subprocess.run([
+            str(nssm_binary), 'stop', grafana_service_name])
+
+    # Check if grafana is already installed
+    grafana_path = base_directory.joinpath('bin', 'grafana')
+    grafana_binary_file = grafana_path.joinpath('bin', 'grafana-cli.exe')
+
+    grafana_found = False
+    grafana_version = 'unknown'
+
+    if grafana_binary_file.is_file():
+        try:
+            process_result = subprocess.run([
+                str(grafana_binary_file), '--version'
+                ], capture_output=True, text=True)
+            grafana_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'version (?P<version>[^ ]+)', process_output)
+            if result:
+                grafana_version = result.group('version').strip()
+
+        except FileNotFoundError:
+            pass
+    
+    install_grafana_binary = True
+
+    if grafana_found:
+        result = button_dialog(
+            title='Grafana binary distribution found',
+            text=(
+f'''
+The grafana binary distribution seems to have already been installed.
+Here are some details found:
+
+Version: {grafana_version}
+Location: {grafana_path}
+
+Do you want to skip installing the grafana binary distribution?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        install_grafana_binary = (result == 2)
+    
+    if install_grafana_binary:
+        # Getting latest Grafana release
+
+        retry_index = 0
+        retry_count = 5
+        retry_delay = 5
+
+        base_timeout = 10.0
+        timeout_retry_increment = 5.0
+
+        response = None
+
+        print('Getting Grafana download packages...')
+
+        while (
+            response is None or
+            response.status_code != 200
+        ) and retry_index < retry_count:
+            try:
+                timeout_delay = base_timeout + (timeout_retry_increment * retry_index)
+                response = httpx.get(GRAFANA_DOWNLOAD_URL, params=GRAFANA_WINDOWS_PARAM, timeout=timeout_delay)
+            except httpx.RequestError as exception:
+                print(f'Cannot connect to Grafana download page. Exception {exception}.')
+                    
+                retry_index = retry_index + 1
+                if retry_index < retry_count:
+                    print(f'We will retry in {retry_delay} seconds.')
+                    time.sleep(retry_delay)
+                continue
+
+            if response.status_code != 200:
+                print(f'Grafana download page returned error code. Status code {response.status_code}')
+
+                retry_index = retry_index + 1
+                if retry_index < retry_count:
+                    print(f'We will retry in {retry_delay} seconds.')
+                    time.sleep(retry_delay)
+                continue
+        
+        if response is None or response.status_code != 200:
+            print(f'We could not get the Grafana download packages from the download page after '
+                f'a few retries. We cannot continue.')
+            return False
+        
+        response_text = response.text
+        soup = BeautifulSoup(response_text, "html.parser")
+
+        results = soup.find_all('div', class_='download-package')
+
+        archive_sha256 = None
+        archive_url = None
+
+        for result in results:
+            anchors = result.find_all('a')
+
+            for anchor in anchors:
+                href = anchor.attrs.get('href', None)
+                if href and href.endswith('windows-amd64.zip'):
+                    archive_url = href
+            
+            if archive_url is not None:
+                sha_spans = result.find_all('span', class_='download-package__sha', limit=1)
+                if sha_spans and len(sha_spans) > 0:
+                    sha_text = sha_spans[0].text
+                    match = re.search(r'SHA256:\s*(?P<sha256>\S+)', sha_text)
+                    if match:
+                        archive_sha256 = match.group('sha256')
+                break
+        
+        if archive_url is None:
+            # TODO: Better handling of missing binary on website download page
+            print('No grafana binary distribution found on grafana download page')
+            return False
+        
+        # Downloading latest Grafana binary distribution archive
+        download_path = base_directory.joinpath('downloads')
+        download_path.mkdir(parents=True, exist_ok=True)
+
+        url_file_name = urlparse(archive_url).path.split('/')[-1]
+        zip_url = archive_url
+
+        grafana_archive_path = download_path.joinpath(url_file_name)
+        grafana_archive_hash = hashlib.sha256()
+        if grafana_archive_path.is_file():
+            grafana_archive_path.unlink()
+
+        try:
+            with open(grafana_archive_path, 'wb') as binary_file:
+                print(f'Downloading grafana archive {url_file_name}...')
+                with httpx.stream('GET', zip_url) as http_stream:
+                    if http_stream.status_code != 200:
+                        print(f'Cannot download grafana archive {zip_url}.\n'
+                            f'Unexpected status code {http_stream.status_code}')
+                        return False
+                    for data in http_stream.iter_bytes():
+                        binary_file.write(data)
+                        grafana_archive_hash.update(data)
+        except httpx.RequestError as exception:
+            print(f'Exception while downloading grafana archive. Exception {exception}')
+            return False
+        
+        # Verify SHA256 checksum
+        if archive_sha256 is not None:
+            grafana_archive_hexdigest = grafana_archive_hash.hexdigest()
+            if grafana_archive_hexdigest.lower() != archive_sha256.lower():
+                print('Grafana archive checksum does not match. We will stop here to protect you.')
+                return False
+
+        # Unzip grafana archive
+        archive_members = None
+
+        print(f'Extracting grafana archive {url_file_name}...')
+        with ZipFile(grafana_archive_path, 'r') as zip_file:
+            archive_members = zip_file.namelist()
+            zip_file.extractall(download_path)
+        
+        # Remove download leftovers
+        grafana_archive_path.unlink()
+
+        if archive_members is None or len(archive_members) == 0:
+            print('No files found in grafana archive. We cannot continue.')
+            return False
+        
+        # Move all those extracted files into their final destination
+        if grafana_path.is_dir():
+            shutil.rmtree(grafana_path)
+        grafana_path.mkdir(parents=True, exist_ok=True)
+
+        archive_extracted_dir = download_path.joinpath(Path(archive_members[0]).parts[0])
+
+        with os.scandir(archive_extracted_dir) as it:
+            for diritem in it:
+                shutil.move(diritem.path, grafana_path)
+            
+        # Make sure grafana was installed properly
+        grafana_found = False
+        if grafana_binary_file.is_file():
+            try:
+                process_result = subprocess.run([
+                    str(grafana_binary_file), '--version'
+                    ], capture_output=True, text=True)
+                grafana_found = True
+
+                process_output = process_result.stdout
+                result = re.search(r'version (?P<version>[^ ]+)', process_output)
+                if result:
+                    grafana_version = result.group('version').strip()
+
+            except FileNotFoundError:
+                pass
+    
+        if not grafana_found:
+            print(f'We could not find the grafana binary distribution from the installed '
+                f'archive in {grafana_path}. We cannot continue.')
+            return False
+        else:
+            print(f'Grafana version {grafana_version} installed.')
+
+    # TODO: Finish step
     return True
 
 def get_dir_size(directory):
