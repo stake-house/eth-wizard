@@ -3607,10 +3607,239 @@ Do you want to skip installing windows exporter?
                 f'Return code {process_result.returncode}')
             return False
 
-    # TODO: Finish step
-    return True
+    # Make sure the Windows Exporter service is started
+    subprocess.run([
+        str(nssm_binary), 'start', we_service_name
+    ])
 
-    # TODO: Test Windows Exporter to see if we can read some metrics
+    delay = 15
+    print(f'We are giving {delay} seconds for the windows exporter service to start properly.')
+    time.sleep(delay)
+
+    # Test Windows Exporter to see if we can read some metrics
+    local_we_query_url = 'http://localhost:9182/metrics'
+    try:
+        response = httpx.get(local_we_query_url)
+    except httpx.RequestError as exception:
+        result = button_dialog(
+            title='Cannot connect to Windows Exporter',
+            text=(
+f'''
+We could not connect to windows exporter server. Here are some details for
+this last test we tried to perform:
+
+URL: {local_we_query_url}
+Method: GET
+Exception: {exception}
+
+We cannot proceed if the windows exporter server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in the Event Viewer for Application with source
+windows_exporter.
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your windows exporter service logs, inspect logs in the Event
+Viewer for Application with source windows_exporter.
+'''
+        )
+
+        return False
+
+    if response.status_code != 200:
+        result = button_dialog(
+            title='Cannot connect to Windows Exporter',
+            text=(
+f'''
+We could not connect to windows exporter server. Here are some details for
+this last test we tried to perform:
+
+URL: {local_we_query_url}
+Method: GET
+Status code: {response.status_code}
+
+We cannot proceed if the windows exporter server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in the Event Viewer for Application with source
+windows_exporter.
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your windows exporter service logs, inspect logs in the Event
+Viewer for Application with source windows_exporter.
+'''
+        )
+
+        return False
+    
+    # Let's find the number of running processes as a test
+
+    response_text = response.text
+    match = re.search(r'windows_os_processes (?P<processes>\d+)', response_text)
+
+    retry_index = 0
+    retry_count = 5
+
+    while (
+        not match
+    ) and retry_index < retry_count:
+        result = button_dialog(
+            title='Unexpected response from Windows Exporter',
+            text=(
+f'''
+We received an unexpected response from the windows exporter server. Here
+are some details for this last test we tried to perform:
+
+URL: {local_we_query_url}
+Method: GET
+Missing line: windows_os_processes
+
+We cannot proceed if the windows exporter server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in the Event Viewer for Application with source
+windows_exporter.
+'''         ),
+            buttons=[
+                ('Retry', 1),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+
+            print(
+f'''
+To examine your windows exporter service logs, inspect logs in the Event
+Viewer for Application with source windows_exporter.
+'''
+            )
+
+            return False
+        
+        retry_index = retry_index + 1
+
+        # Wait a little before the next retry
+        time.sleep(5)
+
+        try:
+            response = httpx.get(local_we_query_url)
+        except httpx.RequestError as exception:
+            result = button_dialog(
+                title='Cannot connect to Windows Exporter',
+                text=(
+f'''
+We could not connect to windows exporter server. Here are some details for
+this last test we tried to perform:
+
+URL: {local_we_query_url}
+Method: GET
+Exception: {exception}
+
+We cannot proceed if the windows exporter server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in the Event Viewer for Application with source
+windows_exporter.
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            print(
+f'''
+To examine your windows exporter service logs, inspect logs in the Event
+Viewer for Application with source windows_exporter.
+'''
+            )
+
+            return False
+
+        if response.status_code != 200:
+            result = button_dialog(
+                title='Cannot connect to Windows Exporter',
+                text=(
+f'''
+We could not connect to windows exporter server. Here are some details for
+this last test we tried to perform:
+
+URL: {local_we_query_url}
+Method: GET
+Status code: {response.status_code}
+
+We cannot proceed if the windows exporter server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in the Event Viewer for Application with source
+windows_exporter.
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            print(
+f'''
+To examine your windows exporter service logs, inspect logs in the Event
+Viewer for Application with source windows_exporter.
+'''
+            )
+
+            return False
+
+        response_text = response.text
+        match = re.search(r'windows_os_processes (?P<processes>\d+)', response_text)
+
+    if (
+        not match
+    ):
+        # We could not get a proper result from Windows Exporter after all those retries
+        result = button_dialog(
+            title='Unexpected response from Windows Exporter',
+            text=(
+f'''
+After a few retries, we still received an unexpected response from the
+windows exporter server. Here are some details for this last test we tried
+to perform:
+
+URL: {local_we_query_url}
+Method: GET
+Missing line: windows_os_processes
+
+We cannot proceed if the windows exporter server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in the Event Viewer for Application with source
+windows_exporter.
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your windows exporter service logs, inspect logs in the Event
+Viewer for Application with source windows_exporter.
+'''
+        )
+
+        return False
+
+    print(
+f'''
+Windows Exporter is installed and working properly.
+''' )
+    time.sleep(5)
+
+    return True
 
 def get_dir_size(directory):
     total_size = 0

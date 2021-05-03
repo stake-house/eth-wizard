@@ -122,6 +122,10 @@ scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ['localhost:9090']
+  - job_name: windows_exporter
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['localhost:9182']
   - job_name: geth
     scrape_interval: 15s
     scrape_timeout: 10s
