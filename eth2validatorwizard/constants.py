@@ -153,6 +153,39 @@ GRAFANA_WINDOWS_PARAM = {
     'platform': 'windows'
 }
 
+GRAFANA_SERVICE_DISPLAY_NAME = 'Grafana - Open Source Visualization and Analytics Software'
+
+GRAFANA_PROMETHEUS_DATASOURCE = (
+'''
+# config file version
+apiVersion: 1
+
+# list of datasources that should be deleted from the database
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+
+# list of datasources to insert/update depending
+# what's available in the database
+datasources:
+  # <string, required> name of the datasource. Required
+  - name: Prometheus
+    # <string, required> datasource type. Required
+    type: prometheus
+    # <string, required> access mode. proxy or direct (Server or Browser in the UI). Required
+    access: proxy
+    # <int> org id. will default to orgId 1 if not specified
+    orgId: 1
+    # <string> custom UID which can be used to reference this datasource in other parts of the configuration, if not specified will be generated automatically
+    uid: prometheus_uid
+    # <string> url
+    url: http://localhost:9090
+    # <bool> mark as default datasource. Max one per org
+    isDefault: true
+'''
+)
+
+
 GETH_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (
 '''

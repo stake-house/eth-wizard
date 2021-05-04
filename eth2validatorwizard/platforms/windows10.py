@@ -8,6 +8,7 @@ import shutil
 import json
 import hashlib
 import winreg
+import io
 
 from pathlib import Path
 
@@ -24,6 +25,8 @@ from bs4 import BeautifulSoup
 from zipfile import ZipFile
 
 from collections.abc import Collection
+
+from functools import partial
 
 from eth2validatorwizard.constants import *
 
@@ -1595,6 +1598,7 @@ Do you want to skip installing the teku binary distribution?
             return False
 
         # Verify checksum
+        print('Verifying teku archive checksum...')
         teku_archive_hexdigest = teku_archive_hash.hexdigest()
         if teku_archive_hexdigest.lower() != zip_sha256.lower():
             print('Teku archive checksum does not match. We will stop here to protect you.')
@@ -3895,15 +3899,16 @@ Do you want to skip installing grafana and its service?
 
     # Check if grafana is already installed
     grafana_path = base_directory.joinpath('bin', 'grafana')
-    grafana_binary_file = grafana_path.joinpath('bin', 'grafana-cli.exe')
+    grafana_cli_binary_file = grafana_path.joinpath('bin', 'grafana-cli.exe')
+    grafana_server_binary_file = grafana_path.joinpath('bin', 'grafana-server.exe')
 
     grafana_found = False
     grafana_version = 'unknown'
 
-    if grafana_binary_file.is_file():
+    if grafana_cli_binary_file.is_file():
         try:
             process_result = subprocess.run([
-                str(grafana_binary_file), '--version'
+                str(grafana_cli_binary_file), '--version'
                 ], capture_output=True, text=True)
             grafana_found = True
 
@@ -4043,8 +4048,9 @@ Do you want to skip installing the grafana binary distribution?
             print(f'Exception while downloading grafana archive. Exception {exception}')
             return False
         
-        # Verify SHA256 checksum
+        # Verify checksum
         if archive_sha256 is not None:
+            print('Verifying grafana archive checksum...')
             grafana_archive_hexdigest = grafana_archive_hash.hexdigest()
             if grafana_archive_hexdigest.lower() != archive_sha256.lower():
                 print('Grafana archive checksum does not match. We will stop here to protect you.')
@@ -4078,10 +4084,10 @@ Do you want to skip installing the grafana binary distribution?
             
         # Make sure grafana was installed properly
         grafana_found = False
-        if grafana_binary_file.is_file():
+        if grafana_cli_binary_file.is_file():
             try:
                 process_result = subprocess.run([
-                    str(grafana_binary_file), '--version'
+                    str(grafana_cli_binary_file), '--version'
                     ], capture_output=True, text=True)
                 grafana_found = True
 
@@ -4092,6 +4098,9 @@ Do you want to skip installing the grafana binary distribution?
 
             except FileNotFoundError:
                 pass
+        
+        if not grafana_server_binary_file.is_file():
+            grafana_found = False
     
         if not grafana_found:
             print(f'We could not find the grafana binary distribution from the installed '
@@ -4100,7 +4109,152 @@ Do you want to skip installing the grafana binary distribution?
         else:
             print(f'Grafana version {grafana_version} installed.')
 
-    # TODO: Finish step
+    # Check if config sample file exists
+    grafana_source_config_file = grafana_path.joinpath('conf', 'sample.ini')
+    if not grafana_source_config_file.is_file():
+        print(f'We could not find the grafana config sample file from the installed '
+            f'archive in {grafana_path}. We cannot continue.')
+        return False
+
+    # Check if grafana directory already exists
+    grafana_datadir = base_directory.joinpath('var', 'lib', 'grafana')
+    if grafana_datadir.is_dir():
+        grafana_datadir_size = sizeof_fmt(get_dir_size(grafana_datadir))
+
+        result = button_dialog(
+            title='Grafana data directory found',
+            text=(
+f'''
+An existing grafana data directory has been found. Here are some details
+found:
+
+Location: {grafana_datadir}
+Size: {grafana_datadir_size}
+
+Do you want to remove this directory first and start from nothing?
+'''         ),
+            buttons=[
+                ('Remove', 1),
+                ('Keep', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            shutil.rmtree(grafana_datadir)
+
+    # Setup grafana directory
+    grafana_datadir.mkdir(parents=True, exist_ok=True)
+
+    # Create grafana custom config file
+    sample_config_content = None
+
+    chunk_size = 1024 * 64
+
+    with open(str(grafana_source_config_file), 'r', encoding='utf8') as sample_file:
+        content_stream = io.StringIO()
+        for chunk in iter(partial(sample_file.read, chunk_size), ''):
+            content_stream.write(chunk)
+        sample_config_content = content_stream.getvalue()
+        content_stream.close()
+    
+    if sample_config_content is None or sample_config_content == '':
+        print(f'We could not get the content of the grafana config sample file from the installed '
+            f'archive in {grafana_path}. We cannot continue.')
+        return False
+    
+    custom_config_content = sample_config_content
+    custom_config_content = re.sub(
+        r';http_addr =.*',
+        'http_addr = 127.0.0.1',
+        custom_config_content)
+    custom_config_content = re.sub(
+        r';data =.*',
+        f'data = {re.escape(str(grafana_datadir))}',
+        custom_config_content)
+
+    grafana_logsdir = grafana_datadir.joinpath('logs')
+    grafana_logsdir.mkdir(parents=True, exist_ok=True)
+
+    custom_config_content = re.sub(
+        r';logs =.*',
+        f'logs = {re.escape(str(grafana_logsdir))}',
+        custom_config_content)
+    
+    grafana_provisioningdir = grafana_datadir.joinpath('provisioning')
+    grafana_provisioningdir.mkdir(parents=True, exist_ok=True)
+
+    custom_config_content = re.sub(
+        r';provisioning =.*',
+        f'provisioning = {re.escape(str(grafana_provisioningdir))}',
+        custom_config_content)
+
+    # Setup grafana custom config file
+    grafana_config_path = base_directory.joinpath('etc', 'grafana')
+    if not grafana_config_path.is_dir():
+        grafana_config_path.mkdir(parents=True, exist_ok=True)
+    
+    grafana_config_file = grafana_config_path.joinpath('grafana.ini')
+    if grafana_config_file.is_file():
+        grafana_config_file.unlink()
+
+    with open(str(grafana_config_file), 'w', encoding='utf8') as config_file:
+        config_file.write(custom_config_content)
+    
+    # Setup datasource provisioning for Prometheus
+    grafana_datasourcedir = grafana_provisioningdir.joinpath('datasources')
+    grafana_datasourcedir.mkdir(parents=True, exist_ok=True)
+
+    prometheus_datasource_file = grafana_datasourcedir.joinpath('prometheus.yaml')
+    with open(prometheus_datasource_file, 'w', encoding='utf8') as datasource_file:
+        datasource_file.write(GRAFANA_PROMETHEUS_DATASOURCE)
+
+    # Setup dashboard provisioning for Geth, Teku and Windows Exporter
+    # TODO: dashboard provisioning
+
+    # Setup grafana service
+    log_path = base_directory.joinpath('var', 'log')
+    log_path.mkdir(parents=True, exist_ok=True)
+
+    grafana_stdout_log_path = log_path.joinpath('grafana-service-stdout.log')
+    grafana_stderr_log_path = log_path.joinpath('grafana-service-stderr.log')
+
+    if grafana_stdout_log_path.is_file():
+        grafana_stdout_log_path.unlink()
+    if grafana_stderr_log_path.is_file():
+        grafana_stderr_log_path.unlink()
+
+    grafana_arguments = [
+        '-config', str(grafana_config_file)
+    ]
+
+    parameters = {
+        'DisplayName': GRAFANA_SERVICE_DISPLAY_NAME,
+        'AppRotateFiles': '1',
+        'AppRotateSeconds': '86400',
+        'AppRotateBytes': '10485760',
+        'AppStdout': str(grafana_stdout_log_path),
+        'AppStderr': str(grafana_stderr_log_path)
+    }
+
+    if not create_service(nssm_binary, grafana_service_name, grafana_server_binary_file,
+        grafana_arguments, parameters):
+        print('There was an issue creating the grafana service. We cannot continue.')
+        return False
+
+    print('Starting grafana service...')
+    process_result = subprocess.run([
+        str(nssm_binary), 'start', grafana_service_name
+    ])
+
+    delay = 15
+    print(f'We are giving {delay} seconds for the grafana service to start properly.')
+    time.sleep(delay)
+
+    # TODO: Finish step including testing Grafana
     return True
 
 def get_dir_size(directory):
