@@ -1077,7 +1077,7 @@ def get_service_details(nssm_binary, service):
     if result:
         service_details['install'] = result.group('install')
 
-    for result in re.finditer(r'nssm.exe set \S+( (?P<param>\S+))?( (?P<quote>")?(?P<value>.+)(?P=quote)?)?', process_output):
+    for result in re.finditer(r'nssm.exe set \S+( (?P<param>\S+))?( (?P<quote>")?(?P<value>.+?)(?P=quote)?)?(\n|$)', process_output):
         param = result.group('param')
         value = result.group('value')
         if param is not None:
@@ -2764,7 +2764,7 @@ deposit(s).
     return public_keys
 
 def install_monitoring(base_directory):
-    # TODO: Improve this dialog text
+
     result = button_dialog(
         title='Monitoring installation',
         text=(
@@ -2774,9 +2774,9 @@ Grafana and Windows Exporter so you can easily monitor your machine's
 resources, Geth, Teku and your validator(s).
 
 It will download the official Prometheus binary distribution from GitHub,
-it will download the official Grafana binary distribution from GitHub and
-it will download the official Windows Exporter binary distribution from
-GitHub.
+it will download the official Grafana binary distribution their official
+website and it will download the official Windows Exporter binary
+distribution from GitHub.
 
 Once installed locally, it will create a service that will automatically
 start Prometheus, Grafana and Windows Exporter on reboot or if they crash.
@@ -2803,7 +2803,29 @@ start Prometheus, Grafana and Windows Exporter on reboot or if they crash.
     if not install_grafana(base_directory):
         return False
     
-    return True
+    # Show message on how to use monitoring
+    result = button_dialog(
+        title='Monitoring has been installed successfully',
+        text=(
+f'''
+Everything needed for basic monitoring has been installed correctly.
+
+You can access your Grafana server on: http://localhost:3000/
+
+There is already an administrator user with the username: admin . You can
+login with the default password: admin . On first login, you will be asked
+to change your password.
+
+Once logged in, you should be able to see various dashboards for Geth,
+Teku and your system resources.
+'''         ),
+        buttons=[
+            ('Keep going', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    return result
 
 def install_prometheus(base_directory):
     # Install Prometheus as a service
@@ -3602,7 +3624,7 @@ Do you want to skip installing windows exporter?
         # Installing Windows Exporter
         print(f'Installing windows exporter using {url_file_name} ...')
         process_result = subprocess.run([
-            'msiexec', '/i', str(we_installer_path), 'ENABLED_COLLECTORS=[defaults],time',
+            'msiexec', '/i', str(we_installer_path), 'ENABLED_COLLECTORS=[defaults],time,process',
             'LISTEN_ADDR=127.0.0.1', '/qn'
         ])
 
@@ -3899,8 +3921,9 @@ Do you want to skip installing grafana and its service?
 
     # Check if grafana is already installed
     grafana_path = base_directory.joinpath('bin', 'grafana')
-    grafana_cli_binary_file = grafana_path.joinpath('bin', 'grafana-cli.exe')
-    grafana_server_binary_file = grafana_path.joinpath('bin', 'grafana-server.exe')
+    grafana_bin_path = grafana_path.joinpath('bin')
+    grafana_cli_binary_file = grafana_bin_path.joinpath('grafana-cli.exe')
+    grafana_server_binary_file = grafana_bin_path.joinpath('grafana-server.exe')
 
     grafana_found = False
     grafana_version = 'unknown'
@@ -4149,6 +4172,75 @@ Do you want to remove this directory first and start from nothing?
     # Setup grafana directory
     grafana_datadir.mkdir(parents=True, exist_ok=True)
 
+    grafana_provisioningdir = grafana_datadir.joinpath('provisioning')
+    grafana_provisioningdir.mkdir(parents=True, exist_ok=True)
+    
+    # Setup datasource provisioning for Prometheus
+    grafana_datasourcedir = grafana_provisioningdir.joinpath('datasources')
+    grafana_datasourcedir.mkdir(parents=True, exist_ok=True)
+
+    prometheus_datasource_file = grafana_datasourcedir.joinpath('prometheus.yaml')
+    with open(prometheus_datasource_file, 'w', encoding='utf8') as datasource_file:
+        datasource_file.write(GRAFANA_PROMETHEUS_DATASOURCE)
+
+    # Setup dashboard provisioning for Geth, Teku and Windows Exporter dashboards
+    grafana_dashboardprovdir = grafana_provisioningdir.joinpath('dashboards')
+    grafana_dashboardprovdir.mkdir(parents=True, exist_ok=True)
+
+    grafana_dashboard_dir = grafana_datadir.joinpath('wizard-dashboards')
+    grafana_dashboard_dir.mkdir(parents=True, exist_ok=True)
+
+    grafana_dashboardprov_file = grafana_dashboardprovdir.joinpath('wizard.yaml')
+    with open(grafana_dashboardprov_file, 'w', encoding='utf8') as dashboardprov_file:
+        dashboardprov_file.write(
+f'''
+apiVersion: 1
+
+providers:
+  # <string> an unique provider name. Required
+  - name: 'Wizard Dashboards'
+    # <int> Org id. Default to 1
+    orgId: 1
+    # <string> name of the dashboard folder.
+    folder: ''
+    # <string> folder UID. will be automatically generated if not specified
+    folderUid: ''
+    # <string> provider type. Default to 'file'
+    type: file
+    # <bool> disable dashboard deletion
+    disableDeletion: false
+    # <int> how often Grafana will scan for changed dashboards
+    updateIntervalSeconds: 60
+    # <bool> allow updating provisioned dashboards from the UI
+    allowUiUpdates: true
+    options:
+      # <string, required> path to dashboard files on disk. Required when using the 'file' type
+      path: {grafana_dashboard_dir}
+      # <bool> use folder names from filesystem to create folders in Grafana
+      foldersFromFilesStructure: true
+'''
+        )
+    
+    geth_dashboard_file = grafana_dashboard_dir.joinpath('geth.json')
+    with open(geth_dashboard_file, 'w', encoding='utf8') as dashboard_file:
+        dashboard_file.write(GETH_GRAFANA_DASHBOARD)
+    
+    windows_system_dashboard_file = grafana_dashboard_dir.joinpath('windows-system.json')
+    with open(windows_system_dashboard_file, 'w', encoding='utf8') as dashboard_file:
+        dashboard_file.write(WINDOWS_SYSTEM_OVERVIEW_GRAFANA_DASHBOARD)
+    
+    windows_services_dashboard_file = grafana_dashboard_dir.joinpath('windows-services.json')
+    with open(windows_services_dashboard_file, 'w', encoding='utf8') as dashboard_file:
+        dashboard_file.write(WINDOWS_SERVICES_PROCESSES_GRAFANA_DASHBOARD)
+    
+    teku_dashboard_file = grafana_dashboard_dir.joinpath('teku.json')
+    with open(teku_dashboard_file, 'w', encoding='utf8') as dashboard_file:
+        dashboard_file.write(TEKU_GRAFANA_DASHBOARD)
+    
+    home_dashboard_file = grafana_dashboard_dir.joinpath('home.json')
+    with open(home_dashboard_file, 'w', encoding='utf8') as dashboard_file:
+        dashboard_file.write(HOME_GRAFANA_DASHBOARD)
+
     # Create grafana custom config file
     sample_config_content = None
 
@@ -4173,7 +4265,7 @@ Do you want to remove this directory first and start from nothing?
         custom_config_content)
     custom_config_content = re.sub(
         r';data =.*',
-        f'data = {re.escape(str(grafana_datadir))}',
+        f'data = {re_repl_escape(str(grafana_datadir))}',
         custom_config_content)
 
     grafana_logsdir = grafana_datadir.joinpath('logs')
@@ -4181,15 +4273,17 @@ Do you want to remove this directory first and start from nothing?
 
     custom_config_content = re.sub(
         r';logs =.*',
-        f'logs = {re.escape(str(grafana_logsdir))}',
+        f'logs = {re_repl_escape(str(grafana_logsdir))}',
         custom_config_content)
-    
-    grafana_provisioningdir = grafana_datadir.joinpath('provisioning')
-    grafana_provisioningdir.mkdir(parents=True, exist_ok=True)
 
     custom_config_content = re.sub(
         r';provisioning =.*',
-        f'provisioning = {re.escape(str(grafana_provisioningdir))}',
+        f'provisioning = {re_repl_escape(str(grafana_provisioningdir))}',
+        custom_config_content)
+    
+    custom_config_content = re.sub(
+        r';default_home_dashboard_path =.*',
+        f'default_home_dashboard_path = {re_repl_escape(str(home_dashboard_file))}',
         custom_config_content)
 
     # Setup grafana custom config file
@@ -4203,17 +4297,12 @@ Do you want to remove this directory first and start from nothing?
 
     with open(str(grafana_config_file), 'w', encoding='utf8') as config_file:
         config_file.write(custom_config_content)
-    
-    # Setup datasource provisioning for Prometheus
-    grafana_datasourcedir = grafana_provisioningdir.joinpath('datasources')
-    grafana_datasourcedir.mkdir(parents=True, exist_ok=True)
 
-    prometheus_datasource_file = grafana_datasourcedir.joinpath('prometheus.yaml')
-    with open(prometheus_datasource_file, 'w', encoding='utf8') as datasource_file:
-        datasource_file.write(GRAFANA_PROMETHEUS_DATASOURCE)
-
-    # Setup dashboard provisioning for Geth, Teku and Windows Exporter
-    # TODO: dashboard provisioning
+    # Install required plugins
+    print('Installing required plugins for Grafana...')
+    process_result = subprocess.run([
+        str(grafana_cli_binary_file), 'plugins', 'install', 'flant-statusmap-panel'
+    ], cwd=str(grafana_bin_path))
 
     # Setup grafana service
     log_path = base_directory.joinpath('var', 'log')
@@ -4254,8 +4343,152 @@ Do you want to remove this directory first and start from nothing?
     print(f'We are giving {delay} seconds for the grafana service to start properly.')
     time.sleep(delay)
 
-    # TODO: Finish step including testing Grafana
+    # Verify proper Grafana service installation
+    service_details = get_service_details(nssm_binary, grafana_service_name)
+    if not service_details:
+        print('We could not find the grafana service we just created. '
+            'We cannot continue.')
+        return False
+
+    if not (
+        service_details['status'] == WINDOWS_SERVICE_RUNNING):
+
+        result = button_dialog(
+            title='Grafana service not running properly',
+            text=(
+f'''
+The grafana service we just created seems to have issues. Here are some
+details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+We cannot proceed if the grafana service cannot be started properly.
+Make sure to check the logs and fix any issue found there. You can see the
+logs in:
+
+{grafana_stdout_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        # Stop the service to prevent indefinite restart attempts
+        subprocess.run([
+            str(nssm_binary), 'stop', grafana_service_name])
+
+        print(
+f'''
+To examine your grafana service logs, inspect the following file:
+
+{grafana_stdout_log_path}
+'''
+        )
+
+        return False
+
+    # Iterate over the logs and output them for around 10 seconds
+    err_log_read_index = 0
+    for i in range(2):
+        subprocess.run([
+            str(nssm_binary), 'rotate', grafana_service_name
+        ])
+        err_log_text = ''
+        with open(grafana_stdout_log_path, 'r', encoding='utf8') as log_file:
+            log_file.seek(err_log_read_index)
+            err_log_text = log_file.read()
+            err_log_read_index = log_file.tell()
+
+        err_log_length = len(err_log_text)
+        if err_log_length > 0:
+            print(err_log_text)
+
+        time.sleep(5)
+
+    # Test if Grafana is working properly
+    local_grafana_url = 'http://localhost:3000/login'
+    try:
+        response = httpx.get(local_grafana_url)
+    except httpx.RequestError as exception:
+        result = button_dialog(
+            title='Cannot connect to Grafana',
+            text=(
+f'''
+We could not connect to the grafana server. Here are some details for
+this last test we tried to perform:
+
+URL: {local_grafana_url}
+Method: GET
+Exception: {exception}
+
+We cannot proceed if the grafana server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
+
+{grafana_stdout_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your grafana service logs, inspect the following file:
+
+{grafana_stdout_log_path}
+'''
+        )
+
+        return False
+
+    if response.status_code != 200:
+        result = button_dialog(
+            title='Cannot connect to Grafana',
+            text=(
+f'''
+We could not connect to the grafana server. Here are some details for
+this last test we tried to perform:
+
+URL: {local_grafana_url}
+Method: GET
+Status code: {response.status_code}
+
+We cannot proceed if the grafana server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
+
+{grafana_stdout_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        print(
+f'''
+To examine your grafana service logs, inspect the following file:
+
+{grafana_stdout_log_path}
+'''
+        )
+
+        return False
+    
+    print(
+f'''
+Grafana is installed and working properly.
+''' )
+    time.sleep(5)
+    
     return True
+
+def re_repl_escape(value):
+    return value.replace('\\', '\\\\')
 
 def get_dir_size(directory):
     total_size = 0
