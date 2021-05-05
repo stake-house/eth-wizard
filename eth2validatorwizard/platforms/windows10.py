@@ -693,9 +693,6 @@ To examine your geth service logs, inspect the following file:
     # Iterate over the logs and output them for around 30 seconds
     log_read_index = 0
     for i in range(6):
-        subprocess.run([
-            str(nssm_binary), 'rotate', geth_service_name
-        ])
         log_text = ''
         with open(geth_stderr_log_path, 'r', encoding='utf8') as log_file:
             log_file.seek(log_read_index)
@@ -1821,9 +1818,6 @@ To examine your teku service logs, inspect the following files:
     out_log_read_index = 0
     err_log_read_index = 0
     for i in range(6):
-        subprocess.run([
-            str(nssm_binary), 'rotate', teku_service_name
-        ])
         out_log_text = ''
         with open(teku_stdout_log_path, 'r', encoding='utf8') as log_file:
             log_file.seek(out_log_read_index)
@@ -3182,9 +3176,6 @@ To examine your prometheus service logs, inspect the following file:
     # Iterate over the logs and output them for around 10 seconds
     err_log_read_index = 0
     for i in range(2):
-        subprocess.run([
-            str(nssm_binary), 'rotate', prometheus_service_name
-        ])
         err_log_text = ''
         with open(prometheus_stderr_log_path, 'r', encoding='utf8') as log_file:
             log_file.seek(err_log_read_index)
@@ -4394,9 +4385,6 @@ To examine your grafana service logs, inspect the following file:
     # Iterate over the logs and output them for around 10 seconds
     err_log_read_index = 0
     for i in range(2):
-        subprocess.run([
-            str(nssm_binary), 'rotate', grafana_service_name
-        ])
         err_log_text = ''
         with open(grafana_stdout_log_path, 'r', encoding='utf8') as log_file:
             log_file.seek(err_log_read_index)
