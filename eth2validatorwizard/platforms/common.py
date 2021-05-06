@@ -61,7 +61,7 @@ For which network would you like to perform this installation?
 def select_initial_state(network):
     # Prompt the user for initial state provider (weak subjectivity checkpoint)
 
-    infura_bn_endpoint = INFURA_BEACON_NODE_ENDPOINTS[network]
+    infura_bn_domain = INFURA_BEACON_NODE_DOMAINS[network]
 
     initial_state_url = None
 
@@ -76,7 +76,7 @@ node. It makes it possible to get a fully synced beacon in just a few
 minutes compared to having to wait hours or days.
 
 An easy way to get a provider is to create a free account on Infura. Your
-infura account can also be used later on in the wizard to provide an eth1
+Infura account can also be used later on in the wizard to provide an eth1
 fallback node.
 
 https://infura.io/
@@ -148,7 +148,7 @@ Enter those values separated by a colon in this format:
 
                 initial_state_url = urlbuilder.URIBuilder(
                     ).add_scheme('https'
-                    ).add_host(infura_bn_endpoint
+                    ).add_host(infura_bn_domain
                     ).add_credentials(username, password
                     ).finalize(
                     ).unsplit()

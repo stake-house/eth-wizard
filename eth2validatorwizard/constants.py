@@ -41,7 +41,7 @@ BEACONCHA_IN_URLS = {
     NETWORK_PRATER: 'https://prater.beaconcha.in'
 }
 
-INFURA_BEACON_NODE_ENDPOINTS = {
+INFURA_BEACON_NODE_DOMAINS = {
     NETWORK_MAINNET: 'eth2-beacon-mainnet.infura.io',
     NETWORK_PYRMONT: 'eth2-beacon-pyrmont.infura.io',
     NETWORK_PRATER: 'eth2-beacon-prater.infura.io'
