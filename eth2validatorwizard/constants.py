@@ -41,6 +41,27 @@ BEACONCHA_IN_URLS = {
     NETWORK_PRATER: 'https://prater.beaconcha.in'
 }
 
+INFURA_BEACON_NODE_ENDPOINTS = {
+    NETWORK_MAINNET: 'eth2-beacon-mainnet.infura.io',
+    NETWORK_PYRMONT: 'eth2-beacon-pyrmont.infura.io',
+    NETWORK_PRATER: 'eth2-beacon-prater.infura.io'
+}
+
+BN_FINALIZED_STATE_URL = '/eth/v1/debug/beacon/states/finalized'
+BN_DEPOSIT_CONTRACT_URL = '/eth/v1/config/deposit_contract'
+
+BN_CHAIN_IDS = {
+    NETWORK_MAINNET: 1,
+    NETWORK_PYRMONT: 5,
+    NETWORK_PRATER: 5
+}
+
+BN_DEPOSIT_CONTRACTS = {
+    NETWORK_MAINNET: '0x00000000219ab540356cbb839cbe05303d7705fa',
+    NETWORK_PYRMONT: '0x8c5fecdc472e27bc447696f431e425d02dd46a8c',
+    NETWORK_PRATER: '0xff50ed3d0ec03ac01d4c79aad74928bff48a7b2b'
+}
+
 NETWORK_CURRENCY = {
     NETWORK_MAINNET: 'ETH',
     NETWORK_PYRMONT: 'GöETH',

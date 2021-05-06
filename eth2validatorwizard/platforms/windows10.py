@@ -32,6 +32,7 @@ from eth2validatorwizard.constants import *
 
 from eth2validatorwizard.platforms.common import (
     select_network,
+    select_initial_state,
     select_eth1_fallbacks,
     input_dialog_default,
     search_for_generated_keys,
@@ -1449,14 +1450,14 @@ beacon node and a validator client in the same binary distribution.
 
 It will install AdoptOpenJDK, a Java Runtime Environment, it will download
 the official Teku binary distribution from GitHub, it will verify its
-checksum and it will extract it for easy use.
+checksum and it will extract it for easy use. You will be invited to
+provide an initial state to fast-track syncing.
 
 Once installed locally, it will create a service that will automatically
 start Teku on reboot or if it crashes. The Teku client will be started and
-you will slowly start syncing with the Ethereum 2.0 network. This syncing
-process can take a few hours or days even with good hardware and good
-internet. The Teku client will automatically start validating once syncing
-is completed and your validator(s) are activated.
+you will start syncing with the Ethereum 2.0 network. The Teku client will
+automatically start validating once syncing is completed and your
+validator(s) are activated.
 '''     ),
         buttons=[
             ('Install', True),
@@ -1684,7 +1685,12 @@ Do you want to remove this directory first and start from nothing?
         if result == 1:
             shutil.rmtree(teku_datadir)
 
-    # Setup and get eth1 fallbacks from user
+    # Get initial state provider
+    initial_state_url = select_initial_state(network)
+    if type(initial_state_url) is not str and not initial_state_url:
+        return False
+
+    # Get eth1 fallbacks from user
     eth1_fallbacks = select_eth1_fallbacks(network)
     if type(eth1_fallbacks) is not list and not eth1_fallbacks:
         return False
@@ -1714,6 +1720,8 @@ Do you want to remove this directory first and start from nothing?
     teku_arguments.append('--data-path=' + str(teku_datadir))
     teku_arguments.append('--validator-keys=' + str(keys['validator_keys_path']) +
         ';' + str(keys['validator_keys_path']))
+    if initial_state_url != '':
+        teku_arguments.append('--initial-state=' + initial_state_url)
 
     parameters = {
         'DisplayName': TEKU_SERVICE_DISPLAY_NAME[network],

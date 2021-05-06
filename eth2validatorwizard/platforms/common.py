@@ -2,7 +2,7 @@ import httpx
 import json
 import os
 
-from urllib.parse import urlparse
+from rfc3986 import urlparse, builder as urlbuilder
 
 from eth2validatorwizard.constants import *
 
@@ -57,6 +57,210 @@ For which network would you like to perform this installation?
     ).run()
 
     return result
+
+def select_initial_state(network):
+    # Prompt the user for initial state provider (weak subjectivity checkpoint)
+
+    infura_bn_endpoint = INFURA_BEACON_NODE_ENDPOINTS[network]
+
+    initial_state_url = None
+
+    while initial_state_url is None:
+
+        result = button_dialog(
+                title='Adding initial state provider',
+                text=(HTML(
+f'''
+Having an initial state provider is highly recommended for your beacon
+node. It makes it possible to get a fully synced beacon in just a few
+minutes compared to having to wait hours or days.
+
+An easy way to get a provider is to create a free account on Infura. Your
+infura account can also be used later on in the wizard to provide an eth1
+fallback node.
+
+https://infura.io/
+
+If you have access to a custom beacon node, you can enter your own URL to
+that beacon node with the custom option. That beacon node should be on the
+<b>{network.capitalize()}</b> Ethereum 2.0 network.
+
+Do you want add an initial state provider?
+'''             )),
+                buttons=[
+                    ('Infura', 1),
+                    ('Custom', 2),
+                    ('Skip', 3),
+                    ('Quit', False)
+                ]
+            ).run()
+        
+        if not result:
+            return result
+        
+        if result == 3:
+            return ''
+        elif result == 1:
+            valid_url = False
+            infura_credentials = None
+            input_canceled = False
+
+            while not valid_url:
+                not_valid_msg = ''
+                initial_state_url = None
+                if infura_credentials is not None:
+                    not_valid_msg = (
+'''
+
+<style bg="red" fg="black">Your last input were <b>not valid credentials</b>. Please make sure to enter
+valid credentials from Infura.</style>'''
+                    )
+
+                infura_credentials = input_dialog(
+                    title='Initial state provider using Infura',
+                    text=(HTML(
+f'''
+Please enter your Infura ETH 2 project's credentials from:
+
+https://infura.io/
+
+Once you are logged into your Infura account, click on <b>DASHBOARD</b> button in
+the top right corner. Click on the <b>ETH 2</b> button in the left column menu.
+Click on <b>CREATE NEW PROJECT</b> button. Give it a name. You should see your
+project settings, a <b>PROJECT ID</b> and a <b>PROJECT SECRET</b> in the <b>KEYS</b> section.
+Enter those values separated by a colon in this format:
+
+&lt;PROJECT ID&gt;:&lt;PROJECT SECRET&gt;
+
+* Press the tab key to switch between the controls below{not_valid_msg}
+'''             ))).run()
+
+                if not infura_credentials:
+                    input_canceled = True
+                    break
+            
+                if ':' not in infura_credentials:
+                    continue
+
+                credentials = infura_credentials.split(':')
+                username = credentials[0]
+                password = credentials[1]
+
+                initial_state_url = urlbuilder.URIBuilder(
+                    ).add_scheme('https'
+                    ).add_host(infura_bn_endpoint
+                    ).add_credentials(username, password
+                    ).finalize(
+                    ).unsplit()
+                
+                valid_url = beacon_node_url_validator(network, initial_state_url)
+
+            if input_canceled:
+                # User clicked the cancel button
+                continue
+
+        elif result == 2:
+            valid_url = False
+            entered_url = None
+            input_canceled = False
+
+            while not valid_url:
+                not_valid_msg = ''
+                initial_state_url = None
+                if entered_url is not None:
+                    not_valid_msg = (
+'''
+
+<style bg="red" fg="black">Your last URL was <b>not valid beacon node</b>. Please make sure to enter a URL for
+a valid beacon node.</style>'''
+                    )
+
+                entered_url = input_dialog(
+                    title='Initial state provider using custom URL',
+                    text=(HTML(
+f'''
+Please enter your beacon node URL:
+
+It usually starts with 'https://' and it should point to the root of a
+running beacon node on the <b>{network.capitalize()}</b> Ethereum 2.0 network that supports the
+Eth2 Beacon Node API. It should implement these endpoints:
+
+- {BN_DEPOSIT_CONTRACT_URL}
+- {BN_FINALIZED_STATE_URL}
+
+* Press the tab key to switch between the controls below{not_valid_msg}
+'''             ))).run()
+
+                if not entered_url:
+                    input_canceled = True
+                    break
+            
+                initial_state_url = entered_url
+                
+                valid_url = beacon_node_url_validator(network, initial_state_url)
+
+            if input_canceled:
+                # User clicked the cancel button
+                continue
+    
+    if initial_state_url is not None:
+        base_url = urlbuilder.URIBuilder.from_uri(initial_state_url)
+        initial_state_url = base_url.add_path(BN_FINALIZED_STATE_URL).finalize().unsplit()
+
+    return initial_state_url
+
+def beacon_node_url_validator(network, url):
+    # Return true if this is a beacon chain endpoint for the network
+
+    if not uri_validator(url):
+        return False
+    
+    base_url = urlbuilder.URIBuilder.from_uri(url)
+    deposit_contract_url = base_url.add_path(BN_DEPOSIT_CONTRACT_URL).finalize().unsplit()
+
+    headers = {
+        'Content-Type': 'application/json'
+    }
+
+    try:
+        response = httpx.get(deposit_contract_url, headers=headers)
+
+        if response.status_code != 200:
+            print(f'Beacon node returned an unexpected status code: {response.status_code}')
+            return False
+        
+        response_json = response.json()
+
+        if not response_json:
+            print(f'Unexpected response from beacon node.')
+            return False
+
+        if (
+            'data' not in response_json or
+            'chain_id' not in response_json['data'] or
+            'address' not in response_json['data']
+        ):
+            print('Unexpected response from beacon node.')
+            return False
+        
+        chain_id = response_json['data']['chain_id']
+        deposit_contract = response_json['data']['address']
+
+        if int(chain_id) != BN_CHAIN_IDS[network]:
+            print(f'Unexpected chain_id ({chain_id}) from beacon node. We expected another value '
+                f'({BN_CHAIN_IDS[network]}) for this network ({network}).')
+            return False
+        
+        if deposit_contract.lower() != BN_DEPOSIT_CONTRACTS[network].lower():
+            print(f'Unexpected deposit contract address ({deposit_contract}) from beacon node. '
+                f'We expected another value ({BN_DEPOSIT_CONTRACTS[network]}) for this network ({network}).')
+            return False
+        
+    except httpx.RequestError as exception:
+        print(f'Exception during request to beacon node: {exception}')
+        return False
+
+    return True
 
 def select_eth1_fallbacks(network):
     # Prompt the user for eth1 fallback nodes
@@ -263,7 +467,7 @@ selected at the beginning of this wizard.
 def uri_validator(uri):
     try:
         result = urlparse(uri)
-        return all([result.scheme, result.netloc, result.path])
+        return all([result.scheme, result.netloc])
     except:
         return False
 
