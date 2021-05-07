@@ -736,7 +736,7 @@ def get_bc_validator_deposits(network, public_keys):
     
     if keep_retrying:
         print(f'We failed to get the validator deposits from the beaconcha.in API after '
-            '{retry_count} retries.')
+            f'{retry_count} retries.')
         return False
     
     validator_deposits = response_json['data']
