@@ -1839,7 +1839,7 @@ Do you want to remove this directory first and start from nothing?
     if initial_state_url != '':
         teku_arguments.append('--initial-state=' + initial_state_url)
     if ports['eth2_bn'] != DEFAULT_TEKU_BN_PORT:
-        teku_arguments.append('--p2p-port==' + str(ports['eth2_bn']))
+        teku_arguments.append('--p2p-port=' + str(ports['eth2_bn']))
 
     parameters = {
         'DisplayName': TEKU_SERVICE_DISPLAY_NAME[network],
