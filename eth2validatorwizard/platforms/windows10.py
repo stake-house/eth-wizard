@@ -128,8 +128,6 @@ def create_firewall_rule(ports):
     geth_tcp_rule_name = f'{geth_rule_name} TCP'
     geth_udp_rule_name = f'{geth_rule_name} UDP'
 
-    breakpoint()
-
     print('Checking if we have a TCP firewall rule for Geth...')
     process_result = subprocess.run([
         'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={geth_tcp_rule_name}'
