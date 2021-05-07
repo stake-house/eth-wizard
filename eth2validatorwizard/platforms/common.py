@@ -58,6 +58,140 @@ For which network would you like to perform this installation?
 
     return result
 
+def select_custom_ports(ports):
+    # Prompt the user for modifying the default ports
+
+    result = button_dialog(
+        title='Open ports configuration',
+        text=(HTML(
+f'''
+In order to improve your ability to connect with peers, you should have
+exposed ports to the Internet on your machine. Here are the default open
+ports needed for this:
+
+Ethereum 1 node: {ports['eth1']} (TCP/UDP)
+Ethereum 2 beacon node: {ports['eth2_bn']} (TCP/UDP)
+
+If this machine is behind a router or another network device that blocks
+incoming connections on those ports, you will have to configure those
+devices so that they can forward (port forward) those connections to this
+machine. If you need help with this, read your device's manual, search for
+"How to Forward Ports" for your device or ask the ETHStaker community.
+
+Do you want to use the default ports?
+'''     )),
+        buttons=[
+            ('Default', 1),
+            ('Custom', 2),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+    
+    if result == 1:
+        return ports
+    
+    if result == 2:
+        valid_port = False
+        entered_port = None
+        input_canceled = False
+
+        while not valid_port:
+            not_valid_msg = ''
+            if entered_port is not None:
+                not_valid_msg = (
+'''
+
+<style bg="red" fg="black">Your last input was <b>not a valid port</b>. Please make sure to enter a valid
+port.</style>'''
+                )
+
+            entered_port = input_dialog(
+                title='Custom port for Ethereum 1 node',
+                text=(HTML(
+f'''
+Please enter your custom port for your Ethereum 1 node:
+
+The default port is {ports['eth1']} (TCP/UDP)
+
+That port number should be greater than 1024 and lower than 65535.
+
+* Press the tab key to switch between the controls below{not_valid_msg}
+'''             ))).run()
+
+            if not entered_port:
+                input_canceled = True
+                break
+        
+            entered_port = entered_port.strip()
+
+            try: 
+                entered_port = int(entered_port)
+            except ValueError:
+                continue
+
+            if not (1024 <= entered_port <= 65535):
+                continue
+            
+            valid_port = True
+
+        if valid_port:
+            ports['eth1'] = entered_port
+        
+        valid_port = False
+        entered_port = None
+        input_canceled = False
+
+        while not valid_port:
+            not_valid_msg = ''
+            if entered_port is not None:
+                not_valid_msg = (
+'''
+
+<style bg="red" fg="black">Your last input was <b>not a valid port</b>. Please make sure to enter a valid
+port.</style>'''
+                )
+
+            entered_port = input_dialog(
+                title='Custom port for Ethereum 2 beacon node',
+                text=(HTML(
+f'''
+Please enter your custom port for your Ethereum 2 beacon node:
+
+The default port is {ports['eth2_bn']} (TCP/UDP)
+
+That port number should be greater than 1024 and lower than 65535. It
+should also be different from the one you choose for Ethereum 1 node.
+
+* Press the tab key to switch between the controls below{not_valid_msg}
+'''             ))).run()
+
+            if not entered_port:
+                input_canceled = True
+                break
+        
+            entered_port = entered_port.strip()
+
+            try: 
+                entered_port = int(entered_port)
+            except ValueError:
+                continue
+
+            if not (1024 <= entered_port <= 65535):
+                continue
+            
+            if entered_port == ports['eth1']:
+                continue
+            
+            valid_port = True
+
+        if valid_port:
+            ports['eth2_bn'] = entered_port
+    
+    return ports
+
 def select_initial_state(network):
     # Prompt the user for initial state provider (weak subjectivity checkpoint)
 

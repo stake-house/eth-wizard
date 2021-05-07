@@ -32,6 +32,7 @@ from eth2validatorwizard.constants import *
 
 from eth2validatorwizard.platforms.common import (
     select_network,
+    select_custom_ports,
     select_initial_state,
     select_eth1_fallbacks,
     input_dialog_default,
@@ -48,11 +49,6 @@ RESUME_CHOCOLATEY = 'resume_chocolatey'
 
 def installation_steps(*args, **kwargs):
 
-    selected_ports = {
-        'eth1': DEFAULT_GETH_PORT,
-        'eth2_bn': DEFAULT_TEKU_BN_PORT
-    }
-
     # TODO: Check time synchronization and configure it if needed
 
     selected_directory = select_directory()
@@ -65,6 +61,24 @@ def installation_steps(*args, **kwargs):
         # User asked to quit
         quit_install()
 
+    selected_ports = {
+        'eth1': DEFAULT_GETH_PORT,
+        'eth2_bn': DEFAULT_TEKU_BN_PORT
+    }
+
+    selected_ports = select_custom_ports(selected_ports)
+    if not selected_ports:
+        # User asked to quit or error
+        quit_install()
+
+    '''if not create_firewall_rule(selected_ports):
+        # User asked to quit or error
+        quit_install()
+    
+    if not test_open_ports(selected_ports):
+        # User asked to quit or error
+        quit_install()'''
+    
     if not install_chocolatey():
         # We could not install chocolatey
         quit_install()
@@ -626,6 +640,9 @@ Do you want to remove this directory first and start from nothing?
     geth_arguments = GETH_ARGUMENTS[network]
     geth_arguments.append('--datadir')
     geth_arguments.append(str(geth_datadir))
+    if ports['eth1'] != DEFAULT_GETH_PORT:
+        geth_arguments.append('--port')
+        geth_arguments.append(str(ports['eth1']))
 
     parameters = {
         'DisplayName': GETH_SERVICE_DISPLAY_NAME[network],
@@ -1722,6 +1739,8 @@ Do you want to remove this directory first and start from nothing?
         ';' + str(keys['validator_keys_path']))
     if initial_state_url != '':
         teku_arguments.append('--initial-state=' + initial_state_url)
+    if ports['eth2_bn'] != DEFAULT_TEKU_BN_PORT:
+        teku_arguments.append('--p2p-port==' + str(ports['eth2_bn']))
 
     parameters = {
         'DisplayName': TEKU_SERVICE_DISPLAY_NAME[network],
