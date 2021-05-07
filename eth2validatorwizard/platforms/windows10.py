@@ -71,13 +71,9 @@ def installation_steps(*args, **kwargs):
         # User asked to quit or error
         quit_install()
 
-    '''if not create_firewall_rule(selected_ports):
+    if not create_firewall_rule(selected_ports):
         # User asked to quit or error
         quit_install()
-    
-    if not test_open_ports(selected_ports):
-        # User asked to quit or error
-        quit_install()'''
     
     if not install_chocolatey():
         # We could not install chocolatey
@@ -99,6 +95,10 @@ def installation_steps(*args, **kwargs):
     if not install_teku(selected_directory, selected_network, generated_keys, selected_ports):
         # User asked to quit or error
         quit_install()
+    
+    '''if not test_open_ports(selected_ports):
+        # User asked to quit or error
+        quit_install()'''
 
     if not install_monitoring(selected_directory):
         # User asked to quit or error
@@ -119,6 +119,107 @@ def quit_install():
     print('Press enter to quit')
     input()
     sys.exit()
+
+def create_firewall_rule(ports):
+    # Add rules to Windows Firewall to make sure we can accept connections on clients ports
+
+    geth_rule_name = 'geth'
+
+    geth_tcp_rule_name = f'{geth_rule_name} TCP'
+    geth_udp_rule_name = f'{geth_rule_name} UDP'
+
+    breakpoint()
+
+    print('Checking if we have a TCP firewall rule for Geth...')
+    process_result = subprocess.run([
+        'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={geth_tcp_rule_name}'
+    ])
+    if process_result.returncode == 0:
+        print('Deleting existing TCP firewall rule for Geth before creating the new one...')
+        subprocess.run([
+            'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={geth_tcp_rule_name}'
+        ])
+    print('Creating a new TCP firewall rule for Geth...')
+    process_result = subprocess.run([
+        'netsh', 'advfirewall', 'firewall', 'add', 'rule',
+        f'name={geth_tcp_rule_name}',
+        'dir=in',
+        'action=allow',
+        'service=any',
+        'profile=any',
+        'protocol=tcp',
+        f'localport={ports["eth1"]}'
+    ])
+
+    print('Checking if we have a UDP firewall rule for Geth...')
+    process_result = subprocess.run([
+        'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={geth_udp_rule_name}'
+    ])
+    if process_result.returncode == 0:
+        print('Deleting existing UDP firewall rule for Geth before creating the new one...')
+        subprocess.run([
+            'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={geth_udp_rule_name}'
+        ])
+    print('Creating a new UDP firewall rule for Geth...')
+    process_result = subprocess.run([
+        'netsh', 'advfirewall', 'firewall', 'add', 'rule',
+        f'name={geth_udp_rule_name}',
+        'dir=in',
+        'action=allow',
+        'service=any',
+        'profile=any',
+        'protocol=udp',
+        f'localport={ports["eth1"]}'
+    ])
+
+    teku_rule_name = 'teku'
+
+    teku_tcp_rule_name = f'{teku_rule_name} TCP'
+    teku_udp_rule_name = f'{teku_rule_name} UDP'
+
+    print('Checking if we have a TCP firewall rule for Teku...')
+    process_result = subprocess.run([
+        'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={teku_tcp_rule_name}'
+    ])
+    if process_result.returncode == 0:
+        print('Deleting existing TCP firewall rule for Teku before creating the new one...')
+        subprocess.run([
+            'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={teku_tcp_rule_name}'
+        ])
+    print('Creating a new TCP firewall rule for Teku...')
+    process_result = subprocess.run([
+        'netsh', 'advfirewall', 'firewall', 'add', 'rule',
+        f'name={teku_tcp_rule_name}',
+        'dir=in',
+        'action=allow',
+        'service=any',
+        'profile=any',
+        'protocol=tcp',
+        f'localport={ports["eth2_bn"]}'
+    ])
+
+    print('Checking if we have a UDP firewall rule for Teku...')
+    process_result = subprocess.run([
+        'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={teku_udp_rule_name}'
+    ])
+    if process_result.returncode == 0:
+        print('Deleting existing UDP firewall rule for Teku before creating the new one...')
+        subprocess.run([
+            'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={teku_udp_rule_name}'
+        ])
+    print('Creating a new UDP firewall rule for Teku...')
+    process_result = subprocess.run([
+        'netsh', 'advfirewall', 'firewall', 'add', 'rule',
+        f'name={teku_udp_rule_name}',
+        'dir=in',
+        'action=allow',
+        'service=any',
+        'profile=any',
+        'protocol=udp',
+        f'localport={ports["eth2_bn"]}'
+    ])
+
+    return True
 
 def install_chocolatey():
     # Install chocolatey to obtain other tools
