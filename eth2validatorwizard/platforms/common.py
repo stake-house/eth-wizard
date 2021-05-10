@@ -748,6 +748,179 @@ def get_bc_validator_deposits(network, public_keys):
 
     return validator_deposits
 
+def test_open_ports(ports):
+    # Test the selected ports to make sure they are opened and exposed to the internet
+
+    params = {
+        'ports': str(ports['eth1']) + ',' + str(ports['eth2_bn'])
+    }
+
+    requested_ports = {ports['eth1'], ports['eth2_bn']}
+
+    all_ports_opened = False
+
+    print('Checking for open ports...')
+
+    while not all_ports_opened:
+        try:
+            print('Connecting to StakeHouse Port Checker...')
+            response = httpx.get(STAKEHOUSE_PORT_CHECKER_URL, params=params)
+
+            if response.status_code != 200:
+                result = button_dialog(
+                    title='Cannot connect to StakeHouse Port Checker',
+                    text=(
+f'''
+We could not connect to StakeHouse Port Checker server. Here are some
+details for this last test we tried to perform:
+
+URL: {STAKEHOUSE_PORT_CHECKER_URL}
+Method: GET
+Parameters: {json.dumps(params)}
+Status code: {response.status_code}
+
+Would you like to retry?
+'''                 ),
+                    buttons=[
+                        ('Retry', 1),
+                        ('Skip', 2),
+                        ('Quit', False)
+                    ]
+                ).run()
+                
+                if not result:
+                    return result
+                
+                if result == 1:
+                    time.sleep(5)
+                    continue
+            
+                if result == 2:
+                    break
+            
+            response_json = response.json()
+
+            if (
+                not response_json or
+                'open_ports' not in response_json or
+                type(response_json['open_ports']) is not list
+            ):
+                result = button_dialog(
+                    title='Unexpected response from StakeHouse Port Checker',
+                    text=(
+f'''
+We received an unexpected response from StakeHouse Port Checker server.
+Here are some details for this last test we tried to perform:
+
+URL: {STAKEHOUSE_PORT_CHECKER_URL}
+Method: GET
+Parameters: {json.dumps(params)}
+Response: {json.dumps(response_json)}
+
+Would you like to retry?
+'''                 ),
+                    buttons=[
+                        ('Retry', 1),
+                        ('Skip', 2),
+                        ('Quit', False)
+                    ]
+                ).run()
+
+                if not result:
+                    return result
+                
+                if result == 1:
+                    time.sleep(5)
+                    continue
+            
+                if result == 2:
+                    break
+            
+            opened_ports = set(response_json['open_ports'])
+
+            if requested_ports != opened_ports:
+                if len(opened_ports) == 0:
+                    opened_ports = 'None'
+                result = button_dialog(
+                    title='Missing open ports',
+                    text=(
+f'''
+It seems like you are missing some open ports. Here are some details for
+this last test we tried to perform:
+
+Tested ports: {requested_ports}
+Open ports: {opened_ports}
+
+In order to improve your ability to connect with peers, you should have
+exposed ports to the Internet on your machine. If this machine is behind a
+router or another network device that blocks incoming connections on those
+ports, you will have to configure those devices so that they can forward
+(port forward) those connections to this machine. If you need help with
+this, read your device's manual, search for "How to Forward Ports" for your
+device or ask the ETHStaker community.
+
+Would you like to retry?
+'''                 ),
+                    buttons=[
+                        ('Retry', 1),
+                        ('Skip', 2),
+                        ('Quit', False)
+                    ]
+                ).run()
+
+                if not result:
+                    return result
+                
+                if result == 1:
+                    time.sleep(5)
+                    continue
+            
+                if result == 2:
+                    break
+
+            else:
+                all_ports_opened = True
+
+        except httpx.RequestError as exception:
+            result = button_dialog(
+                title='Cannot connect to StakeHouse Port Checker',
+                text=(
+f'''
+We could not connect to StakeHouse Port Checker server. Here are some
+details for this last test we tried to perform:
+
+URL: {STAKEHOUSE_PORT_CHECKER_URL}
+Method: GET
+Parameters: {json.dumps(params)}
+Exception: {exception}
+
+Would you like to retry?
+'''             ),
+                buttons=[
+                    ('Retry', 1),
+                    ('Skip', 2),
+                    ('Quit', False)
+                ]
+            ).run()
+
+            if not result:
+                return result
+            
+            if result == 1:
+                time.sleep(5)
+                continue
+        
+            if result == 2:
+                break
+    
+    if all_ports_opened:
+        print('Open ports are configured correctly.')
+    else:
+        print('We could not confirm that open ports are configured correctly.')
+
+    time.sleep(5)
+    return True
+
 def show_whats_next(network, keys, public_keys):
     # Show what's next including wait time
 

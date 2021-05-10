@@ -38,6 +38,7 @@ from eth2validatorwizard.platforms.common import (
     input_dialog_default,
     search_for_generated_keys,
     get_bc_validator_deposits,
+    test_open_ports,
     show_whats_next,
     show_public_keys
 )
@@ -96,9 +97,9 @@ def installation_steps(*args, **kwargs):
         # User asked to quit or error
         quit_install()
     
-    '''if not test_open_ports(selected_ports):
+    if not test_open_ports(selected_ports):
         # User asked to quit or error
-        quit_install()'''
+        quit_install()
 
     if not install_monitoring(selected_directory):
         # User asked to quit or error
@@ -3442,8 +3443,8 @@ To examine your prometheus service logs, inspect the following file:
         time.sleep(5)
 
         params = {
-        'query': 'promhttp_metric_handler_requests_total',
-        'time': datetime.now().timestamp()
+            'query': 'promhttp_metric_handler_requests_total',
+            'time': datetime.now().timestamp()
         }
         try:
             response = httpx.get(local_prometheus_query_url, params=params)
