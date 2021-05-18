@@ -109,6 +109,10 @@ def installation_steps(*args, **kwargs):
         # User asked to quit or error
         quit_install()
     
+    if not disable_windows_updates():
+        # User asked to quit or error
+        quit_install()
+    
     public_keys = initiate_deposit(selected_directory, selected_network, generated_keys)
     if not public_keys:
         # User asked to quit or error
@@ -2964,6 +2968,55 @@ Would you like to improve your time synchronization?
     subprocess.run([
         'net', 'start', 'w32time'
     ])
+
+    return True
+
+def disable_windows_updates():
+    # Disable automatic download and installation of Windows updates
+
+    result = button_dialog(
+        title='Disable automatic Windows updates',
+        text=(
+'''
+Automatic download and installation of Windows updates can impede the
+proper functionning of a validator machine. A validator machine is expected
+to run 24/7 to maximize your rewards. Installing regular Windows updates is
+still strongly recommended to keep your machine secure, but moving this to
+a manual process is recommended for a validator machine.
+
+Going offline for a few minutes during a required reboot for Windows updates
+should still be fine. By disabling automatic Windows updates you will have
+greater control of when that happens.
+
+Would you like to disable automatic Windows updates?
+'''     ),
+        buttons=[
+            ('Disable', 1),
+            ('Skip', 2),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if result == 2:
+        return True
+
+    if not result:
+        return result
+
+    # Based on Debloat-Windows-10 optimize windows update script
+    # https://github.com/W4RH4WK/Debloat-Windows-10/blob/master/scripts/optimize-windows-update.ps1
+    wuau_key = r'SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\WindowsUpdate\AU'
+    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, wuau_key) as key:
+
+        winreg.SetValueEx(key, 'NoAutoUpdate', 0, winreg.REG_DWORD, 0)
+        winreg.SetValueEx(key, 'AUOptions', 0, winreg.REG_DWORD, 2)
+        winreg.SetValueEx(key, 'ScheduledInstallDay', 0, winreg.REG_DWORD, 0)
+        winreg.SetValueEx(key, 'ScheduledInstallTime', 0, winreg.REG_DWORD, 3)
+
+    delivery_optimization_key = r'SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization'
+    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, delivery_optimization_key) as key:
+    
+        winreg.SetValueEx(key, 'DODownloadMode', 0, winreg.REG_DWORD, 0)
 
     return True
 
