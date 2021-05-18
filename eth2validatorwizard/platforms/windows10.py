@@ -105,6 +105,10 @@ def installation_steps(*args, **kwargs):
         # User asked to quit or error
         quit_install()
     
+    if not improve_time_sync():
+        # User asked to quit or error
+        quit_install()
+    
     public_keys = initiate_deposit(selected_directory, selected_network, generated_keys)
     if not public_keys:
         # User asked to quit or error
@@ -2883,6 +2887,85 @@ deposit(s).
     deposit_file_path.unlink()
     
     return public_keys
+
+def improve_time_sync():
+    # Improve time sync
+
+    result = button_dialog(
+        title='Improve time synchronization',
+        text=(
+'''
+Time synchronization is very important for a validator setup. Being out of
+sync can lead to lower rewards and other undesirable results.
+
+The default settings on a Windows 10 installation are poor for time sync.
+This next step can significantly improve your time sync configuration for
+your machine.
+
+Would you like to improve your time synchronization?
+'''     ),
+        buttons=[
+            ('Improve', 1),
+            ('Skip', 2),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if result == 2:
+        return True
+
+    if not result:
+        return result
+    
+    # Stop Windows Time service
+    subprocess.run([
+        'net', 'stop', 'w32time'
+    ])
+
+    # Start Windows Time service
+    subprocess.run([
+        'net', 'start', 'w32time'
+    ])
+
+    # Configure Windows Time service to use 4 ntp.org servers
+    subprocess.run([
+        'w32tm', '/config', '/update', '/manualpeerlist:0.pool.ntp.org 1.pool.ntp.org 2.pool.ntp.org 3.pool.ntp.org'
+    ])
+
+    # Manually sync time
+    subprocess.run([
+        'w32tm', '/resync'
+    ])
+
+    # Set the Windows Time service to start automatically
+    subprocess.run([
+        'sc', 'config', 'w32time', 'start=auto'
+    ])
+
+    # Configure Windows Time service for High Accuracy as mentioned on
+    # https://docs.microsoft.com/en-us/windows-server/networking/windows-time-service/configuring-systems-for-high-accuracy
+    win32time_config_key = r'SYSTEM\CurrentControlSet\Services\W32Time\Config'
+    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, win32time_config_key, 0, winreg.KEY_WRITE) as key:
+
+        winreg.SetValueEx(key, 'MinPollInterval', 0, winreg.REG_DWORD, 6)
+        winreg.SetValueEx(key, 'MaxPollInterval', 0, winreg.REG_DWORD, 10)
+        winreg.SetValueEx(key, 'UpdateInterval', 0, winreg.REG_DWORD, 100)
+        winreg.SetValueEx(key, 'FrequencyCorrectRate', 0, winreg.REG_DWORD, 2)
+
+    ntpclient_key = r'SYSTEM\CurrentControlSet\Services\W32Time\TimeProviders\NtpClient'
+    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, ntpclient_key, 0, winreg.KEY_WRITE) as key:
+    
+        winreg.SetValueEx(key, 'SpecialPollInterval', 0, winreg.REG_DWORD, 2)
+    
+    # Restart the Windows Time service
+    subprocess.run([
+        'net', 'stop', 'w32time'
+    ])
+    subprocess.run([
+        'net', 'start', 'w32time'
+    ])
+
+    return True
 
 def install_monitoring(base_directory):
 
