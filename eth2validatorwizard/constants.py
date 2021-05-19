@@ -29,6 +29,10 @@ MIN_SUSTAINED_K_WRITE_IOPS = 1.0
 MIN_DOWN_MBS = 4.5
 MIN_UP_MBS = 4.5
 
+BN_MIN_FEW_PEERS = 10
+
+UNKNOWN_VALUE = 'Unknown'
+
 CHOCOLATEY_DEFAULT_BIN_PATH = r'C:\ProgramData\chocolatey\bin'
 
 LAUNCHPAD_URLS = {
@@ -52,6 +56,7 @@ INFURA_BEACON_NODE_DOMAINS = {
 BN_FINALIZED_STATE_URL = '/eth/v1/debug/beacon/states/finalized'
 BN_DEPOSIT_CONTRACT_URL = '/eth/v1/config/deposit_contract'
 BN_VERSION_EP = '/eth/v1/node/version'
+BN_PEERS_EP = '/eth/v1/node/peers'
 BN_PEER_COUNT_EP = '/eth/v1/node/peer_count'
 BN_SYNCING_EP = '/eth/v1/node/syncing'
 
