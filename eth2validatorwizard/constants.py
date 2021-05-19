@@ -51,6 +51,9 @@ INFURA_BEACON_NODE_DOMAINS = {
 
 BN_FINALIZED_STATE_URL = '/eth/v1/debug/beacon/states/finalized'
 BN_DEPOSIT_CONTRACT_URL = '/eth/v1/config/deposit_contract'
+BN_VERSION_EP = '/eth/v1/node/version'
+BN_PEER_COUNT_EP = '/eth/v1/node/peer_count'
+BN_SYNCING_EP = '/eth/v1/node/syncing'
 
 BN_CHAIN_IDS = {
     NETWORK_MAINNET: 1,

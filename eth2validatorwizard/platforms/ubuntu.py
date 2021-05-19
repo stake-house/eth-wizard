@@ -1391,7 +1391,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
     # Verify proper Lighthouse beacon node installation and syncing
     local_lighthouse_bn_http_base = 'http://127.0.0.1:5052'
     
-    lighthouse_bn_version_query = '/eth/v1/node/version'
+    lighthouse_bn_version_query = BN_VERSION_EP
     lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_version_query
     headers = {
         'accept': 'application/json'
@@ -1469,7 +1469,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
         return False
     
     # Verify proper Lighthouse beacon node syncing
-    lighthouse_bn_syncing_query = '/eth/v1/node/syncing'
+    lighthouse_bn_syncing_query = BN_SYNCING_EP
     lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_syncing_query
     headers = {
         'accept': 'application/json'

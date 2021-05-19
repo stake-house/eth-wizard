@@ -1978,7 +1978,7 @@ To examine your teku service logs, inspect the following files:
     # Verify proper Teku installation and syncing
     local_teku_http_base = 'http://127.0.0.1:5051'
     
-    teku_version_query = '/eth/v1/node/version'
+    teku_version_query = BN_VERSION_EP
     teku_query_url = local_teku_http_base + teku_version_query
     headers = {
         'accept': 'application/json'
@@ -2081,7 +2081,7 @@ To examine your teku service logs, inspect the following files:
         return False
     
     # Verify proper Teku syncing
-    teku_syncing_query = '/eth/v1/node/syncing'
+    teku_syncing_query = BN_SYNCING_EP
     teku_query_url = local_teku_http_base + teku_syncing_query
     headers = {
         'accept': 'application/json'
