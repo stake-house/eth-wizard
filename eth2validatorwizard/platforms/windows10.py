@@ -828,7 +828,7 @@ To examine your geth service logs, inspect the following file:
         log_length = len(log_text)
 
         if log_length > 0:
-            print(log_text)
+            print(log_text, end='')
         time.sleep(5)
 
     # Verify proper Geth syncing
@@ -1967,11 +1967,11 @@ To examine your teku service logs, inspect the following files:
         
         out_log_length = len(out_log_text)
         if out_log_length > 0:
-            print(out_log_text)
+            print(out_log_text, end='')
 
         err_log_length = len(err_log_text)
         if err_log_length > 0:
-            print(err_log_text)
+            print(err_log_text, end='')
 
         time.sleep(5)
 
@@ -3447,7 +3447,7 @@ To examine your prometheus service logs, inspect the following file:
 
         err_log_length = len(err_log_text)
         if err_log_length > 0:
-            print(err_log_text)
+            print(err_log_text, end='')
 
         time.sleep(5)
 
@@ -4656,7 +4656,7 @@ To examine your grafana service logs, inspect the following file:
 
         err_log_length = len(err_log_text)
         if err_log_length > 0:
-            print(err_log_text)
+            print(err_log_text, end='')
 
         time.sleep(5)
 
