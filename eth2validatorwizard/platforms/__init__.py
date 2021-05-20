@@ -9,11 +9,6 @@ import base64
 
 from packaging import version
 
-from eth2validatorwizard.platforms.ubuntu import installation_steps as ubuntu_steps
-from eth2validatorwizard.platforms.windows10 import installation_steps as windows10_steps
-
-from eth2validatorwizard.platforms.windows10 import RESUME_CHOCOLATEY
-
 PLATFORM_UBUNTU = 'Ubuntu'
 PLATFORM_WINDOWS10 = 'Windows10'
 
@@ -105,15 +100,19 @@ def has_su_perm(platform):
 
 def get_install_steps(platform):
     if platform == PLATFORM_UBUNTU:
+        from eth2validatorwizard.platforms.ubuntu import installation_steps as ubuntu_steps
         return ubuntu_steps
     elif platform == PLATFORM_WINDOWS10:
+        from eth2validatorwizard.platforms.windows10 import installation_steps as windows10_steps
         return windows10_steps
     
     return False
 
 def resume_step(platform):
     if platform == PLATFORM_WINDOWS10:
+        from eth2validatorwizard.platforms.windows10 import RESUME_CHOCOLATEY
         if RESUME_CHOCOLATEY in sys.argv:
+            from eth2validatorwizard.platforms.windows10 import installation_steps as windows10_steps
             windows10_steps(resume_chocolatey=True)
             return True
     
