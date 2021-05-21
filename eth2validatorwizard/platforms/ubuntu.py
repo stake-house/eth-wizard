@@ -84,19 +84,19 @@ def installation_steps():
     if not obtained_keys:
         # User asked to quit or error
         quit()
-    
+
     if not install_lighthouse_validator(selected_network, obtained_keys):
         # User asked to quit or error
         quit()
 
     # TODO: Check time synchronization and configure it if needed
 
+    # TODO: Monitoring setup
+
     public_keys = initiate_deposit(selected_network, obtained_keys)
     if not public_keys:
         # User asked to quit or error
         quit()
-
-    # TODO: Monitoring setup
 
     show_whats_next(selected_network, obtained_keys, public_keys)
 
@@ -1958,7 +1958,7 @@ your keys on the USB drive and import them here.
 An easier but somewhat riskier alternative is let this wizard download
 the tool and generate your keys on this machine.
 
-Would you like to generate your keys here or import them?
+Would you like to import your keys or generate them here?
 '''         ),
             buttons=[
                 ('Import', 1),
