@@ -29,6 +29,8 @@ MIN_SUSTAINED_K_WRITE_IOPS = 1.0
 MIN_DOWN_MBS = 4.5
 MIN_UP_MBS = 4.5
 
+MIN_AVAILABLE_RAM_GB = 12.0
+
 BN_MIN_FEW_PEERS = 10
 
 UNKNOWN_VALUE = 'Unknown'
@@ -41523,7 +41525,7 @@ Group=goeth
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart=geth --cache 2048 --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof
+ExecStart=geth --cache 2048 --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof{addparams}
 
 [Install]
 WantedBy=default.target
@@ -41541,7 +41543,7 @@ Group=goeth
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart=geth --goerli --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof
+ExecStart=geth --goerli --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof{addparams}
 
 [Install]
 WantedBy=default.target
@@ -41559,7 +41561,7 @@ Group=goeth
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart=geth --goerli --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof
+ExecStart=geth --goerli --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof{addparams}
 
 [Install]
 WantedBy=default.target
@@ -41580,7 +41582,7 @@ User=lighthousebeacon
 Group=lighthousebeacon
 Restart=always
 RestartSec=5
-ExecStart=/usr/local/bin/lighthouse bn --network mainnet --datadir /var/lib/lighthouse --staking --eth1-endpoints {eth1endpoints} --validator-monitor-auto --metrics
+ExecStart=/usr/local/bin/lighthouse bn --network mainnet --datadir /var/lib/lighthouse --staking --eth1-endpoints {eth1endpoints} --validator-monitor-auto --metrics{addparams}
 
 [Install]
 WantedBy=multi-user.target
@@ -41598,7 +41600,7 @@ User=lighthousebeacon
 Group=lighthousebeacon
 Restart=always
 RestartSec=5
-ExecStart=/usr/local/bin/lighthouse bn --network pyrmont --datadir /var/lib/lighthouse --staking --eth1-endpoints {eth1endpoints} --validator-monitor-auto --metrics
+ExecStart=/usr/local/bin/lighthouse bn --network pyrmont --datadir /var/lib/lighthouse --staking --eth1-endpoints {eth1endpoints} --validator-monitor-auto --metrics{addparams}
 
 [Install]
 WantedBy=multi-user.target
@@ -41616,7 +41618,7 @@ User=lighthousebeacon
 Group=lighthousebeacon
 Restart=always
 RestartSec=5
-ExecStart=/usr/local/bin/lighthouse bn --network prater --datadir /var/lib/lighthouse --staking --eth1-endpoints {eth1endpoints} --validator-monitor-auto --metrics
+ExecStart=/usr/local/bin/lighthouse bn --network prater --datadir /var/lib/lighthouse --staking --eth1-endpoints {eth1endpoints} --validator-monitor-auto --metrics{addparams}
 
 [Install]
 WantedBy=multi-user.target

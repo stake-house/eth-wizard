@@ -14,9 +14,11 @@ from eth2validatorwizard.constants import *
 
 from eth2validatorwizard.platforms.common import (
     select_network,
+    select_custom_ports,
     select_eth1_fallbacks,
     search_for_generated_keys,
     get_bc_validator_deposits,
+    test_open_ports,
     show_whats_next,
     show_public_keys
 )
@@ -26,34 +28,38 @@ from prompt_toolkit.shortcuts import button_dialog, radiolist_dialog, input_dial
 
 def installation_steps():
 
-    selected_ports = {
-        'eth1': DEFAULT_GETH_PORT,
-        'eth2_bn': DEFAULT_LIGHTHOUSE_BN_PORT
-    }
-
     want_to_test = show_test_overview()
     if not want_to_test:
         # User asked to quit
         quit()
 
     if want_to_test == 1:
-        # TODO: Check for opened ports
         if not test_disk_size():
             # User asked to quit
             quit()
         if not test_disk_speed():
             # User asked to quit
             quit()
-        # TODO: Check for available RAM
+        if not test_available_ram():
+            # User asked to quit
+            quit()
         if not test_internet_speed():
             # User asked to quit
             quit()
-    
-    # TODO: Check time synchronization and configure it if needed
 
     selected_network = select_network()
     if not selected_network:
         # User asked to quit
+        quit()
+    
+    selected_ports = {
+        'eth1': DEFAULT_GETH_PORT,
+        'eth2_bn': DEFAULT_LIGHTHOUSE_BN_PORT
+    }
+
+    selected_ports = select_custom_ports(selected_ports)
+    if not selected_ports:
+        # User asked to quit or error
         quit()
 
     if not install_geth(selected_network, selected_ports):
@@ -69,6 +75,10 @@ def installation_steps():
         # User asked to quit or error
         quit()
 
+    if not test_open_ports(selected_ports):
+        # User asked to quit or error
+        quit()
+
     generated_keys = generate_keys(selected_network)
     if not generated_keys:
         # User asked to quit or error
@@ -77,6 +87,8 @@ def installation_steps():
     if not install_lighthouse_validator(selected_network, generated_keys):
         # User asked to quit or error
         quit()
+
+    # TODO: Check time synchronization and configure it if needed
 
     public_keys = initiate_deposit(selected_network, generated_keys)
     if not public_keys:
@@ -99,10 +111,9 @@ f'''
 We can test your system to make sure it is fit for being a validator. Here
 is the list of tests we will perform:
 
-* Opened ports (2 ports: 1 port for eth1 and 1 port for eth2 beacon node)
 * Disk size (>= {MIN_AVAILABLE_DISK_SPACE_GB:.0f}GB of available space)
 * Disk speed (>= {MIN_SUSTAINED_K_READ_IOPS:.1f}K sustained read IOPS and >= {MIN_SUSTAINED_K_WRITE_IOPS:.1f}K sustained write IOPS)
-* Memory size (>= 8GB of available RAM)
+* Memory size (>= {MIN_AVAILABLE_RAM_GB:.1f}GB of available RAM)
 * Internet speed (>= {MIN_DOWN_MBS:.1f}MB/s down and >= {MIN_UP_MBS:.1f}MB/s up)
 
 Do you want to test your system?
@@ -117,6 +128,8 @@ Do you want to test your system?
     return result
 
 def test_disk_size():
+    # Test disk size
+
     process_result = subprocess.run([
         'df', '-h', '--output=avail', '-B1MB', '/var/lib'
         ], capture_output=True, text=True)
@@ -176,7 +189,11 @@ enough</b></style> to be a fully working validator. Here are your results:
     return result
 
 def test_disk_speed():
+    # Test disk speed using fio tool
+
     # Install fio using APT
+    print('Installing fio...')
+
     subprocess.run([
         'apt', '-y', 'update'])
     subprocess.run([
@@ -191,6 +208,8 @@ def test_disk_speed():
 
     fio_target_path = Path(fio_path, fio_target_filename)
     fio_output_path = Path(fio_path, fio_output_filename)
+
+    print('Executing fio...')
 
     process_result = subprocess.run([
         'fio', '--randrepeat=1', '--ioengine=libaio', '--direct=1', '--gtod_reduce=1',
@@ -298,7 +317,10 @@ be a fully working validator. Here are your results:
     return result
 
 def test_internet_speed():
+    # Test for internet speed
+
     # Downloading speedtest script
+    print('Downloading speedtest-cli script...')
     download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
     download_path.mkdir(parents=True, exist_ok=True)
 
@@ -402,6 +424,71 @@ enough</b></style> to be a fully working validator. Here are your results:
 * Server name: {server_name}
 * Server country: {server_country}
 * Server location: {server_lat}, {server_lon}
+'''     )),
+        buttons=[
+            ('Keep going', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    return result
+
+def test_available_ram():
+    # Test available RAM
+
+    process_result = subprocess.run([
+        'grep', 'MemTotal', '/proc/meminfo'
+        ], capture_output=True, text=True)
+    
+    if process_result.returncode != 0:
+        print(f'Unable to get available total RAM. Return code {process_result.returncode}')
+        print(f'{process_result.stdout}\n{process_result.stderr}')
+        return False
+    
+    process_output = process_result.stdout
+
+    total_available_ram_gb = 0.0
+
+    result = re.search(r'MemTotal:\s*(?P<memkb>\d+) kB', process_output)
+    if result:
+        total_available_ram_gb = int(result.group('memkb')) / 1000000.0
+    else:
+        print(f'Unable to parse the output of /proc/meminfo to get available total RAM.')
+        print(f'{process_output}')
+        return False
+    
+    # Test if available RAM is above minimal values
+    if not total_available_ram_gb >= MIN_AVAILABLE_RAM_GB:
+
+        result = button_dialog(
+            title=HTML('Memory size test <style bg="red" fg="black">failed</style>'),
+            text=(HTML(
+f'''
+Your memory size results seem to indicate that <style bg="red" fg="black">your available RAM is <b>lower
+than</b> what would be required</style> to be a fully working validator. Here are your
+results:
+
+* Memory size: {total_available_ram_gb:.1f}GB of available RAM (>= {MIN_AVAILABLE_RAM_GB:.1f}GB of available RAM)
+
+It might still be possible to be a validator but you should consider having
+more memory.
+'''         )),
+            buttons=[
+                ('Keep going', True),
+                ('Quit', False)
+            ]
+        ).run()
+
+        return result
+
+    result = button_dialog(
+        title=HTML('Memory size test <style bg="green" fg="white">passed</style>'),
+        text=(HTML(
+f'''
+Your memory size results seem to indicate that <style bg="green" fg="white">your available RAM is <b>large
+enough</b></style> to be a fully working validator. Here are your results:
+
+* Memory size: {total_available_ram_gb:.1f}GB of available RAM (>= {MIN_AVAILABLE_RAM_GB:.1f}GB of available RAM)
 '''     )),
         buttons=[
             ('Keep going', True),
@@ -621,8 +708,12 @@ Do you want to remove this directory first and start from nothing?
         'chown', '-R', 'goeth:goeth', geth_datadir])
     
     # Setup Geth systemd service
+    addparams = ''
+    if ports['eth1'] != DEFAULT_GETH_PORT:
+        addparams = f' --port {ports["eth1"]}'
+
     with open('/etc/systemd/system/' + geth_service_name, 'w') as service_file:
-        service_file.write(GETH_SERVICE_DEFINITION[network])
+        service_file.write(GETH_SERVICE_DEFINITION[network].format(addparams=addparams))
     subprocess.run([
         'systemctl', 'daemon-reload'])
     subprocess.run([
@@ -1314,7 +1405,14 @@ Do you want to remove this directory first and start from nothing?
     service_definition = LIGHTHOUSE_BN_SERVICE_DEFINITION[network]
 
     eth1_endpoints = ['http://127.0.0.1:8545'] + eth1_fallbacks
-    service_definition = service_definition.format(eth1endpoints=','.join(eth1_endpoints))
+
+    addparams = ''
+    if ports['eth2_bn'] != DEFAULT_LIGHTHOUSE_BN_PORT:
+        addparams = f' --port {ports["eth2_bn"]}'
+
+    service_definition = service_definition.format(
+        eth1endpoints=','.join(eth1_endpoints),
+        addparams=addparams)
 
     with open('/etc/systemd/system/' + lighthouse_bn_service_name, 'w') as service_file:
         service_file.write(service_definition)
