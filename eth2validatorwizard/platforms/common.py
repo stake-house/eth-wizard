@@ -5,6 +5,8 @@ import time
 
 from rfc3986 import urlparse, builder as urlbuilder
 
+from pathlib import Path
+
 from eth2validatorwizard.constants import *
 
 from prompt_toolkit.formatted_text import HTML
@@ -920,6 +922,61 @@ Would you like to retry?
 
     time.sleep(5)
     return True
+
+def select_keys_directory(network):
+    # Prompt the user for a directory that contains keys he generated already for the selected
+    # network
+
+    valid_keys_directory = False
+    entered_directory = None
+    input_canceled = False
+
+    while not valid_keys_directory:
+        not_valid_msg = ''
+        if entered_directory is not None:
+            not_valid_msg = (
+'''
+
+<style bg="red" fg="black">Your last input was <b>not a valid keys directory</b>. Please make sure to enter a
+valid keys directory.</style>'''
+            )
+
+        entered_directory = input_dialog(
+            title='Keys directory',
+            text=(HTML(
+f'''
+Please enter the directory in which we can find the keys you generated. It
+should include all the files that the eth2.0-deposit-cli tool created
+including:
+
+- deposit_data(...).json
+- keystore-(...).json
+
+When creating your keys offline or elsewhere, make sure you select the
+correct network: {network.capitalize()}
+
+* Press the tab key to switch between the controls below{not_valid_msg}
+'''             ))).run()
+
+        if not entered_directory:
+            input_canceled = True
+            break
+    
+        entered_directory = Path(entered_directory)
+
+        if not entered_directory.is_dir():
+            continue
+        
+        generated_keys = search_for_generated_keys(entered_directory)
+        if (
+            generated_keys['deposit_data_path'] is not None and
+            len(generated_keys['keystore_paths']) > 0):
+            valid_keys_directory = True
+
+    if input_canceled:
+        return ''
+
+    return entered_directory
 
 def show_whats_next(network, keys, public_keys):
     # Show what's next including wait time
