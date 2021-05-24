@@ -2010,6 +2010,9 @@ Would you like to import your keys or generate them here?
             title='Generating keys',
             text=(HTML(
 f'''
+This next step will generate the keys needed to be a validator on this
+machine.
+
 It will download the official eth2.0-deposit-cli binary from GitHub,
 verify its SHA256 checksum, extract it and start it.
 
