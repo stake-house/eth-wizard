@@ -1648,7 +1648,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
     response_json = response.json()
 
     retry_index = 0
-    retry_count = 5
+    retry_count = 10
 
     while (
         'data' not in response_json or

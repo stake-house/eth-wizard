@@ -2084,7 +2084,7 @@ To examine your teku service logs, inspect the following files:
     # Verify proper Teku syncing
 
     retry_index = 0
-    retry_count = 5
+    retry_count = 10
 
     bn_is_working = False
     bn_is_syncing = False
