@@ -51,8 +51,6 @@ RESUME_CHOCOLATEY = 'resume_chocolatey'
 
 def installation_steps(*args, **kwargs):
 
-    # TODO: Check time synchronization and configure it if needed
-
     selected_directory = select_directory()
     if not selected_directory:
         # User asked to quit
