@@ -2561,8 +2561,8 @@ Would you like to import your keys or generate them here?
             imported_keys = search_for_generated_keys(keys_path)
             
             if (
-                generated_keys['deposit_data_path'] is None or
-                len(generated_keys['keystore_paths']) == 0):
+                imported_keys['deposit_data_path'] is None or
+                len(imported_keys['keystore_paths']) == 0):
                 print(f'No key has been found while importing them from {keys_path}')
             else:
                 actual_keys = imported_keys
