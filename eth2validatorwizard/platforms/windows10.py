@@ -36,6 +36,7 @@ from eth2validatorwizard.platforms.common import (
     select_initial_state,
     select_eth1_fallbacks,
     input_dialog_default,
+    progress_log_dialog,
     search_for_generated_keys,
     select_keys_directory,
     get_bc_validator_deposits,
@@ -1948,32 +1949,6 @@ To examine your teku service logs, inspect the following files:
 
         return False
 
-    # Iterate over the logs and output them for around 30 seconds
-    out_log_read_index = 0
-    err_log_read_index = 0
-    for i in range(6):
-        out_log_text = ''
-        with open(teku_stdout_log_path, 'r', encoding='utf8') as log_file:
-            log_file.seek(out_log_read_index)
-            out_log_text = log_file.read()
-            out_log_read_index = log_file.tell()
-        
-        err_log_text = ''
-        with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
-            log_file.seek(err_log_read_index)
-            err_log_text = log_file.read()
-            err_log_read_index = log_file.tell()
-        
-        out_log_length = len(out_log_text)
-        if out_log_length > 0:
-            print(out_log_text, end='')
-
-        err_log_length = len(err_log_text)
-        if err_log_length > 0:
-            print(err_log_text, end='')
-
-        time.sleep(5)
-
     # Verify proper Teku installation and syncing
     local_teku_http_base = 'http://127.0.0.1:5051'
     
@@ -1990,6 +1965,7 @@ To examine your teku service logs, inspect the following files:
         if teku_stderr_log_path.is_file():
             log_part = ''
             with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
+                log_file.seek(-1024, 2)
                 log_part = log_file.read(1024)
             result = re.search(r'Failed to decrypt', log_part)
             if result:
@@ -2081,274 +2057,22 @@ To examine your teku service logs, inspect the following files:
     
     # Verify proper Teku syncing
 
-    retry_index = 0
-    retry_count = 10
+    def verifying_callback(set_percentage, log_text, change_status):
+        set_percentage(0)
 
-    bn_is_working = False
-    bn_is_syncing = False
-    bn_has_few_peers = False
-    bn_connected_peers = 0
-    bn_head_slot = UNKNOWN_VALUE
-    bn_sync_distance = UNKNOWN_VALUE
-
-    while True:
-
-        teku_syncing_query = BN_SYNCING_EP
-        teku_query_url = local_teku_http_base + teku_syncing_query
-        headers = {
-            'accept': 'application/json'
-        }
-        try:
-            response = httpx.get(teku_query_url, headers=headers)
-        except httpx.RequestError as exception:
-            button_dialog(
-                title='Cannot connect to Teku',
-                text=(
-f'''
-We could not connect to teku HTTP server. Here are some details for this
-last test we tried to perform:
-
-URL: {teku_query_url}
-Method: GET
-Headers: {headers}
-Exception: {exception}
-
-We cannot proceed if the teku HTTP server is not responding properly. Make
-sure to check the logs and fix any issue found there. You can see the logs
-in:
-
-{teku_stdout_log_path}
-{teku_stderr_log_path}
-'''             ),
-                buttons=[
-                    ('Quit', False)
-                ]
-            ).run()
-
-            print(
-f'''
-To examine your teku service logs, inspect the following files:
-
-{teku_stdout_log_path}
-{teku_stderr_log_path}
-'''
-            )
-
-            return False
-
-        if response.status_code != 200:
-            button_dialog(
-                title='Cannot connect to Teku',
-                text=(
-f'''
-We could not connect to teku HTTP server. Here are some details for this
-last test we tried to perform:
-
-URL: {teku_query_url}
-Method: GET
-Headers: {headers}
-Status code: {response.status_code}
-
-We cannot proceed if the teku HTTP server is not responding properly. Make
-sure to check the logs and fix any issue found there. You can see the logs
-in:
-
-{teku_stdout_log_path}
-{teku_stderr_log_path}
-'''             ),
-                buttons=[
-                    ('Quit', False)
-                ]
-            ).run()
-
-            print(
-f'''
-To examine your teku service logs, inspect the following files:
-
-{teku_stdout_log_path}
-{teku_stderr_log_path}
-'''
-            )
-
-            return False
-        
-        response_json = response.json()
-        syncing_json = response_json
-
-        teku_peers_query = BN_PEERS_EP
-        teku_query_url = local_teku_http_base + teku_peers_query
-        headers = {
-            'accept': 'application/json'
-        }
-        try:
-            response = httpx.get(teku_query_url, headers=headers)
-        except httpx.RequestError as exception:
-            button_dialog(
-                title='Cannot connect to Teku',
-                text=(
-f'''
-We could not connect to teku HTTP server. Here are some details for this
-last test we tried to perform:
-
-URL: {teku_query_url}
-Method: GET
-Headers: {headers}
-Exception: {exception}
-
-We cannot proceed if the teku HTTP server is not responding properly. Make
-sure to check the logs and fix any issue found there. You can see the logs
-in:
-
-{teku_stdout_log_path}
-{teku_stderr_log_path}
-'''             ),
-                buttons=[
-                    ('Quit', False)
-                ]
-            ).run()
-
-            print(
-f'''
-To examine your teku service logs, inspect the following files:
-
-{teku_stdout_log_path}
-{teku_stderr_log_path}
-'''
-            )
-
-            return False
-
-        if response.status_code != 200:
-            button_dialog(
-                title='Cannot connect to Teku',
-                text=(
-f'''
-We could not connect to teku HTTP server. Here are some details for this
-last test we tried to perform:
-
-URL: {teku_query_url}
-Method: GET
-Headers: {headers}
-Status code: {response.status_code}
-
-We cannot proceed if the teku HTTP server is not responding properly. Make
-sure to check the logs and fix any issue found there. You can see the logs
-in:
-
-{teku_stdout_log_path}
-{teku_stderr_log_path}
-'''             ),
-                buttons=[
-                    ('Quit', False)
-                ]
-            ).run()
-
-            print(
-f'''
-To examine your teku service logs, inspect the following files:
-
-{teku_stdout_log_path}
-{teku_stderr_log_path}
-'''
-            )
-
-            return False
-
-        response_json = response.json()
-        peers_json = response_json
-
-        if (
-            syncing_json and
-            'data' in syncing_json and
-            'is_syncing' in syncing_json['data']
-            ):
-            bn_is_syncing = bool(syncing_json['data']['is_syncing'])
-        else:
-            bn_is_syncing = False
-        
-        if (
-            syncing_json and
-            'data' in syncing_json and
-            'head_slot' in syncing_json['data']
-            ):
-            bn_head_slot = syncing_json['data']['head_slot']
-        else:
-            bn_head_slot = UNKNOWN_VALUE
-
-        if (
-            syncing_json and
-            'data' in syncing_json and
-            'sync_distance' in syncing_json['data']
-            ):
-            bn_sync_distance = syncing_json['data']['sync_distance']
-        else:
-            bn_sync_distance = UNKNOWN_VALUE
-
+        bn_is_working = False
+        bn_is_syncing = False
+        bn_has_few_peers = False
         bn_connected_peers = 0
-        if (
-            peers_json and
-            'data' in peers_json and
-            type(peers_json['data']) is list
-            ):
-            for peer in peers_json['data']:
-                if 'state' not in peer:
-                    continue
-                if peer['state'] == 'connected':
-                    bn_connected_peers = bn_connected_peers + 1
-        
-        bn_has_few_peers = bn_connected_peers >= BN_MIN_FEW_PEERS
+        bn_head_slot = UNKNOWN_VALUE
+        bn_sync_distance = UNKNOWN_VALUE
 
-        if bn_is_syncing or bn_has_few_peers:
-            bn_is_working = True
-            break
-        
-        if retry_index >= retry_count:
-            break
+        out_log_read_index = 0
+        err_log_read_index = 0
 
-        retry_index = retry_index + 1
+        while True:
 
-        result = button_dialog(
-            title='Unexpected response from Teku',
-            text=(
-f'''
-We received an unexpected response from the teku HTTP server. This is
-likely because teku has not started syncing yet or because it's taking a
-little longer to find peers. We suggest you wait and retry in a minute.
-Here are some results for the last tests we performed:
-
-Syncing: {bn_is_syncing} (Head slot: {bn_head_slot}, Sync distance: {bn_sync_distance})
-Connected Peers: {bn_connected_peers}
-
-Retry attempt {retry_index} of {retry_count}
-
-We cannot proceed if the teku HTTP server is not responding properly. Make
-sure to check the logs and fix any issue found there. You can see the logs
-in:
-
-{teku_stdout_log_path}
-{teku_stderr_log_path}
-'''         ),
-            buttons=[
-                ('Retry', 1),
-                ('Quit', False)
-            ]
-        ).run()
-        
-        if not result:
-
-            print(
-f'''
-To examine your teku service logs, inspect the following files:
-
-{teku_stdout_log_path}
-{teku_stderr_log_path}
-'''
-            )
-
-            return False
-        
-        # Show logs between retries
-        for i in range(2):
+            # Output logs
             out_log_text = ''
             with open(teku_stdout_log_path, 'r', encoding='utf8') as log_file:
                 log_file.seek(out_log_read_index)
@@ -2363,16 +2087,125 @@ To examine your teku service logs, inspect the following files:
             
             out_log_length = len(out_log_text)
             if out_log_length > 0:
-                print(out_log_text, end='')
+                log_text(out_log_text)
 
             err_log_length = len(err_log_text)
             if err_log_length > 0:
-                print(err_log_text, end='')
+                log_text(err_log_text)
 
-            time.sleep(5)
+            time.sleep(1)
+            
+            teku_syncing_query = BN_SYNCING_EP
+            teku_query_url = local_teku_http_base + teku_syncing_query
+            headers = {
+                'accept': 'application/json'
+            }
+            try:
+                response = httpx.get(teku_query_url, headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Teku.')
+                continue
+
+            if response.status_code != 200:
+                log_text(f'Status code: {response.status_code} while querying Teku.')
+                continue
+        
+            response_json = response.json()
+            syncing_json = response_json
+
+            teku_peers_query = BN_PEERS_EP
+            teku_query_url = local_teku_http_base + teku_peers_query
+            headers = {
+                'accept': 'application/json'
+            }
+            try:
+                response = httpx.get(teku_query_url, headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Teku.')
+                continue
+
+            if response.status_code != 200:
+                log_text(f'Status code: {response.status_code} while querying Teku.')
+                continue
+
+            response_json = response.json()
+            peers_json = response_json
+
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'is_syncing' in syncing_json['data']
+                ):
+                bn_is_syncing = bool(syncing_json['data']['is_syncing'])
+            else:
+                bn_is_syncing = False
+            
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'head_slot' in syncing_json['data']
+                ):
+                bn_head_slot = syncing_json['data']['head_slot']
+            else:
+                bn_head_slot = UNKNOWN_VALUE
+
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'sync_distance' in syncing_json['data']
+                ):
+                bn_sync_distance = syncing_json['data']['sync_distance']
+            else:
+                bn_sync_distance = UNKNOWN_VALUE
+
+            bn_connected_peers = 0
+            if (
+                peers_json and
+                'data' in peers_json and
+                type(peers_json['data']) is list
+                ):
+                for peer in peers_json['data']:
+                    if 'state' not in peer:
+                        continue
+                    if peer['state'] == 'connected':
+                        bn_connected_peers = bn_connected_peers + 1
+            
+            bn_has_few_peers = bn_connected_peers >= BN_MIN_FEW_PEERS
+
+            change_status((
+f'''
+Syncing: {bn_is_syncing} (Head slot: {bn_head_slot}, Sync distance: {bn_sync_distance})
+Connected Peers: {bn_connected_peers}
+'''         ).strip())
+
+            if bn_is_syncing or bn_has_few_peers:
+                bn_is_working = True
+                return {
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                }
+
+    result = progress_log_dialog(
+        title='Verifying proper Teku service installation',
+        text=(
+f'''
+We are waiting for Teku to sync or find enough peers to confirm that it is
+working properly.
+'''     ),
+        status_text=(
+'''
+Syncing: Unknown (Head slot: Unknown, Sync distance: Unknown)
+Connected Peers: Unknown
+'''
+        ).strip(),
+        run_callback=verifying_callback
+    ).run()
     
-    if not bn_is_working:
-        # We could not get a proper result from the Teku after all those retries
+    if not result['bn_is_working']:
+        # We could not get a proper result from the Teku
         result = button_dialog(
             title='Unexpected response from Teku',
             text=(
@@ -2380,10 +2213,8 @@ f'''
 After a few retries, we still received an unexpected response from the
 teku HTTP server. Here are some results for the last tests we performed:
 
-Syncing: {bn_is_syncing} (Head slot: {bn_head_slot}, Sync distance: {bn_sync_distance})
-Connected Peers: {bn_connected_peers}
-
-Retry count: {retry_count}
+Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
+Connected Peers: {result['bn_connected_peers']}
 
 We cannot proceed if the teku HTTP server is not responding properly. Make
 sure to check the logs and fix any issue found there. You can see the logs
@@ -2408,15 +2239,12 @@ To examine your teku service logs, inspect the following files:
 
         return False
 
-    # TODO: Using async and prompt_toolkit asyncio loop to display syncing and connected peers
-    # values updating in realtime for a few seconds.
-
     print(
 f'''
 Teku is installed and working properly.
 
-Syncing: {bn_is_syncing} (Head slot: {bn_head_slot}, Sync distance: {bn_sync_distance})
-Connected Peers: {bn_connected_peers}
+Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
+Connected Peers: {result['bn_connected_peers']}
 ''' )
     time.sleep(5)
 

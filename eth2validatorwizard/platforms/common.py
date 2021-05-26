@@ -9,11 +9,13 @@ from pathlib import Path
 
 from eth2validatorwizard.constants import *
 
+from asyncio import get_event_loop
+
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import radiolist_dialog, button_dialog, input_dialog
 from prompt_toolkit.shortcuts.dialogs import _return_none, _create_app
 
-from typing import Optional
+from typing import Optional, Callable
 
 from prompt_toolkit.application import Application
 from prompt_toolkit.application.current import get_app
@@ -25,11 +27,14 @@ from prompt_toolkit.layout.containers import HSplit
 from prompt_toolkit.layout.dimension import Dimension as D
 from prompt_toolkit.styles import BaseStyle
 from prompt_toolkit.validation import Validator
+from prompt_toolkit.eventloop import run_in_executor_with_context
 
 from prompt_toolkit.widgets import (
+    Box,
     Button,
     Dialog,
     Label,
+    ProgressBar,
     TextArea,
     ValidationToolbar,
 )
@@ -658,6 +663,72 @@ def input_dialog_default(
     )
 
     return _create_app(dialog, style)
+
+def progress_log_dialog(
+    title: AnyFormattedText = "",
+    text: AnyFormattedText = "",
+    status_text: AnyFormattedText = "",
+    run_callback: Callable[[Callable[[int], None], Callable[[str], None], Callable[[str], None]], None] = (
+        lambda *a: None
+    ),
+    style: Optional[BaseStyle] = None,
+) -> Application[None]:
+    """
+    :param run_callback: A function that receives as input a `set_percentage`
+        function and it does the work.
+    """
+    loop = get_event_loop()
+    progressbar = ProgressBar()
+    text_area = TextArea(
+        focusable=False,
+        # Prefer this text area as big as possible, to avoid having a window
+        # that keeps resizing when we add text to it.
+        height=D(preferred=10 ** 10),
+        width=D(preferred=10 ** 10)
+    )
+    status = Label(text=status_text)
+
+    dialog = Dialog(
+        body=HSplit(
+            [
+                Box(Label(text=text)),
+                Box(text_area, padding=D.exact(1)),
+                Box(status, padding=D.exact(1)),
+                progressbar,
+            ]
+        ),
+        title=title,
+        with_background=True,
+    )
+    app = _create_app(dialog, style)
+
+    def set_percentage(value: int) -> None:
+        progressbar.percentage = int(value)
+        app.invalidate()
+
+    def log_text(text: str) -> None:
+        loop.call_soon_threadsafe(text_area.buffer.insert_text, text)
+        app.invalidate()
+    
+    def change_status(text: str) -> None:
+        status.formatted_text_control.text = text
+        app.invalidate()
+
+    # Run the callback in the executor. When done, set a return value for the
+    # UI, so that it quits.
+    def start() -> None:
+        result = None
+        try:
+            result = run_callback(set_percentage, log_text, change_status)
+        finally:
+            app.exit(result=result)
+
+    def pre_run() -> None:
+        run_in_executor_with_context(start)
+
+    app.pre_run_callables.append(pre_run)
+
+    return app
 
 def search_for_generated_keys(validator_keys_path):
     # Search for keys generated with the eth2.0-deposit-cli binary
