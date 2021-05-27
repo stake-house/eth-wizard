@@ -3,6 +3,7 @@ import json
 import os
 import time
 import humanize
+import asyncio
 
 from rfc3986 import urlparse, builder as urlbuilder
 
@@ -57,32 +58,50 @@ def select_network():
         'accept': 'application/json'
     }
 
+    async def network_joining_validators(network):
+        async with httpx.AsyncClient() as client:
+            beaconcha_in_queue_query_url = (
+                BEACONCHA_IN_URLS[network] + BEACONCHA_VALIDATOR_QUEUE_API_URL)
+            try:
+                response = await client.get(beaconcha_in_queue_query_url, headers=headers)
+            except httpx.RequestError as exception:
+                print(f'Exception: {exception} while querying beaconcha.in.')
+                return None
+
+            if response.status_code != 200:
+                print(f'Status code: {response.status_code} while querying beaconcha.in.')
+                return None
+
+            response_json = response.json()
+
+            if (
+                response_json and
+                'data' in response_json and
+                'beaconchain_entering' in response_json['data']):
+                validators_entering = int(response_json['data']['beaconchain_entering'])
+                waiting_td = timedelta(days=validators_entering / 900.0)
+
+                queue_info = (
+                    f'({validators_entering} validators waiting to join '
+                    f'[{humanize.naturaldelta(waiting_td)}])'
+                )
+                return network, queue_info
+            
+        return None
+
+    async_tasks = []
+
     for network in network_queue_info.keys():
-        beaconcha_in_queue_query_url = (
-            BEACONCHA_IN_URLS[network] + BEACONCHA_VALIDATOR_QUEUE_API_URL)
-        try:
-            response = httpx.get(beaconcha_in_queue_query_url, headers=headers)
-        except httpx.RequestError as exception:
-            print(f'Exception: {exception} while querying beaconcha.in.')
+        async_tasks.append(network_joining_validators(network))
+    
+    loop = asyncio.get_event_loop()
+    results = loop.run_until_complete(asyncio.gather(*async_tasks))
+
+    for result in results:
+        if result is None:
             continue
-
-        if response.status_code != 200:
-            print(f'Status code: {response.status_code} while querying beaconcha.in.')
-            continue
-
-        response_json = response.json()
-
-        if (
-            response_json and
-            'data' in response_json and
-            'beaconchain_entering' in response_json['data']):
-            validators_entering = int(response_json['data']['beaconchain_entering'])
-            waiting_td = timedelta(days=validators_entering / 900.0)
-
-            network_queue_info[network] = (
-                f'({validators_entering} validators waiting to join '
-                f'[{humanize.naturaldelta(waiting_td)}])'
-            )
+        network, queue_info = result
+        network_queue_info[network] = queue_info
 
     result = radiolist_dialog(
         title='Network selection',
