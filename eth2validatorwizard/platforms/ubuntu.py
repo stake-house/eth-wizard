@@ -16,6 +16,7 @@ from eth2validatorwizard.platforms.common import (
     select_network,
     select_custom_ports,
     select_eth1_fallbacks,
+    progress_log_dialog,
     search_for_generated_keys,
     select_keys_directory,
     get_bc_validator_deposits,
@@ -56,7 +57,7 @@ def installation_steps():
     selected_ports = {
         'eth1': DEFAULT_GETH_PORT,
         'eth2_bn': DEFAULT_LIGHTHOUSE_BN_PORT
-    }
+    } 
 
     selected_ports = select_custom_ports(selected_ports)
     if not selected_ports:
@@ -1424,23 +1425,18 @@ Do you want to remove this directory first and start from nothing?
     subprocess.run([
         'systemctl', 'enable', lighthouse_bn_service_name])
     
+    delay = 30
     print(
-'''
-We are giving the lighthouse beacon node a few seconds to start before testing
-it.
+f'''
+We are giving the lighthouse beacon node {delay} seconds to start before
+testing it.
 
 You might see some error and warn messages about your eth1 node not being in
 sync, being far behind or about the beacon node being unable to connect to any
 eth1 node. Those message are normal to see while your eth1 client is syncing.
 '''
-)
-    time.sleep(6)
-    try:
-        subprocess.run([
-            'journalctl', '-fu', lighthouse_bn_service_name
-        ], timeout=30)
-    except subprocess.TimeoutExpired:
-        pass
+    )
+    time.sleep(delay)
 
     # Check if the Lighthouse beacon node service is still running
     service_details = get_systemd_service_details(lighthouse_bn_service_name)
@@ -1568,64 +1564,212 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
         return False
     
     # Verify proper Lighthouse beacon node syncing
-    lighthouse_bn_syncing_query = BN_SYNCING_EP
-    lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_syncing_query
-    headers = {
-        'accept': 'application/json'
-    }
-    try:
-        response = httpx.get(lighthouse_bn_query_url, headers=headers)
-    except httpx.RequestError as exception:
-        button_dialog(
-            title='Cannot connect to Lighthouse beacon node',
-            text=(
+    def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
+        bn_is_working = False
+        bn_is_syncing = False
+        bn_has_few_peers = False
+        bn_connected_peers = 0
+        bn_head_slot = UNKNOWN_VALUE
+        bn_sync_distance = UNKNOWN_VALUE
+
+        set_result({
+            'bn_is_working': bn_is_working,
+            'bn_is_syncing': bn_is_syncing,
+            'bn_head_slot': bn_head_slot,
+            'bn_sync_distance': bn_sync_distance,
+            'bn_connected_peers': bn_connected_peers
+        })
+
+        set_percentage(10)
+
+        journalctl_cursor = None
+
+        while True:
+
+            if get_exited():
+                return {
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                }
+
+            # Output logs
+            command = []
+            if journalctl_cursor is None:
+                command = ['journalctl', '--no-pager', '--show-cursor', '-q', '-n', '25',
+                    '-u', lighthouse_bn_service_name]
+            else:
+                command = ['journalctl', '--no-pager', '--show-cursor', '-q',
+                    '--after-cursor=' + journalctl_cursor, '-u', lighthouse_bn_service_name]
+
+            process_result = subprocess.run(command, capture_output=True, text=True)
+
+            process_output = ''
+            if process_result.returncode == 0:
+                process_output = process_result.stdout
+            else:
+                log_text(f'Return code: {process_result.returncode} while calling journalctl.')
+
+            # Parse journalctl cursor and remove it from process_output
+            log_length = len(process_output)
+            if log_length > 0:
+                result = re.search(r'-- cursor: (?P<cursor>[^\n]+)', process_output)
+                if result:
+                    journalctl_cursor = result.group('cursor')
+                    process_output = (
+                        process_output[:result.start()] +
+                        process_output[result.end():])
+                    process_output = process_output.strip()
+            
+                    log_length = len(process_output)
+
+            if log_length > 0:
+                log_text(process_output)
+
+            time.sleep(1)
+            
+            lighthouse_bn_syncing_query = BN_SYNCING_EP
+            lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_syncing_query
+            headers = {
+                'accept': 'application/json'
+            }
+            try:
+                response = httpx.get(lighthouse_bn_query_url, headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Lighthouse beacon node.')
+                continue
+
+            if response.status_code != 200:
+                log_text(
+                    f'Status code: {response.status_code} while querying Lighthouse beacon node.')
+                continue
+        
+            response_json = response.json()
+            syncing_json = response_json
+
+            lighthouse_bn_peer_count_query = BN_PEER_COUNT_EP
+            lighthouse_bn_query_url = (
+                local_lighthouse_bn_http_base + lighthouse_bn_peer_count_query)
+            headers = {
+                'accept': 'application/json'
+            }
+            try:
+                response = httpx.get(lighthouse_bn_query_url, headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Lighthouse beacon node.')
+                continue
+
+            if response.status_code != 200:
+                log_text(
+                    f'Status code: {response.status_code} while querying Lighthouse beacon node.')
+                continue
+
+            response_json = response.json()
+            peer_count_json = response_json
+
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'is_syncing' in syncing_json['data']
+                ):
+                bn_is_syncing = bool(syncing_json['data']['is_syncing'])
+            else:
+                bn_is_syncing = False
+            
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'head_slot' in syncing_json['data']
+                ):
+                bn_head_slot = syncing_json['data']['head_slot']
+            else:
+                bn_head_slot = UNKNOWN_VALUE
+
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'sync_distance' in syncing_json['data']
+                ):
+                bn_sync_distance = syncing_json['data']['sync_distance']
+            else:
+                bn_sync_distance = UNKNOWN_VALUE
+
+            bn_connected_peers = 0
+            if (
+                peer_count_json and
+                'data' in peer_count_json and
+                'connected' in peer_count_json['data']
+                ):
+                bn_connected_peers = int(peer_count_json['data']['connected'])
+            
+            bn_has_few_peers = bn_connected_peers >= BN_MIN_FEW_PEERS
+
+            if bn_is_syncing or bn_has_few_peers:
+                set_percentage(100)
+            else:
+                set_percentage(10 + round(min(bn_connected_peers / BN_MIN_FEW_PEERS, 1.0) * 90.0))
+
+            change_status((
 f'''
-We could not connect to lighthouse beacon node HTTP server. Here are some
-details for this last test we tried to perform:
+Syncing: {bn_is_syncing} (Head slot: {bn_head_slot}, Sync distance: {bn_sync_distance})
+Connected Peers: {bn_connected_peers}
+'''         ).strip())
 
-URL: {lighthouse_bn_query_url}
-Method: GET
-Headers: {headers}
-Exception: {exception}
+            if bn_is_syncing or bn_has_few_peers:
+                bn_is_working = True
+                return {
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                }
+            else:
+                set_result({
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                })
 
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
-
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-'''         ),
-            buttons=[
-                ('Quit', False)
-            ]
-        ).run()
-
-        print(
+    result = progress_log_dialog(
+        title='Verifying proper Lighthouse beacon node service installation',
+        text=(
 f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
-
-$ sudo journalctl -ru {lighthouse_bn_service_name}
+We are waiting for Lighthouse beacon node to sync or find enough peers to
+confirm that it is working properly.
+'''     ),
+        status_text=(
 '''
-        )
-
+Syncing: Unknown (Head slot: Unknown, Sync distance: Unknown)
+Connected Peers: Unknown
+'''
+        ).strip(),
+        run_callback=verifying_callback
+    ).run()
+    
+    if not result:
+        print('Lighthouse beacon node verification was cancelled.')
         return False
 
-    if response.status_code != 200:
-        button_dialog(
-            title='Cannot connect to Lighthouse beacon node',
+    if not result['bn_is_working']:
+        # We could not get a proper result from the Teku
+        result = button_dialog(
+            title='Lighthouse beacon node verification interrupted',
             text=(
 f'''
-We could not connect to lighthouse beacon node HTTP server. Here are some
-details for this last test we tried to perform:
+We were interrupted before we could fully verify the lighthouse beacon node
+installation. Here are some results for the last tests we performed:
 
-URL: {lighthouse_bn_query_url}
-Method: GET
-Headers: {headers}
-Status code: {response.status_code}
+Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
+Connected Peers: {result['bn_connected_peers']}
 
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
+We cannot proceed if the lighthouse beacon node is not installed properly.
+Make sure to check the logs and fix any issue found there. You can see the
+logs with:
 
 $ sudo journalctl -ru {lighthouse_bn_service_name}
 '''         ),
@@ -1645,187 +1789,12 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
         return False
     
-    response_json = response.json()
-
-    retry_index = 0
-    retry_count = 10
-
-    while (
-        'data' not in response_json or
-        'is_syncing' not in response_json['data'] or
-        not response_json['data']['is_syncing']
-    ) and retry_index < retry_count:
-        result = button_dialog(
-            title='Unexpected response from Lighthouse beacon node',
-            text=(
-f'''
-We received an unexpected response from the lighthouse beacon node HTTP
-server. This is likely because lighthouse has not started syncing yet or
-because it's taking a little longer to find peers. We suggest you wait and
-retry in a minute. Here are some details for this last test we tried to
-perform:
-
-URL: {lighthouse_bn_query_url}
-Method: GET
-Headers: {headers}
-Response: {json.dumps(response_json)}
-
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
-
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-'''         ),
-            buttons=[
-                ('Retry', 1),
-                ('Quit', False)
-            ]
-        ).run()
-        
-        if not result:
-
-            print(
-f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
-
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-'''
-            )
-
-            return False
-        
-        retry_index = retry_index + 1
-
-        # Wait a little before the next retry
-        time.sleep(5)
-
-        try:
-            response = httpx.get(lighthouse_bn_query_url, headers=headers)
-        except httpx.RequestError as exception:
-            button_dialog(
-                title='Cannot connect to Lighthouse beacon node',
-                text=(
-f'''
-We could not connect to lighthouse beacon node HTTP server. Here are some
-details for this last test we tried to perform:
-
-URL: {lighthouse_bn_query_url}
-Method: GET
-Headers: {headers}
-Exception: {exception}
-
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
-
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-    '''         ),
-                buttons=[
-                    ('Quit', False)
-                ]
-            ).run()
-
-            print(
-f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
-
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-'''
-            )
-
-            return False
-
-        if response.status_code != 200:
-            button_dialog(
-                title='Cannot connect to Lighthouse beacon node',
-                text=(
-f'''
-We could not connect to lighthouse beacon node HTTP server. Here are some
-details for this last test we tried to perform:
-
-URL: {lighthouse_bn_query_url}
-Method: GET
-Headers: {headers}
-Status code: {response.status_code}
-
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
-
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-    '''         ),
-                buttons=[
-                    ('Quit', False)
-                ]
-            ).run()
-
-            print(
-f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
-
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-'''
-            )
-
-            return False
-        
-        response_json = response.json()
-    
-    if (
-        'data' not in response_json or
-        'is_syncing' not in response_json['data'] or
-        not response_json['data']['is_syncing']
-    ):
-        # We could not get a proper result from the Lighthouse beacon node after all those retries
-        result = button_dialog(
-            title='Unexpected response from Lighthouse beacon node',
-            text=(
-f'''
-After a few retries, we still received an unexpected response from the
-lighthouse beacon node HTTP server. Here are some details for this last
-test we tried to perform:
-
-URL: {lighthouse_bn_query_url}
-Method: GET
-Headers: {headers}
-Response: {json.dumps(response_json)}
-
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
-
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-'''         ),
-            buttons=[
-                ('Quit', False)
-            ]
-        ).run()
-
-        print(
-f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
-
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-'''
-        )
-
-        return False
-
-    # TODO: Using async and prompt_toolkit asyncio loop to display syncing values updating
-    # in realtime for a few seconds
-
     print(
 f'''
-The lighthouse beacon node is currently syncing properly.
+The lighthouse beacon node is installed and working properly.
 
-Head slot: {response_json['data'].get('head_slot', 'unknown')}
-Sync distance: {response_json['data'].get('sync_distance', 'unknown')}
-
-Raw data: {response_json['data']}
+Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
+Connected Peers: {result['bn_connected_peers']}
 ''' )
     time.sleep(5)
 
