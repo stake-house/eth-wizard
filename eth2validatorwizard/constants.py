@@ -93,6 +93,7 @@ ETH1_NETWORK_CHAINID = {
 }
 
 BEACONCHA_VALIDATOR_DEPOSITS_API_URL = '/api/v1/validator/{indexOrPubkey}/deposits'
+BEACONCHA_VALIDATOR_QUEUE_API_URL = '/api/v1/validators/queue'
 
 ETHEREUM_APT_SOURCE_URL = 'http://ppa.launchpad.net/ethereum/ethereum/ubuntu'
 

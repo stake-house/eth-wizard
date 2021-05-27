@@ -2,8 +2,11 @@ import httpx
 import json
 import os
 import time
+import humanize
 
 from rfc3986 import urlparse, builder as urlbuilder
+
+from datetime import timedelta
 
 from pathlib import Path
 
@@ -42,6 +45,45 @@ from prompt_toolkit.widgets import (
 def select_network():
     # Prompt for the selection on which network to perform the installation
 
+    unknown_joining_queue = '(No join queue information found)'
+
+    network_queue_info = {
+        NETWORK_MAINNET: unknown_joining_queue,
+        NETWORK_PYRMONT: unknown_joining_queue,
+        NETWORK_PRATER: unknown_joining_queue
+    }
+
+    headers = {
+        'accept': 'application/json'
+    }
+
+    for network in network_queue_info.keys():
+        beaconcha_in_queue_query_url = (
+            BEACONCHA_IN_URLS[network] + BEACONCHA_VALIDATOR_QUEUE_API_URL)
+        try:
+            response = httpx.get(beaconcha_in_queue_query_url, headers=headers)
+        except httpx.RequestError as exception:
+            print(f'Exception: {exception} while querying beaconcha.in.')
+            continue
+
+        if response.status_code != 200:
+            print(f'Status code: {response.status_code} while querying beaconcha.in.')
+            continue
+
+        response_json = response.json()
+
+        if (
+            response_json and
+            'data' in response_json and
+            'beaconchain_entering' in response_json['data']):
+            validators_entering = int(response_json['data']['beaconchain_entering'])
+            waiting_td = timedelta(days=validators_entering / 900.0)
+
+            network_queue_info[network] = (
+                f'({validators_entering} validators waiting to join '
+                f'[{humanize.naturaldelta(waiting_td)}])'
+            )
+
     result = radiolist_dialog(
         title='Network selection',
         text=(
@@ -50,15 +92,19 @@ This wizard supports installing and configuring software for various
 Ethereum 2.0 networks. Mainnet is the main network with real value. The
 others are mostly for testing and they do not use anything of real value.
 
+Joining a beacon chain network as a validator can take extra time if many
+validators are trying to join at the same time. The amount of validators in
+the join queue and the estimated time is displayed below for each network.
+
 For which network would you like to perform this installation?
 
 * Press the tab key to switch between the controls below
 '''
         ),
         values=[
-            (NETWORK_MAINNET, "Mainnet"),
-            (NETWORK_PYRMONT, "Pyrmont"),
-            (NETWORK_PRATER, "Prater")
+            (NETWORK_MAINNET, f'Mainnet {network_queue_info[NETWORK_MAINNET]}'),
+            (NETWORK_PYRMONT, f'Pyrmont {network_queue_info[NETWORK_PYRMONT]}'),
+            (NETWORK_PRATER, f'Prater {network_queue_info[NETWORK_PRATER]}')
         ],
         ok_text='Use this',
         cancel_text='Quit'
