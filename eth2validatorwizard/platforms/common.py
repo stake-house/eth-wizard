@@ -667,8 +667,11 @@ def input_dialog_default(
 def progress_log_dialog(
     title: AnyFormattedText = "",
     text: AnyFormattedText = "",
+    wait_text: str = "Wait",
+    quit_text: str = "Quit",
     status_text: AnyFormattedText = "",
-    run_callback: Callable[[Callable[[int], None], Callable[[str], None], Callable[[str], None]], None] = (
+    run_callback: Callable[[Callable[[int], None], Callable[[str], None],
+        Callable[[str], None], Callable[[dict], None], Callable[[], bool]], None] = (
         lambda *a: None
     ),
     style: Optional[BaseStyle] = None,
@@ -678,6 +681,19 @@ def progress_log_dialog(
         function and it does the work.
     """
     loop = get_event_loop()
+
+    def wait_handler() -> None:
+        pass
+
+    def quit_handler() -> None:
+        app = get_app()
+        if not app.exited:
+            app.exited = True
+            app.exit(result=app.result)
+
+    wait_button = Button(text=wait_text, handler=wait_handler)
+    quit_button = Button(text=quit_text, handler=quit_handler)
+
     progressbar = ProgressBar()
     text_area = TextArea(
         focusable=False,
@@ -689,6 +705,7 @@ def progress_log_dialog(
     status = Label(text=status_text)
 
     dialog = Dialog(
+        title=title,
         body=HSplit(
             [
                 Box(Label(text=text)),
@@ -697,10 +714,12 @@ def progress_log_dialog(
                 progressbar,
             ]
         ),
-        title=title,
+        buttons=[wait_button, quit_button],
         with_background=True,
     )
     app = _create_app(dialog, style)
+    app.result = None
+    app.exited = False
 
     def set_percentage(value: int) -> None:
         progressbar.percentage = int(value)
@@ -713,15 +732,23 @@ def progress_log_dialog(
     def change_status(text: str) -> None:
         status.formatted_text_control.text = text
         app.invalidate()
+    
+    def set_result(new_result: dict) -> None:
+        app.result = new_result
+    
+    def get_exited() -> bool:
+        return app.exited
 
     # Run the callback in the executor. When done, set a return value for the
     # UI, so that it quits.
     def start() -> None:
         result = None
         try:
-            result = run_callback(set_percentage, log_text, change_status)
+            result = run_callback(set_percentage, log_text, change_status, set_result, get_exited)
         finally:
-            app.exit(result=result)
+            if not app.exited:
+                app.exited = True
+                app.exit(result=result)
 
     def pre_run() -> None:
         run_in_executor_with_context(start)

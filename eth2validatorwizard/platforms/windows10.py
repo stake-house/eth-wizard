@@ -2057,9 +2057,7 @@ To examine your teku service logs, inspect the following files:
     
     # Verify proper Teku syncing
 
-    def verifying_callback(set_percentage, log_text, change_status):
-        set_percentage(0)
-
+    def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
         bn_is_working = False
         bn_is_syncing = False
         bn_has_few_peers = False
@@ -2067,10 +2065,29 @@ To examine your teku service logs, inspect the following files:
         bn_head_slot = UNKNOWN_VALUE
         bn_sync_distance = UNKNOWN_VALUE
 
+        set_result({
+            'bn_is_working': bn_is_working,
+            'bn_is_syncing': bn_is_syncing,
+            'bn_head_slot': bn_head_slot,
+            'bn_sync_distance': bn_sync_distance,
+            'bn_connected_peers': bn_connected_peers
+        })
+
+        set_percentage(10)
+
         out_log_read_index = 0
         err_log_read_index = 0
 
         while True:
+
+            if get_exited():
+                return {
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                }
 
             # Output logs
             out_log_text = ''
@@ -2172,6 +2189,11 @@ To examine your teku service logs, inspect the following files:
             
             bn_has_few_peers = bn_connected_peers >= BN_MIN_FEW_PEERS
 
+            if bn_is_syncing or bn_has_few_peers:
+                set_percentage(100)
+            else:
+                set_percentage(10 + round(min(bn_connected_peers / BN_MIN_FEW_PEERS, 1.0) * 90.0))
+
             change_status((
 f'''
 Syncing: {bn_is_syncing} (Head slot: {bn_head_slot}, Sync distance: {bn_sync_distance})
@@ -2187,6 +2209,14 @@ Connected Peers: {bn_connected_peers}
                     'bn_sync_distance': bn_sync_distance,
                     'bn_connected_peers': bn_connected_peers
                 }
+            else:
+                set_result({
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                })
 
     result = progress_log_dialog(
         title='Verifying proper Teku service installation',
@@ -2204,21 +2234,24 @@ Connected Peers: Unknown
         run_callback=verifying_callback
     ).run()
     
+    if not result:
+        print('Teku service installation verification was cancelled.')
+        return False
+
     if not result['bn_is_working']:
         # We could not get a proper result from the Teku
         result = button_dialog(
-            title='Unexpected response from Teku',
+            title='Teku service installation verification interrupted',
             text=(
 f'''
-After a few retries, we still received an unexpected response from the
-teku HTTP server. Here are some results for the last tests we performed:
+We were interrupted before we could fully verify the teku service
+installation. Here are some results for the last tests we performed:
 
 Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
 Connected Peers: {result['bn_connected_peers']}
 
-We cannot proceed if the teku HTTP server is not responding properly. Make
-sure to check the logs and fix any issue found there. You can see the logs
-in:
+We cannot proceed if the teku service is not installed properly. Make sure
+to check the logs and fix any issue found there. You can see the logs in:
 
 {teku_stdout_log_path}
 {teku_stderr_log_path}
