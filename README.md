@@ -5,7 +5,7 @@ This project is part of [the larger StakeHouse community](https://github.com/sta
 
 ## Disclaimer
 
-The eth2-validator-wizard is not ready to be used in the real world yet. It is still in development and it is subject to radical changes. It can still have major and important issues. DO NOT USE UNLESS YOU KNOW WHAT YOU ARE DOING! This disclaimer will be removed once we believe it is ready for the general population.
+The eth2-validator-wizard should be stable enough to be used by everyone. It was never audited and it might still have some issues. Support is offered through [the EthStaker community](https://ethstaker.cc/).
 
 ## Goals
 
