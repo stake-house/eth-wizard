@@ -723,6 +723,15 @@ Do you want to remove this directory first and start from nothing?
     subprocess.run([
         'systemctl', 'enable', geth_service_name])
     
+    # Wait a little before checking for Geth syncing since it can be slow to start
+    delay = 30
+    print(
+f'''
+We are giving Geth {delay} seconds to start before testing it.
+'''
+    )
+    time.sleep(delay)
+
     # Verify proper Geth service installation
     service_details = get_systemd_service_details(geth_service_name)
 
@@ -766,22 +775,12 @@ $ sudo journalctl -ru {geth_service_name}
 
         return False
 
-    # Wait a little before checking for Geth syncing since it can be slow to start
-    print('We are giving Geth a few seconds to start before testing syncing.')
-    time.sleep(2)
-    try:
-        subprocess.run([
-            'journalctl', '-fu', geth_service_name
-        ], timeout=30)
-    except subprocess.TimeoutExpired:
-        pass
-
-    # Verify proper Geth syncing
+    # Verify Geth JSON-RPC response
     local_geth_jsonrpc_url = 'http://127.0.0.1:8545'
     request_json = {
         'jsonrpc': '2.0',
-        'method': 'eth_syncing',
-        'id': 1
+        'method': 'web3_clientVersion',
+        'id': 67
     }
     headers = {
         'Content-Type': 'application/json'
@@ -858,157 +857,216 @@ $ sudo journalctl -ru {geth_service_name}
 
         return False
     
-    response_json = response.json()
+    # Verify proper Geth syncing
+    def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
+        exe_is_working = False
+        exe_is_syncing = False
+        exe_has_few_peers = False
+        exe_connected_peers = 0
+        exe_starting_block = UNKNOWN_VALUE
+        exe_current_block = UNKNOWN_VALUE
+        exe_highest_block = UNKNOWN_VALUE
 
-    retry_index = 0
-    retry_count = 5
+        set_result({
+            'exe_is_working': exe_is_working,
+            'exe_is_syncing': exe_is_syncing,
+            'exe_starting_block': exe_starting_block,
+            'exe_current_block': exe_current_block,
+            'exe_highest_block': exe_highest_block,
+            'exe_connected_peers': exe_connected_peers
+        })
 
-    while (
-        not response_json or
-        'result' not in response_json or
-        not response_json['result']
-    ) and retry_index < retry_count:
-        result = button_dialog(
-            title='Unexpected response from Geth',
-            text=(
-f'''
-We received an unexpected response from geth HTTP-RPC server. This is
-likely because geth has not started syncing yet or because it's taking a
-little longer to find peers. We suggest you wait and retry in a minute.
-Here are some details for this last test we tried to perform:
+        set_percentage(10)
 
-URL: {local_geth_jsonrpc_url}
-Method: POST
-Headers: {headers}
-JSON payload: {json.dumps(request_json)}
-Response: {json.dumps(response_json)}
+        journalctl_cursor = None
 
-We cannot proceed if the geth HTTP-RPC server is not responding properly.
-Make sure to check the logs and fix any issue found there. You can see the
-logs with:
+        while True:
 
-$ sudo journalctl -ru {geth_service_name}
-'''         ),
-            buttons=[
-                ('Retry', 1),
-                ('Quit', False)
-            ]
-        ).run()
+            if get_exited():
+                return {
+                    'exe_is_working': exe_is_working,
+                    'exe_is_syncing': exe_is_syncing,
+                    'exe_starting_block': exe_starting_block,
+                    'exe_current_block': exe_current_block,
+                    'exe_highest_block': exe_highest_block,
+                    'exe_connected_peers': exe_connected_peers
+                }
 
-        if not result:
+            # Output logs
+            command = []
+            if journalctl_cursor is None:
+                command = ['journalctl', '--no-pager', '--show-cursor', '-q', '-n', '25',
+                    '-u', geth_service_name]
+            else:
+                command = ['journalctl', '--no-pager', '--show-cursor', '-q',
+                    '--after-cursor=' + journalctl_cursor, '-u', geth_service_name]
 
-            print(
-f'''
-To examine your geth service logs, type the following command:
+            process_result = subprocess.run(command, capture_output=True, text=True)
 
-$ sudo journalctl -ru {geth_service_name}
-'''
-            )
+            process_output = ''
+            if process_result.returncode == 0:
+                process_output = process_result.stdout
+            else:
+                log_text(f'Return code: {process_result.returncode} while calling journalctl.')
 
-            return False
+            # Parse journalctl cursor and remove it from process_output
+            log_length = len(process_output)
+            if log_length > 0:
+                result = re.search(r'-- cursor: (?P<cursor>[^\n]+)', process_output)
+                if result:
+                    journalctl_cursor = result.group('cursor')
+                    process_output = (
+                        process_output[:result.start()] +
+                        process_output[result.end():])
+                    process_output = process_output.strip()
+            
+                    log_length = len(process_output)
+
+            if log_length > 0:
+                log_text(process_output)
+
+            time.sleep(1)
+            
+            local_geth_jsonrpc_url = 'http://127.0.0.1:8545'
+            request_json = {
+                'jsonrpc': '2.0',
+                'method': 'eth_syncing',
+                'id': 1
+            }
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            try:
+                response = httpx.post(local_geth_jsonrpc_url, json=request_json, headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Geth.')
+                continue
+
+            if response.status_code != 200:
+                log_text(
+                    f'Status code: {response.status_code} while querying Geth.')
+                continue
         
-        retry_index = retry_index + 1
+            response_json = response.json()
+            syncing_json = response_json
 
-        # Wait a little before the next retry
-        time.sleep(5)
+            local_geth_jsonrpc_url = 'http://127.0.0.1:8545'
+            request_json = {
+                'jsonrpc': '2.0',
+                'method': 'net_peerCount',
+                'id': 1
+            }
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            try:
+                response = httpx.post(local_geth_jsonrpc_url, json=request_json, headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Geth.')
+                continue
 
-        try:
-            response = httpx.post(local_geth_jsonrpc_url, json=request_json, headers=headers)
-        except httpx.RequestError as exception:
-            result = button_dialog(
-                title='Cannot connect to Geth',
-                text=(
+            if response.status_code != 200:
+                log_text(
+                    f'Status code: {response.status_code} while querying Geth.')
+                continue
+
+            response_json = response.json()
+            peer_count_json = response_json
+
+            exe_starting_block = UNKNOWN_VALUE
+            exe_current_block = UNKNOWN_VALUE
+            exe_highest_block = UNKNOWN_VALUE
+            if (
+                syncing_json and
+                'result' in syncing_json and
+                syncing_json['result']
+                ):
+                exe_is_syncing = True
+                if 'startingBlock' in syncing_json['result']:
+                    exe_starting_block = int(syncing_json['result']['startingBlock'], 16)
+                if 'currentBlock' in syncing_json['result']:
+                    exe_current_block = int(syncing_json['result']['currentBlock'], 16)
+                if 'highestBlock' in syncing_json['result']:
+                    exe_highest_block = int(syncing_json['result']['highestBlock'], 16)
+            else:
+                exe_is_syncing = False
+
+            exe_connected_peers = 0
+            if (
+                peer_count_json and
+                'result' in peer_count_json and
+                peer_count_json['result']
+                ):
+                exe_connected_peers = int(peer_count_json['result'], 16)
+            
+            exe_has_few_peers = exe_connected_peers >= EXE_MIN_FEW_PEERS
+
+            if exe_is_syncing or exe_has_few_peers:
+                set_percentage(100)
+            else:
+                set_percentage(10 +
+                    round(min(exe_connected_peers / EXE_MIN_FEW_PEERS, 1.0) * 90.0))
+
+            change_status((
 f'''
-We could not connect to geth HTTP-RPC server. Here are some details for
-this last test we tried to perform:
+Syncing: {exe_is_syncing} (Starting: {exe_starting_block}, Current: {exe_current_block}, Highest: {exe_highest_block})
+Connected Peers: {exe_connected_peers}
+'''         ).strip())
 
-URL: {local_geth_jsonrpc_url}
-Method: POST
-Headers: {headers}
-JSON payload: {json.dumps(request_json)}
-Exception: {exception}
+            if exe_is_syncing or exe_has_few_peers:
+                exe_is_working = True
+                return {
+                    'exe_is_working': exe_is_working,
+                    'exe_is_syncing': exe_is_syncing,
+                    'exe_starting_block': exe_starting_block,
+                    'exe_current_block': exe_current_block,
+                    'exe_highest_block': exe_highest_block,
+                    'exe_connected_peers': exe_connected_peers
+                }
+            else:
+                set_result({
+                    'exe_is_working': exe_is_working,
+                    'exe_is_syncing': exe_is_syncing,
+                    'exe_starting_block': exe_starting_block,
+                    'exe_current_block': exe_current_block,
+                    'exe_highest_block': exe_highest_block,
+                    'exe_connected_peers': exe_connected_peers
+                })
 
-We cannot proceed if the geth HTTP-RPC server is not responding properly.
-Make sure to check the logs and fix any issue found there. You can see the
-logs with:
-
-$ sudo journalctl -ru {geth_service_name}
-'''             ),
-                buttons=[
-                    ('Quit', False)
-                ]
-            ).run()
-
-            print(
+    result = progress_log_dialog(
+        title='Verifying proper Geth service installation',
+        text=(
 f'''
-To examine your geth service logs, type the following command:
-
-$ sudo journalctl -ru {geth_service_name}
+We are waiting for Geth to sync or find enough peers to confirm that it is
+working properly.
+'''     ),
+        status_text=(
 '''
-            )
-
-            return False
-
-        if response.status_code != 200:
-            result = button_dialog(
-                title='Cannot connect to Geth',
-                text=(
-f'''
-We could not connect to geth HTTP-RPC server. Here are some details for
-this last test we tried to perform:
-
-URL: {local_geth_jsonrpc_url}
-Method: POST
-Headers: {headers}
-JSON payload: {json.dumps(request_json)}
-Status code: {response.status_code}
-
-We cannot proceed if the geth HTTP-RPC server is not responding properly.
-Make sure to check the logs and fix any issue found there. You can see the
-logs with:
-
-$ sudo journalctl -ru {geth_service_name}
-    '''         ),
-                buttons=[
-                    ('Quit', False)
-                ]
-            ).run()
-
-            print(
-f'''
-To examine your geth service logs, type the following command:
-
-$ sudo journalctl -ru {geth_service_name}
+Syncing: Unknown (Starting: Unknown, Current: Unknown, Highest: Unknown)
+Connected Peers: Unknown
 '''
-            )
+        ).strip(),
+        run_callback=verifying_callback
+    ).run()
+    
+    if not result:
+        print('Geth verification was cancelled.')
+        return False
 
-            return False
-
-        response_json = response.json()
-
-    if (
-        not response_json or
-        'result' not in response_json or
-        not response_json['result']
-    ):
-        # We could not get a proper result from Geth after all those retries
+    if not result['exe_is_working']:
+        # We could not get a proper result from Geth
         result = button_dialog(
-            title='Unexpected response from Geth',
+            title='Geth verification interrupted',
             text=(
 f'''
-After a few retries, we still received an unexpected response from geth
-HTTP-RPC server. Here are some details for this last test we tried to
-perform:
+We were interrupted before we could fully verify the Geth installation.
+Here are some results for the last tests we performed:
 
-URL: {local_geth_jsonrpc_url}
-Method: POST
-Headers: {headers}
-JSON payload: {json.dumps(request_json)}
-Response: {json.dumps(response_json)}
+Syncing: {result['exe_is_syncing']} (Starting: {result['exe_starting_block']}, Current: {result['exe_current_block']}, Highest: {result['exe_highest_block']})
+Connected Peers: {result['exe_connected_peers']}
 
-We cannot proceed if the geth HTTP-RPC server is not responding properly.
-Make sure to check the logs and fix any issue found there. You can see the
-logs with:
+We cannot proceed if Geth is not installed properly. Make sure to check the
+logs and fix any issue found there. You can see the logs with:
 
 $ sudo journalctl -ru {geth_service_name}
 '''         ),
@@ -1026,55 +1084,14 @@ $ sudo journalctl -ru {geth_service_name}
         )
 
         return False
-
-    response_result = response_json['result']
-
-    if 'currentBlock' not in response_result:
-        result = button_dialog(
-            title='Unexpected response from Geth',
-            text=(
-f'''
-The response from the eth_syncing JSON-RPC call on Geth HTTP-RPC server
-was unexpected. Here are some details for this call:
-
-result field: {json.dumps(response_result)}
-
-We cannot proceed if the geth HTTP-RPC server is not responding properly.
-Make sure to check the logs and fix any issue found there. You can see the
-logs with:
-
-$ sudo journalctl -ru {geth_service_name}
-'''         ),
-            buttons=[
-                ('Quit', False)
-            ]
-        ).run()
-
-        print(
-f'''
-To examine your geth service logs, type the following command:
-
-$ sudo journalctl -ru {geth_service_name}
-'''
-        )
-
-        return False
-
-    # TODO: Using async and prompt_toolkit asyncio loop to display syncing values updating
-    # in realtime for a few seconds
-
+    
     print(
 f'''
-Geth is currently syncing properly.
+Geth is installed and working properly.
 
-currentBlock: {int(response_result.get('currentBlock', '0x0'), base=16)}
-highestBlock: {int(response_result.get('highestBlock', '0x0'), base=16)}
-knownStates: {int(response_result.get('knownStates', '0x0'), base=16)}
-pulledStates: {int(response_result.get('pulledStates', '0x0'), base=16)}
-startingBlock: {int(response_result.get('startingBlock', '0x0'), base=16)}
-
-Raw result: {response_result}
-''')
+Syncing: {result['exe_is_syncing']} (Starting: {result['exe_starting_block']}, Current: {result['exe_current_block']}, Highest: {result['exe_highest_block']})
+Connected Peers: {result['exe_connected_peers']}
+''' )
     time.sleep(5)
 
     return True
@@ -1756,7 +1773,7 @@ Connected Peers: Unknown
         return False
 
     if not result['bn_is_working']:
-        # We could not get a proper result from the Teku
+        # We could not get a proper result from Teku
         result = button_dialog(
             title='Lighthouse beacon node verification interrupted',
             text=(
