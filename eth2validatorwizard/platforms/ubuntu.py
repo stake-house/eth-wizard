@@ -2124,7 +2124,7 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
 
             if response.status_code != 200:
                 log.error(f'Cannot get latest eth2.0-deposit-cli release from Github. '
-                    f'Error code {response.status_code}')
+                    f'Status code {response.status_code}')
                 return False
             
             release_json = response.json()
@@ -2213,7 +2213,8 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
                     if binary_hexdigest != checksum:
                         # SHA256 checksum failed
                         log.error(f'SHA256 checksum failed on eth2.0-deposit-cli binary from '
-                            f'Github. Expected {checksum} but we got {binary_hexdigest}')
+                            f'Github. Expected {checksum} but we got {binary_hexdigest}. We will '
+                            f'stop here to protect you')
                         return False
             
             # Extracting the eth2.0-deposit-cli binary archive

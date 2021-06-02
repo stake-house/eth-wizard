@@ -177,16 +177,16 @@ def create_firewall_rule(ports):
     geth_tcp_rule_name = f'{geth_rule_name} TCP'
     geth_udp_rule_name = f'{geth_rule_name} UDP'
 
-    print('Checking if we have a TCP firewall rule for Geth...')
+    log.info('Checking if we have a TCP firewall rule for Geth...')
     process_result = subprocess.run([
         'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={geth_tcp_rule_name}'
     ])
     if process_result.returncode == 0:
-        print('Deleting existing TCP firewall rule for Geth before creating the new one...')
+        log.info('Deleting existing TCP firewall rule for Geth before creating the new one...')
         subprocess.run([
             'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={geth_tcp_rule_name}'
         ])
-    print('Creating a new TCP firewall rule for Geth...')
+    log.info('Creating a new TCP firewall rule for Geth...')
     process_result = subprocess.run([
         'netsh', 'advfirewall', 'firewall', 'add', 'rule',
         f'name={geth_tcp_rule_name}',
@@ -198,16 +198,16 @@ def create_firewall_rule(ports):
         f'localport={ports["eth1"]}'
     ])
 
-    print('Checking if we have a UDP firewall rule for Geth...')
+    log.info('Checking if we have a UDP firewall rule for Geth...')
     process_result = subprocess.run([
         'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={geth_udp_rule_name}'
     ])
     if process_result.returncode == 0:
-        print('Deleting existing UDP firewall rule for Geth before creating the new one...')
+        log.info('Deleting existing UDP firewall rule for Geth before creating the new one...')
         subprocess.run([
             'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={geth_udp_rule_name}'
         ])
-    print('Creating a new UDP firewall rule for Geth...')
+    log.info('Creating a new UDP firewall rule for Geth...')
     process_result = subprocess.run([
         'netsh', 'advfirewall', 'firewall', 'add', 'rule',
         f'name={geth_udp_rule_name}',
@@ -224,16 +224,16 @@ def create_firewall_rule(ports):
     teku_tcp_rule_name = f'{teku_rule_name} TCP'
     teku_udp_rule_name = f'{teku_rule_name} UDP'
 
-    print('Checking if we have a TCP firewall rule for Teku...')
+    log.info('Checking if we have a TCP firewall rule for Teku...')
     process_result = subprocess.run([
         'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={teku_tcp_rule_name}'
     ])
     if process_result.returncode == 0:
-        print('Deleting existing TCP firewall rule for Teku before creating the new one...')
+        log.info('Deleting existing TCP firewall rule for Teku before creating the new one...')
         subprocess.run([
             'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={teku_tcp_rule_name}'
         ])
-    print('Creating a new TCP firewall rule for Teku...')
+    log.info('Creating a new TCP firewall rule for Teku...')
     process_result = subprocess.run([
         'netsh', 'advfirewall', 'firewall', 'add', 'rule',
         f'name={teku_tcp_rule_name}',
@@ -245,16 +245,16 @@ def create_firewall_rule(ports):
         f'localport={ports["eth2_bn"]}'
     ])
 
-    print('Checking if we have a UDP firewall rule for Teku...')
+    log.info('Checking if we have a UDP firewall rule for Teku...')
     process_result = subprocess.run([
         'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={teku_udp_rule_name}'
     ])
     if process_result.returncode == 0:
-        print('Deleting existing UDP firewall rule for Teku before creating the new one...')
+        log.info('Deleting existing UDP firewall rule for Teku before creating the new one...')
         subprocess.run([
             'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={teku_udp_rule_name}'
         ])
-    print('Creating a new UDP firewall rule for Teku...')
+    log.info('Creating a new UDP firewall rule for Teku...')
     process_result = subprocess.run([
         'netsh', 'advfirewall', 'firewall', 'add', 'rule',
         f'name={teku_udp_rule_name}',
@@ -280,7 +280,7 @@ def install_chocolatey():
         if process_result.returncode == 0:
             choco_installed = True
             
-            print('Chocolatey is already installed, we will update it to the latest version')
+            log.warning('Chocolatey is already installed, we will update it to the latest version')
             subprocess.run([
                 'choco', 'upgrade', 'chocolatey'])
 
@@ -290,7 +290,7 @@ def install_chocolatey():
     if choco_installed:
         return True
 
-    print('Chocolatey is not installed, we will install it')
+    log.info('Chocolatey is not installed, we will install it')
     subprocess.run([
         'powershell', '-Command',
         "& {Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))}"
@@ -322,7 +322,7 @@ def install_nssm():
             nssm_installed = False
     
     if nssm_installed:
-        print('NSSM is already installed, no need to install it')
+        log.info('NSSM is already installed, no need to install it')
         return True
 
     choco_path = Path(CHOCOLATEY_DEFAULT_BIN_PATH, 'choco')
@@ -345,7 +345,7 @@ def install_nssm():
             choco_installed = False
 
     if not choco_installed:
-        print('We could not find choco. You might need to close this '
+        log.error('We could not find choco. You might need to close this '
             'window and restart the wizard to continue.')
         return False
     
@@ -443,7 +443,7 @@ def get_nssm_binary():
             nssm_installed = False
     
     if not nssm_installed:
-        print('NSSM is not installed, we cannot continue.')
+        log.error('NSSM is not installed, we cannot continue.')
         return False
     
     return nssm_binary
@@ -580,7 +580,7 @@ Do you want to skip installing the geth binary?
         windows_builds = []
 
         try:
-            print('Getting geth builds...')
+            log.info('Getting geth builds...')
             while not page_end_found:
                 params = GETH_STORE_BUILDS_PARAMS.copy()
                 if next_marker is not None:
@@ -589,8 +589,8 @@ Do you want to skip installing the geth binary?
                 response = httpx.get(GETH_STORE_BUILDS_URL, params=params)
 
                 if response.status_code != 200:
-                    print(f'Cannot connect to geth builds URL {GETH_STORE_BUILDS_URL}.\n'
-                    f'Unexpected status code {response.status_code}')
+                    log.error(f'Cannot connect to geth builds URL {GETH_STORE_BUILDS_URL}.\n'
+                        f'Unexpected status code {response.status_code}')
                     return False
                 
                 builds_tree_root = ElementTree.fromstring(response.text)
@@ -617,11 +617,12 @@ Do you want to skip installing the geth binary?
                     page_end_found = True
 
         except httpx.RequestError as exception:
-            print(f'Cannot connect to geth builds URL {GETH_STORE_BUILDS_URL}.\nException {exception}')
+            log.error(f'Cannot connect to geth builds URL {GETH_STORE_BUILDS_URL}.\n'
+                f'Exception {exception}')
             return False
 
         if len(windows_builds) <= 0:
-            print('No geth builds found on geth store. We cannot continue.')
+            log.error('No geth builds found on geth store. We cannot continue.')
             return False
 
         # Download latest geth build and its signature
@@ -639,16 +640,16 @@ Do you want to skip installing the geth binary?
 
         try:
             with open(geth_archive_path, 'wb') as binary_file:
-                print(f'Downloading geth archive {latest_build["name"]}...')
+                log.info(f'Downloading geth archive {latest_build["name"]}...')
                 with httpx.stream('GET', latest_build_url) as http_stream:
                     if http_stream.status_code != 200:
-                        print(f'Cannot download geth archive {latest_build_url}.\n'
+                        log.error(f'Cannot download geth archive {latest_build_url}.\n'
                             f'Unexpected status code {http_stream.status_code}')
                         return False
                     for data in http_stream.iter_bytes():
                         binary_file.write(data)
         except httpx.RequestError as exception:
-            print(f'Exception while downloading geth archive. Exception {exception}')
+            log.error(f'Exception while downloading geth archive. Exception {exception}')
             return False
 
         geth_archive_sig_path = download_path.joinpath(latest_build['name'] + '.asc')
@@ -659,16 +660,16 @@ Do you want to skip installing the geth binary?
 
         try:
             with open(geth_archive_sig_path, 'wb') as binary_file:
-                print(f'Downloading geth archive signature {latest_build["name"]}.asc...')
+                log.info(f'Downloading geth archive signature {latest_build["name"]}.asc...')
                 with httpx.stream('GET', latest_build_sig_url) as http_stream:
                     if http_stream.status_code != 200:
-                        print(f'Cannot download geth archive signature {latest_build_sig_url}.\n'
+                        log.error(f'Cannot download geth archive signature {latest_build_sig_url}.\n'
                             f'Unexpected status code {http_stream.status_code}')
                         return False
                     for data in http_stream.iter_bytes():
                         binary_file.write(data)
         except httpx.RequestError as exception:
-            print(f'Exception while downloading geth archive signature. Exception {exception}')
+            log.error(f'Exception while downloading geth archive signature. Exception {exception}')
             return False
 
         if not install_gpg(base_directory):
@@ -677,7 +678,7 @@ Do you want to skip installing the geth binary?
         # Verify PGP signature
         gpg_binary_path = base_directory.joinpath('bin', 'gpg.exe')
 
-        print('Downloading geth Windows Builder PGP key...')
+        log.info('Downloading geth Windows Builder PGP key...')
 
         command_line = [str(gpg_binary_path), '--keyserver', 'pool.sks-keyservers.net',
             '--recv-keys', GETH_WINDOWS_PGP_KEY_ID]
@@ -689,25 +690,25 @@ Do you want to skip installing the geth binary?
             retry_index = 0
             while process_result.returncode != 0 and retry_index < retry_count:
                 retry_index = retry_index + 1
-                print('GPG failed to download the PGP key. We will wait 10 seconds and try again.')
-                time.sleep(10)
+                delay = 10
+                log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
+                    f'and try again.')
+                time.sleep(delay)
                 process_result = subprocess.run(command_line)
         
         if process_result.returncode != 0:
-            # TODO: Better handling of failed PGP key download
-            print(
+            log.error(
 f'''
 We failed to download the Geth Windows Builder PGP key to verify the geth
 archive after {retry_count} retries.
 '''
-)
+            )
             return False
         
         process_result = subprocess.run([
             str(gpg_binary_path), '--verify', str(geth_archive_sig_path)])
         if process_result.returncode != 0:
-            # TODO: Better handling of failed PGP signature
-            print('The geth archive signature is wrong. We\'ll stop here to protect you.')
+            log.error('The geth archive signature is wrong. We\'ll stop here to protect you.')
             return False
         
         # Remove download leftovers
@@ -728,7 +729,7 @@ archive after {retry_count} retries.
         geth_archive_path.unlink()
 
         if geth_extracted_binary is None:
-            print('The geth binary was not found in the archive. We cannot continue.')
+            log.error('The geth binary was not found in the archive. We cannot continue.')
             return False
 
         # Move geth back into bin directory
@@ -802,27 +803,23 @@ Do you want to remove this directory first and start from nothing?
     }
 
     if not create_service(nssm_binary, geth_service_name, geth_path, geth_arguments, parameters):
-        print('There was an issue creating the geth service. We cannot continue.')
+        log.error('There was an issue creating the geth service. We cannot continue.')
         return False
     
-    print('Starting geth service...')
+    log.info('Starting geth service...')
     process_result = subprocess.run([
         str(nssm_binary), 'start', geth_service_name
     ])
 
     # Wait a little before checking for Geth syncing since it can be slow to start
     delay = 30
-    print(
-f'''
-We are giving Geth {delay} seconds to start before testing it.
-'''
-    )
+    log.info(f'We are giving Geth {delay} seconds to start before testing it.')
     time.sleep(delay)
     
     # Verify proper Geth service installation
     service_details = get_service_details(nssm_binary, geth_service_name)
     if not service_details:
-        print('We could not find the geth service we just created. We cannot continue.')
+        log.error('We could not find the geth service we just created. We cannot continue.')
         return False
 
     if not (
@@ -851,7 +848,7 @@ to check the logs and fix any issue found there. You can see the logs in:
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your geth service logs, inspect the following file:
 
@@ -898,7 +895,7 @@ logs in:
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your geth service logs, inspect the following file:
 
@@ -933,7 +930,7 @@ logs in:
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your geth service logs, inspect the following file:
 
@@ -1114,7 +1111,7 @@ Connected Peers: Unknown
     ).run()
     
     if not result:
-        print('Geth verification was cancelled.')
+        log.warning('Geth verification was cancelled.')
         return False
 
     if not result['exe_is_working']:
@@ -1139,7 +1136,7 @@ logs and fix any issue found there. You can see the logs in:
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your geth service logs, inspect the following file:
 
@@ -1149,7 +1146,7 @@ To examine your geth service logs, inspect the following file:
 
         return False
     
-    print(
+    log.info(
 f'''
 Geth is installed and working properly.
 
@@ -1179,7 +1176,7 @@ def create_service(nssm_binary, service_name, binary_path, binary_args, paramete
         ] + binary_args)
 
     if process_result.returncode != 0:
-        print(f'Unexpected return code from NSSM when installing a new service. '
+        log.error(f'Unexpected return code from NSSM when installing a new service. '
             f'Return code {process_result.returncode}')
         return False
 
@@ -1195,11 +1192,11 @@ def create_service(nssm_binary, service_name, binary_path, binary_args, paramete
                     str(nssm_binary), 'set', service_name, param
                     ] + list(value))
             else:
-                print(f'Unexpected parameter value {value} for parameter {param}.')
+                log.error(f'Unexpected parameter value {value} for parameter {param}.')
                 return False
             
             if process_result.returncode != 0:
-                print(f'Unexpected return code from NSSM when modifying at parameter. '
+                log.error(f'Unexpected return code from NSSM when modifying at parameter. '
                     f'Return code {process_result.returncode}')
                 return False
     
@@ -1268,7 +1265,7 @@ def install_gpg(base_directory):
             gpg_installed = True
 
     if gpg_installed:
-        print('GNUPG is already installed, no need to install it')
+        log.info('GNUPG is already installed, no need to install it')
         return True
 
     # Get the gnupg install URL
@@ -1277,19 +1274,20 @@ def install_gpg(base_directory):
         response = httpx.get(GNUPG_DOWNLOAD_URL)
         
         if response.status_code != 200:
-            print(f'Cannot connect to GNUPG download URL {GNUPG_DOWNLOAD_URL}.\n'
+            log.error(f'Cannot connect to GNUPG download URL {GNUPG_DOWNLOAD_URL}.\n'
                 f'Unexpected status code {response.status_code}')
             return False
         
         response_text = response.text
         match = re.search(r'href="(?P<url>[^"]+gnupg-w32-[^"]+.exe)"', response_text)
         if not match:
-            print(f'Cannot find GNUPG installer on GNUPG download URL {GNUPG_DOWNLOAD_URL}.')
+            log.error(f'Cannot find GNUPG installer on GNUPG download URL {GNUPG_DOWNLOAD_URL}.')
             return False
         
         gpg_installer_url = urljoin(GNUPG_DOWNLOAD_URL, match.group('url'))
     except httpx.RequestError as exception:
-        print(f'Cannot connect to GNUPG download URL {GNUPG_DOWNLOAD_URL}.\nException {exception}')
+        log.error(f'Cannot connect to GNUPG download URL {GNUPG_DOWNLOAD_URL}.\n'
+            f'Exception {exception}')
         return False
 
     if gpg_installer_url is None:
@@ -1307,34 +1305,35 @@ def install_gpg(base_directory):
 
     try:
         with open(download_installer_path, 'wb') as binary_file:
-            print('Downloading GNUPG installer...')
+            log.info('Downloading GNUPG installer...')
             with httpx.stream('GET', gpg_installer_url) as http_stream:
                 if http_stream.status_code != 200:
-                    print(f'Cannot download GNUPG installer {gpg_installer_url}.\n'
+                    log.error(f'Cannot download GNUPG installer {gpg_installer_url}.\n'
                         f'Unexpected status code {http_stream.status_code}')
                     return False
                 for data in http_stream.iter_bytes():
                     binary_file.write(data)
     except httpx.RequestError as exception:
-        print(f'Exception while downloading GNUPG installer. Exception {exception}')
+        log.error(f'Exception while downloading GNUPG installer. Exception {exception}')
         return False
 
     # Run installer silently
-    print('Installing GNUPG...')
+    log.info('Installing GNUPG...')
 
     process_result = subprocess.run([
         str(download_installer_path), '/S', '/D=' + str(base_directory)
     ])
 
     if process_result.returncode != 0:
-        print(f'Failed to install GNUPG. Return code {process_result.returncode}')
+        log.error(f'Failed to install GNUPG. Return code {process_result.returncode}')
         return False
 
     # Remove download leftovers
     download_installer_path.unlink()
 
     if not gpg_binary_path.is_file():
-        print(f'Could not find GPG binary after installation. Expected to be in {gpg_binary_path}')
+        log.error(f'Could not find GPG binary after installation. '
+            f'Expected to be in {gpg_binary_path}')
         return False
     
     process_result = subprocess.run([
@@ -1342,7 +1341,7 @@ def install_gpg(base_directory):
     ])
 
     if process_result.returncode != 0:
-        print(f'Unexpected return from gpg binary. Return code {process_result.returncode}')
+        log.error(f'Unexpected return from gpg binary. Return code {process_result.returncode}')
         return False
 
     return True
@@ -1402,13 +1401,13 @@ Do you want to skip installing the JRE?
         windows_builds = []
 
         try:
-            print('Getting JRE builds...')
+            log.info('Getting JRE builds...')
 
             response = httpx.get(ADOPTOPENJDK_11_API_URL, params=ADOPTOPENJDK_11_API_PARAMs)
 
             if response.status_code != 200:
-                print(f'Cannot connect to JRE builds URL {ADOPTOPENJDK_11_API_URL}.\n'
-                f'Unexpected status code {response.status_code}')
+                log.error(f'Cannot connect to JRE builds URL {ADOPTOPENJDK_11_API_URL}.\n'
+                    f'Unexpected status code {response.status_code}')
                 return False
             
             response_json = response.json()
@@ -1418,7 +1417,7 @@ Do you want to skip installing the JRE?
                 len(response_json) == 0 or
                 type(response_json[0]) is not dict or
                 'binaries' not in response_json[0]):
-                print(f'Unexpected response from JRE builds URL {ADOPTOPENJDK_11_API_URL}')
+                log.error(f'Unexpected response from JRE builds URL {ADOPTOPENJDK_11_API_URL}')
                 return False
             
             binaries = response_json[0]['binaries']
@@ -1447,7 +1446,8 @@ Do you want to skip installing the JRE?
                     'name' not in package or
                     'checksum' not in package or
                     'link' not in package):
-                    print(f'Unexpected response from JRE builds URL {ADOPTOPENJDK_11_API_URL} in package')
+                    log.error(f'Unexpected response from JRE builds URL '
+                        f'{ADOPTOPENJDK_11_API_URL} in package')
                     return False
                 
                 package_name = package['name']
@@ -1462,11 +1462,12 @@ Do you want to skip installing the JRE?
                 })
 
         except httpx.RequestError as exception:
-            print(f'Cannot connect to JRE builds URL {ADOPTOPENJDK_11_API_URL}.\nException {exception}')
+            log.error(f'Cannot connect to JRE builds URL {ADOPTOPENJDK_11_API_URL}.'
+                f'\nException {exception}')
             return False
 
         if len(windows_builds) <= 0:
-            print('No JRE builds found on adoptopenjdk.net. We cannot continue.')
+            log.error('No JRE builds found on adoptopenjdk.net. We cannot continue.')
             return False
         
         # Download latest JRE build and its signature
@@ -1482,22 +1483,22 @@ Do you want to skip installing the JRE?
 
         try:
             with open(jre_archive_path, 'wb') as binary_file:
-                print(f'Downloading JRE archive {latest_build["name"]}...')
+                log.info(f'Downloading JRE archive {latest_build["name"]}...')
                 with httpx.stream('GET', latest_build['link']) as http_stream:
                     if http_stream.status_code != 200:
-                        print(f'Cannot download JRE archive {latest_build["link"]}.\n'
+                        log.error(f'Cannot download JRE archive {latest_build["link"]}.\n'
                             f'Unexpected status code {http_stream.status_code}')
                         return False
                     for data in http_stream.iter_bytes():
                         binary_file.write(data)
         except httpx.RequestError as exception:
-            print(f'Exception while downloading JRE archive. Exception {exception}')
+            log.error(f'Exception while downloading JRE archive. Exception {exception}')
             return False
         
         # Unzip JRE archive
         archive_members = None
 
-        print(f'Extracting JRE archive {latest_build["name"]}...')
+        log.info(f'Extracting JRE archive {latest_build["name"]}...')
         with ZipFile(jre_archive_path, 'r') as zip_file:
             archive_members = zip_file.namelist()
             zip_file.extractall(download_path)
@@ -1506,7 +1507,7 @@ Do you want to skip installing the JRE?
         jre_archive_path.unlink()
 
         if archive_members is None or len(archive_members) == 0:
-            print('No files found in JRE archive. We cannot continue.')
+            log.error('No files found in JRE archive. We cannot continue.')
             return False
         
         # Move all those extracted files into their final destination
@@ -1537,7 +1538,7 @@ Do you want to skip installing the JRE?
             pass
     
         if not jre_found:
-            print(f'We could not find the java binary from the installed JRE in {java_path}. '
+            log.error(f'We could not find the java binary from the installed JRE in {java_path}. '
                 f'We cannot continue.')
             return False
     
@@ -1683,18 +1684,17 @@ Do you want to skip installing the teku binary distribution?
         try:
             response = httpx.get(teku_gh_release_url, headers=headers)
         except httpx.RequestError as exception:
-            print(f'Cannot connect to Github. Exception {exception}')
+            log.error(f'Cannot connect to Github. Exception {exception}')
             return False
 
         if response.status_code != 200:
-            # TODO: Better handling for network response issue
-            print(f'Github returned error code. Status code {response.status_code}')
+            log.error(f'Github returned error code. Status code {response.status_code}')
             return False
         
         release_json = response.json()
 
         if 'body' not in release_json:
-            print('Unexpected response from github release. We cannot continue.')
+            log.error('Unexpected response from github release. We cannot continue.')
             return False
         
         release_desc = release_json['body']
@@ -1715,8 +1715,7 @@ Do you want to skip installing the teku binary distribution?
         
 
         if zip_url is None or zip_sha256 is None:
-            # TODO: Better handling of missing zip or checksum in latest release
-            print('Could not find binary distribution zip or checksum in Github release body. '
+            log.error('Could not find binary distribution zip or checksum in Github release body. '
                 'We cannot continue.')
             return False
         
@@ -1733,30 +1732,30 @@ Do you want to skip installing the teku binary distribution?
 
         try:
             with open(teku_archive_path, 'wb') as binary_file:
-                print(f'Downloading teku archive {url_file_name}...')
+                log.info(f'Downloading teku archive {url_file_name}...')
                 with httpx.stream('GET', zip_url) as http_stream:
                     if http_stream.status_code != 200:
-                        print(f'Cannot download teku archive {zip_url}.\n'
+                        log.error(f'Cannot download teku archive {zip_url}.\n'
                             f'Unexpected status code {http_stream.status_code}')
                         return False
                     for data in http_stream.iter_bytes():
                         binary_file.write(data)
                         teku_archive_hash.update(data)
         except httpx.RequestError as exception:
-            print(f'Exception while downloading teku archive. Exception {exception}')
+            log.error(f'Exception while downloading teku archive. Exception {exception}')
             return False
 
         # Verify checksum
-        print('Verifying teku archive checksum...')
+        log.info('Verifying teku archive checksum...')
         teku_archive_hexdigest = teku_archive_hash.hexdigest()
         if teku_archive_hexdigest.lower() != zip_sha256.lower():
-            print('Teku archive checksum does not match. We will stop here to protect you.')
+            log.error('Teku archive checksum does not match. We will stop here to protect you.')
             return False
         
         # Unzip teku archive
         archive_members = None
 
-        print(f'Extracting teku archive {url_file_name}...')
+        log.info(f'Extracting teku archive {url_file_name}...')
         with ZipFile(teku_archive_path, 'r') as zip_file:
             archive_members = zip_file.namelist()
             zip_file.extractall(download_path)
@@ -1765,7 +1764,7 @@ Do you want to skip installing the teku binary distribution?
         teku_archive_path.unlink()
 
         if archive_members is None or len(archive_members) == 0:
-            print('No files found in teku archive. We cannot continue.')
+            log.error('No files found in teku archive. We cannot continue.')
             return False
         
         # Move all those extracted files into their final destination
@@ -1800,11 +1799,11 @@ Do you want to skip installing the teku binary distribution?
                 pass
     
         if not teku_found:
-            print(f'We could not find the teku binary distribution from the installed archive '
+            log.error(f'We could not find the teku binary distribution from the installed archive '
                 f'in {teku_path}. We cannot continue.')
             return False
         else:
-            print(f'Teku version {teku_version} installed.')
+            log.info(f'Teku version {teku_version} installed.')
 
     # Check if teku directory already exists
     teku_datadir = base_directory.joinpath('var', 'lib', 'teku')
@@ -1892,22 +1891,22 @@ Do you want to remove this directory first and start from nothing?
 
     if not create_service(nssm_binary, teku_service_name, teku_batch_file, teku_arguments,
         parameters):
-        print('There was an issue creating the teku service. We cannot continue.')
+        log.error('There was an issue creating the teku service. We cannot continue.')
         return False
 
-    print('Starting teku service...')
+    log.info('Starting teku service...')
     process_result = subprocess.run([
         str(nssm_binary), 'start', teku_service_name
     ])
 
     delay = 15
-    print(f'We are giving {delay} seconds for the teku service to start properly.')
+    log.info(f'We are giving {delay} seconds for the teku service to start properly.')
     time.sleep(delay)
 
     # Verify proper Teku service installation
     service_details = get_service_details(nssm_binary, teku_service_name)
     if not service_details:
-        print('We could not find the teku service we just created. '
+        log.error('We could not find the teku service we just created. '
             'We cannot continue.')
         return False
 
@@ -1924,7 +1923,7 @@ Do you want to remove this directory first and start from nothing?
                 subprocess.run([
                     str(nssm_binary), 'stop', teku_service_name])
                 
-                print(
+                log.error(
 f'''
 Your password file contains the wrong password. Teku cannot be started. You
 might need to generate your keys again or fix your password file. We cannot
@@ -1964,7 +1963,7 @@ to check the logs and fix any issue found there. You can see the logs in:
         subprocess.run([
             str(nssm_binary), 'stop', teku_service_name])
 
-        print(
+        log.info(
 f'''
 To examine your teku service logs, inspect the following files:
 
@@ -1998,7 +1997,7 @@ To examine your teku service logs, inspect the following files:
                 subprocess.run([
                     str(nssm_binary), 'stop', teku_service_name])
                 
-                print(
+                log.error(
 f'''
 Your password file contains the wrong password. Teku cannot be started. You
 might need to generate your keys again or fix your password file. We cannot
@@ -2034,7 +2033,7 @@ in:
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your teku service logs, inspect the following files:
 
@@ -2070,7 +2069,7 @@ in:
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your teku service logs, inspect the following files:
 
@@ -2260,7 +2259,7 @@ Connected Peers: Unknown
     ).run()
     
     if not result:
-        print('Teku service installation verification was cancelled.')
+        log.warning('Teku service installation verification was cancelled.')
         return False
 
     if not result['bn_is_working']:
@@ -2286,7 +2285,7 @@ to check the logs and fix any issue found there. You can see the logs in:
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your teku service logs, inspect the following files:
 
@@ -2297,7 +2296,7 @@ To examine your teku service logs, inspect the following files:
 
         return False
 
-    print(
+    log.info(
 f'''
 Teku is installed and working properly.
 
@@ -2447,7 +2446,7 @@ Would you like to import your keys or generate them here?
             if (
                 imported_keys['deposit_data_path'] is None or
                 len(imported_keys['keystore_paths']) == 0):
-                print(f'No key has been found while importing them from {keys_path}')
+                log.warning(f'No key has been found while importing them from {keys_path}')
             else:
                 actual_keys = imported_keys
                 obtained_keys = True
@@ -2533,24 +2532,19 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
             try:
                 response = httpx.get(eth2_cli_gh_release_url, headers=headers)
             except httpx.RequestError as exception:
-                # TODO: Better handling for network response issue
-                print(
-f'Cannot get latest eth2.0-deposit-cli release from Github. Exception {exception}'
-                )
+                log.error(f'Cannot get latest eth2.0-deposit-cli release from Github. '
+                    f'Exception {exception}')
                 return False
 
             if response.status_code != 200:
-                # TODO: Better handling for network response issue
-                print(
-f'Cannot get latest eth2.0-deposit-cli release from Github. Error code {response.status_code}'
-                )
+                log.error(f'Cannot get latest eth2.0-deposit-cli release from Github. '
+                    f'Status code {response.status_code}')
                 return False
             
             release_json = response.json()
 
             if 'assets' not in release_json:
-                # TODO: Better handling on unexpected response structure
-                print('Unexpected response from Github API.')
+                log.error('No assets in Github release for eth2.0-deposit-cli.')
                 return False
             
             binary_asset = None
@@ -2577,15 +2571,13 @@ f'Cannot get latest eth2.0-deposit-cli release from Github. Error code {response
                     }
             
             if binary_asset is None:
-                # TODO: Better handling of missing binary in latest release
-                print('No eth2.0-deposit-cli binary found in Github release')
+                log.error('No eth2.0-deposit-cli binary found in Github release')
                 return False
             
             checksum_path = None
 
             if checksum_asset is None:
-                # TODO: Better handling of missing checksum in latest release
-                print('Warning: No eth2.0-deposit-cli checksum found in Github release')
+                log.warning('No eth2.0-deposit-cli checksum found in Github release')
             
             # Downloading latest eth2.0-deposit-cli release files
             download_path = base_directory.joinpath('downloads')
@@ -2599,23 +2591,25 @@ f'Cannot get latest eth2.0-deposit-cli release from Github. Error code {response
 
             try:
                 with open(binary_path, 'wb') as binary_file:
-                    print(f'Downloading eth2.0-deposit-cli binary {binary_asset["file_name"]}...')
+                    log.info(f'Downloading eth2.0-deposit-cli binary '
+                        f'{binary_asset["file_name"]}...')
                     with httpx.stream('GET', binary_asset['file_url']) as http_stream:
                         if http_stream.status_code != 200:
-                            print(f'Cannot download eth2.0-deposit-cli binary from Github '
+                            log.error(f'Cannot download eth2.0-deposit-cli binary from Github '
                                 f'{binary_asset["file_url"]}.\nUnexpected status code '
                                 f'{http_stream.status_code}')
                             return False
                         for data in http_stream.iter_bytes():
                             binary_file.write(data)
-                            binary_hash.update(data)
+                            if checksum_asset is not None:
+                                binary_hash.update(data)
             except httpx.RequestError as exception:
-                print(f'Exception while downloading eth2.0-deposit-cli binary from Github. '
+                log.error(f'Exception while downloading eth2.0-deposit-cli binary from Github. '
                     f'Exception {exception}')
                 return False
 
             if checksum_asset is not None:
-                binary_hexdigest = binary_hash.hexdigest()
+                binary_hexdigest = binary_hash.hexdigest().lower()
 
                 checksum_path = Path(download_path, checksum_asset['file_name'])
 
@@ -2624,23 +2618,23 @@ f'Cannot get latest eth2.0-deposit-cli release from Github. Error code {response
 
                 try:
                     with open(checksum_path, 'wb') as signature_file:
-                        print(
-f'Downloading eth2.0-deposit-cli checksum {checksum_asset["file_name"]}...')
+                        log.info(f'Downloading eth2.0-deposit-cli checksum '
+                            f'{checksum_asset["file_name"]}...')
                         with httpx.stream('GET', checksum_asset['file_url']) as http_stream:
                             if http_stream.status_code != 200:
-                                print(f'Cannot download eth2.0-deposit-cli checksum from Github '
-                                    f'{checksum_asset["file_url"]}.\nUnexpected status code '
+                                log.error(f'Cannot download eth2.0-deposit-cli checksum from '
+                                    f'Github {checksum_asset["file_url"]}.\nUnexpected status code '
                                     f'{http_stream.status_code}')
                                 return False
                             for data in http_stream.iter_bytes():
                                 signature_file.write(data)
                 except httpx.RequestError as exception:
-                    print(f'Exception while downloading eth2.0-deposit-cli checksum from Github. '
-                        f'Exception {exception}')
+                    log.error(f'Exception while downloading eth2.0-deposit-cli checksum from '
+                        f'Github. Exception {exception}')
                     return False
 
                 # Verify SHA256 signature
-                print('Verifying eth2.0-deposit-cli checksum...')
+                log.info('Verifying eth2.0-deposit-cli checksum...')
                 checksum_value = ''
                 with open(checksum_path, 'r', encoding='utf_16_le') as signature_file:
                     checksum_value = signature_file.read(1024).strip()
@@ -2651,10 +2645,11 @@ f'Downloading eth2.0-deposit-cli checksum {checksum_asset["file_name"]}...')
                 # Remove BOM
                 if checksum_value.startswith('\ufeff'):
                     checksum_value = checksum_value[1:]
+                checksum_value = checksum_value.lower()
                 if binary_hexdigest != checksum_value:
-                    # TODO: Better handling of failed SHA256 checksum
-                    print('SHA256 checksum failed on eth2.0-deposit-cli binary from Github. '
-                        'We will stop here to protect you.')
+                    log.error('SHA256 checksum failed on eth2.0-deposit-cli binary from Github. '
+                        f'Expected {checksum_value} but we got {binary_hexdigest}. We will stop '
+                        f'here to protect you.')
                     return False
             
             # Unzip eth2.0-deposit-cli archive
@@ -2663,7 +2658,7 @@ f'Downloading eth2.0-deposit-cli checksum {checksum_asset["file_name"]}...')
 
             deposit_extracted_binary = None
 
-            print(f'Extracting eth2.0-deposit-cli binary {binary_asset["file_name"]}...')
+            log.info(f'Extracting eth2.0-deposit-cli binary {binary_asset["file_name"]}...')
             with ZipFile(binary_path, 'r') as zip_file:
                 for name in zip_file.namelist():
                     if name.endswith('deposit.exe'):
@@ -2673,7 +2668,7 @@ f'Downloading eth2.0-deposit-cli checksum {checksum_asset["file_name"]}...')
             binary_path.unlink()
 
             if deposit_extracted_binary is None:
-                print('The eth2.0-deposit-cli binary was not found in the archive. '
+                log.error('The eth2.0-deposit-cli binary was not found in the archive. '
                     'We cannot continue.')
                 return False
 
@@ -2692,10 +2687,10 @@ f'Downloading eth2.0-deposit-cli checksum {checksum_asset["file_name"]}...')
         keys_path.mkdir(parents=True, exist_ok=True)
         
         # Launch eth2.0-deposit-cli
-        print('Generating keys with eth2.0-deposit-cli binary...')
+        log.info('Generating keys with eth2.0-deposit-cli binary...')
         subprocess.run([
-            str(eth2_deposit_cli_binary), 'new-mnemonic', '--chain', network, '--folder', str(keys_path)],
-            cwd=keys_path)
+            str(eth2_deposit_cli_binary), 'new-mnemonic', '--chain', network, '--folder',
+            str(keys_path)], cwd=keys_path)
 
         # Clean up eth2.0-deposit-cli binary
         eth2_deposit_cli_binary.unlink()
@@ -2718,8 +2713,7 @@ f'Downloading eth2.0-deposit-cli checksum {checksum_asset["file_name"]}...')
         if (
             generated_keys['deposit_data_path'] is None or
             len(generated_keys['keystore_paths']) == 0):
-            # TODO: Better handling of no keys generated
-            print('No key has been generated with the eth2.0-deposit-cli tool.')
+            log.warning('No key has been generated with the eth2.0-deposit-cli tool.')
         else:
             actual_keys = generated_keys
             obtained_keys = True
@@ -2787,9 +2781,9 @@ def initiate_deposit(base_directory, network, keys):
     deposit_file_path = base_directory.joinpath('var', 'lib', 'eth2', 'deposit',
         'deposit_data.json')
     if not deposit_file_path.is_file():
-        print(f'We could not find the deposit data file in {deposit_file_path} . If you already '
-            f'performed your deposit on the launchpad, you should be good. If not, there was '
-            f'an issue somewhere during the installation.')
+        log.warning(f'We could not find the deposit data file in {deposit_file_path} . If you '
+            f'already performed your deposit on the launchpad, you should be good. If not, there '
+            f'was an issue somewhere during the installation.')
         return False
 
     # TODO: Create an alternative way to easily obtain the deposit file with a simple HTTP server
@@ -2834,16 +2828,14 @@ When you are done with the deposit(s), click the "I'm done" button below.
             public_keys.append('0x' + public_key)
     
     if len(public_keys) == 0:
-        # TODO: Better handling of no public keys in deposit data file
-        print('No public key(s) found in the deposit file.')
+        log.error('No public key(s) found in the deposit file.')
         return False
 
     # Verify that the deposit was done correctly using beaconcha.in API
     validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
     if type(validator_deposits) is not list and not validator_deposits:
-        # TODO: Better handling of unability to get validator(s) deposits from beaconcha.in
-        print('Unability to get validator(s) deposits from beaconcha.in')
+        log.error('Unable to get validator(s) deposits from beaconcha.in')
         return False
 
     while len(validator_deposits) == 0:
@@ -2881,8 +2873,7 @@ deposit(s).
         validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
         if type(validator_deposits) is not list and not validator_deposits:
-            # TODO: Better handling of unability to get validator(s) deposits from beaconcha.in
-            print('Unability to get validator(s) deposits from beaconcha.in')
+            log.error('Unable to get validator(s) deposits from beaconcha.in')
             return False
     
     # Check if all the deposit(s) were done for each validator
@@ -2920,8 +2911,7 @@ deposit(s).
         validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
         if type(validator_deposits) is not list and not validator_deposits:
-            # TODO: Better handling of unability to get validator(s) deposits from beaconcha.in
-            print('Unability to get validator(s) deposits from beaconcha.in')
+            log.error('Unable to get validator(s) deposits from beaconcha.in')
             return False
 
     # Clean up deposit data file
@@ -3226,19 +3216,19 @@ Do you want to skip installing the prometheus binary distribution?
         try:
             response = httpx.get(prometheus_gh_release_url, headers=headers)
         except httpx.RequestError as exception:
-            print(f'Cannot connect to Github. Exception {exception}')
+            log.error(f'Cannot get latest Prometheus release from Github. '
+                    f'Exception {exception}')
             return False
 
         if response.status_code != 200:
-            # TODO: Better handling for network response issue
-            print(f'Github returned error code. Status code {response.status_code}')
+            log.error(f'Cannot get latest Prometheus release from Github. '
+                    f'Status code {response.status_code}')
             return False
         
         release_json = response.json()
 
         if 'assets' not in release_json:
-            # TODO: Better handling on unexpected response structure
-            print('Unexpected response from Github API.')
+            log.error('No assets found in Github release for Prometheus.')
             return False
         
         binary_asset = None
@@ -3260,8 +3250,7 @@ Do you want to skip installing the prometheus binary distribution?
                 break
         
         if binary_asset is None:
-            # TODO: Better handling of missing binary in latest release
-            print('No prometheus binary distribution found in Github release')
+            log.error('No prometheus binary distribution found in Github release')
             return False
         
         # Downloading latest Prometheus binary distribution archive
@@ -3278,23 +3267,23 @@ Do you want to skip installing the prometheus binary distribution?
 
         try:
             with open(prometheus_archive_path, 'wb') as binary_file:
-                print(f'Downloading prometheus archive {url_file_name}...')
+                log.info(f'Downloading prometheus archive {url_file_name}...')
                 with httpx.stream('GET', zip_url) as http_stream:
                     if http_stream.status_code != 200:
-                        print(f'Cannot download prometheus archive {zip_url}.\n'
+                        log.error(f'Cannot download prometheus archive {zip_url}.\n'
                             f'Unexpected status code {http_stream.status_code}')
                         return False
                     for data in http_stream.iter_bytes():
                         binary_file.write(data)
                         prometheus_archive_hash.update(data)
         except httpx.RequestError as exception:
-            print(f'Exception while downloading prometheus archive. Exception {exception}')
+            log.error(f'Exception while downloading prometheus archive. Exception {exception}')
             return False
         
         # Unzip prometheus archive
         archive_members = None
 
-        print(f'Extracting prometheus archive {url_file_name}...')
+        log.info(f'Extracting prometheus archive {url_file_name}...')
         with ZipFile(prometheus_archive_path, 'r') as zip_file:
             archive_members = zip_file.namelist()
             zip_file.extractall(download_path)
@@ -3303,7 +3292,7 @@ Do you want to skip installing the prometheus binary distribution?
         prometheus_archive_path.unlink()
 
         if archive_members is None or len(archive_members) == 0:
-            print('No files found in prometheus archive. We cannot continue.')
+            log.error('No files found in prometheus archive. We cannot continue.')
             return False
         
         # Move all those extracted files into their final destination
@@ -3335,11 +3324,11 @@ Do you want to skip installing the prometheus binary distribution?
                 pass
     
         if not prometheus_found:
-            print(f'We could not find the prometheus binary distribution from the installed '
+            log.error(f'We could not find the prometheus binary distribution from the installed '
                 f'archive in {prometheus_path}. We cannot continue.')
             return False
         else:
-            print(f'Prometheus version {prometheus_version} installed.')
+            log.info(f'Prometheus version {prometheus_version} installed.')
 
     # Check if prometheus directory already exists
     prometheus_datadir = base_directory.joinpath('var', 'lib', 'prometheus')
@@ -3413,22 +3402,22 @@ Do you want to remove this directory first and start from nothing?
 
     if not create_service(nssm_binary, prometheus_service_name, prometheus_binary_file,
         prometheus_arguments, parameters):
-        print('There was an issue creating the prometheus service. We cannot continue.')
+        log.error('There was an issue creating the prometheus service. We cannot continue.')
         return False
 
-    print('Starting prometheus service...')
+    log.info('Starting prometheus service...')
     process_result = subprocess.run([
         str(nssm_binary), 'start', prometheus_service_name
     ])
 
     delay = 15
-    print(f'We are giving {delay} seconds for the prometheus service to start properly.')
+    log.info(f'We are giving {delay} seconds for the prometheus service to start properly.')
     time.sleep(delay)
 
     # Verify proper Prometheus service installation
     service_details = get_service_details(nssm_binary, prometheus_service_name)
     if not service_details:
-        print('We could not find the prometheus service we just created. '
+        log.error('We could not find the prometheus service we just created. '
             'We cannot continue.')
         return False
 
@@ -3463,7 +3452,7 @@ logs in:
         subprocess.run([
             str(nssm_binary), 'stop', prometheus_service_name])
 
-        print(
+        log.info(
 f'''
 To examine your prometheus service logs, inspect the following file:
 
@@ -3520,7 +3509,7 @@ in:
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your prometheus service logs, inspect the following file:
 
@@ -3554,7 +3543,7 @@ in:
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your prometheus service logs, inspect the following file:
 
@@ -3600,7 +3589,7 @@ in:
 
         if not result:
 
-            print(
+            log.info(
 f'''
 To examine your prometheus service logs, inspect the following file:
 
@@ -3645,7 +3634,7 @@ in:
                 ]
             ).run()
 
-            print(
+            log.info(
 f'''
 To examine your prometheus service logs, inspect the following file:
 
@@ -3679,7 +3668,7 @@ in:
                 ]
             ).run()
 
-            print(
+            log.info(
 f'''
 To examine your prometheus service logs, inspect the following file:
 
@@ -3721,7 +3710,7 @@ in:
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your prometheus service logs, inspect the following file:
 
@@ -3731,7 +3720,7 @@ To examine your prometheus service logs, inspect the following file:
 
         return False
 
-    print(
+    log.info(
 f'''
 Prometheus is installed and working properly.
 ''' )
@@ -3835,14 +3824,14 @@ Do you want to skip installing windows exporter?
     if install_we:
         # Uninstalling Windows Exporter first if found
         if we_found and we_uninstall_command is not None:
-            print('Uninstalling Windows Exporter...')
+            log.info('Uninstalling Windows Exporter...')
             process_result = subprocess.run([
                 'msiexec', '/x', WINDOWS_EXPORTER_GUID, '/qn'
             ])
 
             if process_result.returncode != 0:
-                print(f'Unexpected return code from msiexec when uninstalling windows exporter. '
-                    f'Return code {process_result.returncode}')
+                log.error(f'Unexpected return code from msiexec when uninstalling windows '
+                    f'exporter. Return code {process_result.returncode}')
                 return False
         
         # Getting latest Windows Exporter release files
@@ -3851,19 +3840,19 @@ Do you want to skip installing windows exporter?
         try:
             response = httpx.get(we_gh_release_url, headers=headers)
         except httpx.RequestError as exception:
-            print(f'Cannot connect to Github. Exception {exception}')
+            log.error(f'Cannot get latest Windows Exporter release from Github. '
+                    f'Exception {exception}')
             return False
 
         if response.status_code != 200:
-            # TODO: Better handling for network response issue
-            print(f'Github returned error code. Status code {response.status_code}')
+            log.error(f'Cannot get latest Windows Exporter release from Github. '
+                    f'Status code {response.status_code}')
             return False
         
         release_json = response.json()
 
         if 'assets' not in release_json:
-            # TODO: Better handling on unexpected response structure
-            print('Unexpected response from Github API.')
+            log.error('No assets found in Github release for Windows Exporter.')
             return False
         
         binary_asset = None
@@ -3885,8 +3874,7 @@ Do you want to skip installing windows exporter?
                 break
         
         if binary_asset is None:
-            # TODO: Better handling of missing binary in latest release
-            print('No windows exporter installer found in Github release')
+            log.error('No windows exporter installer found in Github release')
             return False
         
         # Downloading latest Windows Exporter binary distribution archive
@@ -3900,20 +3888,21 @@ Do you want to skip installing windows exporter?
 
         try:
             with open(we_installer_path, 'wb') as binary_file:
-                print(f'Downloading windows exporter installer {url_file_name}...')
+                log.info(f'Downloading windows exporter installer {url_file_name}...')
                 with httpx.stream('GET', installer_url) as http_stream:
                     if http_stream.status_code != 200:
-                        print(f'Cannot download windows exporter installer {installer_url}.\n'
+                        log.error(f'Cannot download windows exporter installer {installer_url}.\n'
                             f'Unexpected status code {http_stream.status_code}')
                         return False
                     for data in http_stream.iter_bytes():
                         binary_file.write(data)
         except httpx.RequestError as exception:
-            print(f'Exception while downloading windows exporter installer. Exception {exception}')
+            log.error(f'Exception while downloading windows exporter installer. '
+                f'Exception {exception}')
             return False
 
         # Installing Windows Exporter
-        print(f'Installing windows exporter using {url_file_name} ...')
+        log.info(f'Installing windows exporter using {url_file_name} ...')
         process_result = subprocess.run([
             'msiexec', '/i', str(we_installer_path), 'ENABLED_COLLECTORS=[defaults],time,process',
             'LISTEN_ADDR=127.0.0.1', '/qn'
@@ -3923,7 +3912,7 @@ Do you want to skip installing windows exporter?
         we_installer_path.unlink()
 
         if process_result.returncode != 0:
-            print(f'Unexpected return code from msiexec when installing windows exporter. '
+            log.error(f'Unexpected return code from msiexec when installing windows exporter. '
                 f'Return code {process_result.returncode}')
             return False
 
@@ -3933,7 +3922,7 @@ Do you want to skip installing windows exporter?
     ])
 
     delay = 15
-    print(f'We are giving {delay} seconds for the windows exporter service to start properly.')
+    log.info(f'We are giving {delay} seconds for the windows exporter service to start properly.')
     time.sleep(delay)
 
     # Test Windows Exporter to see if we can read some metrics
@@ -3962,7 +3951,7 @@ windows_exporter.
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your windows exporter service logs, inspect logs in the Event
 Viewer for Application with source windows_exporter.
@@ -3993,7 +3982,7 @@ windows_exporter.
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your windows exporter service logs, inspect logs in the Event
 Viewer for Application with source windows_exporter.
@@ -4037,7 +4026,7 @@ windows_exporter.
 
         if not result:
 
-            print(
+            log.info(
 f'''
 To examine your windows exporter service logs, inspect logs in the Event
 Viewer for Application with source windows_exporter.
@@ -4075,7 +4064,7 @@ windows_exporter.
                 ]
             ).run()
 
-            print(
+            log.info(
 f'''
 To examine your windows exporter service logs, inspect logs in the Event
 Viewer for Application with source windows_exporter.
@@ -4106,7 +4095,7 @@ windows_exporter.
                 ]
             ).run()
 
-            print(
+            log.info(
 f'''
 To examine your windows exporter service logs, inspect logs in the Event
 Viewer for Application with source windows_exporter.
@@ -4144,7 +4133,7 @@ windows_exporter.
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your windows exporter service logs, inspect logs in the Event
 Viewer for Application with source windows_exporter.
@@ -4153,7 +4142,7 @@ Viewer for Application with source windows_exporter.
 
         return False
 
-    print(
+    log.info(
 f'''
 Windows Exporter is installed and working properly.
 ''' )
@@ -4217,7 +4206,7 @@ Do you want to skip installing grafana and its service?
     grafana_server_binary_file = grafana_bin_path.joinpath('grafana-server.exe')
 
     grafana_found = False
-    grafana_version = 'unknown'
+    grafana_version = UNKNOWN_VALUE
 
     if grafana_cli_binary_file.is_file():
         try:
@@ -4266,14 +4255,14 @@ Do you want to skip installing the grafana binary distribution?
 
         retry_index = 0
         retry_count = 5
-        retry_delay = 5
+        retry_delay = 30
 
         base_timeout = 10.0
         timeout_retry_increment = 5.0
 
         response = None
 
-        print('Getting Grafana download packages...')
+        log.info('Getting Grafana download packages...')
 
         while (
             response is None or
@@ -4281,28 +4270,30 @@ Do you want to skip installing the grafana binary distribution?
         ) and retry_index < retry_count:
             try:
                 timeout_delay = base_timeout + (timeout_retry_increment * retry_index)
-                response = httpx.get(GRAFANA_DOWNLOAD_URL, params=GRAFANA_WINDOWS_PARAM, timeout=timeout_delay)
+                response = httpx.get(GRAFANA_DOWNLOAD_URL, params=GRAFANA_WINDOWS_PARAM,
+                    timeout=timeout_delay)
             except httpx.RequestError as exception:
-                print(f'Cannot connect to Grafana download page. Exception {exception}.')
+                log.error(f'Cannot connect to Grafana download page. Exception {exception}.')
                     
                 retry_index = retry_index + 1
                 if retry_index < retry_count:
-                    print(f'We will retry in {retry_delay} seconds.')
+                    log.info(f'We will retry in {retry_delay} seconds.')
                     time.sleep(retry_delay)
                 continue
 
             if response.status_code != 200:
-                print(f'Grafana download page returned error code. Status code {response.status_code}')
+                log.error(f'Grafana download page returned error code. '
+                    f'Status code {response.status_code}')
 
                 retry_index = retry_index + 1
                 if retry_index < retry_count:
-                    print(f'We will retry in {retry_delay} seconds.')
+                    log.info(f'We will retry in {retry_delay} seconds.')
                     time.sleep(retry_delay)
                 continue
         
         if response is None or response.status_code != 200:
-            print(f'We could not get the Grafana download packages from the download page after '
-                f'a few retries. We cannot continue.')
+            log.error(f'We could not get the Grafana download packages from the download page '
+                f'after a few retries. We cannot continue.')
             return False
         
         response_text = response.text
@@ -4327,12 +4318,11 @@ Do you want to skip installing the grafana binary distribution?
                     sha_text = sha_spans[0].text
                     match = re.search(r'SHA256:\s*(?P<sha256>\S+)', sha_text)
                     if match:
-                        archive_sha256 = match.group('sha256')
+                        archive_sha256 = match.group('sha256').lower()
                 break
         
         if archive_url is None:
-            # TODO: Better handling of missing binary on website download page
-            print('No grafana binary distribution found on grafana download page')
+            log.error('No grafana binary distribution found on grafana download page')
             return False
         
         # Downloading latest Grafana binary distribution archive
@@ -4349,31 +4339,32 @@ Do you want to skip installing the grafana binary distribution?
 
         try:
             with open(grafana_archive_path, 'wb') as binary_file:
-                print(f'Downloading grafana archive {url_file_name}...')
+                log.info(f'Downloading grafana archive {url_file_name}...')
                 with httpx.stream('GET', zip_url) as http_stream:
                     if http_stream.status_code != 200:
-                        print(f'Cannot download grafana archive {zip_url}.\n'
+                        log.error(f'Cannot download grafana archive {zip_url}.\n'
                             f'Unexpected status code {http_stream.status_code}')
                         return False
                     for data in http_stream.iter_bytes():
                         binary_file.write(data)
                         grafana_archive_hash.update(data)
         except httpx.RequestError as exception:
-            print(f'Exception while downloading grafana archive. Exception {exception}')
+            log.error(f'Exception while downloading grafana archive. Exception {exception}')
             return False
         
         # Verify checksum
         if archive_sha256 is not None:
-            print('Verifying grafana archive checksum...')
-            grafana_archive_hexdigest = grafana_archive_hash.hexdigest()
-            if grafana_archive_hexdigest.lower() != archive_sha256.lower():
-                print('Grafana archive checksum does not match. We will stop here to protect you.')
+            log.info('Verifying grafana archive checksum...')
+            grafana_archive_hexdigest = grafana_archive_hash.hexdigest().lower()
+            if grafana_archive_hexdigest != archive_sha256:
+                log.error(f'Grafana archive checksum does not match. Expected {archive_sha256} '
+                    f'but we got {grafana_archive_hexdigest}. We will stop here to protect you.')
                 return False
 
         # Unzip grafana archive
         archive_members = None
 
-        print(f'Extracting grafana archive {url_file_name}...')
+        log.info(f'Extracting grafana archive {url_file_name}...')
         with ZipFile(grafana_archive_path, 'r') as zip_file:
             archive_members = zip_file.namelist()
             zip_file.extractall(download_path)
@@ -4382,7 +4373,7 @@ Do you want to skip installing the grafana binary distribution?
         grafana_archive_path.unlink()
 
         if archive_members is None or len(archive_members) == 0:
-            print('No files found in grafana archive. We cannot continue.')
+            log.error('No files found in grafana archive. We cannot continue.')
             return False
         
         # Move all those extracted files into their final destination
@@ -4398,6 +4389,8 @@ Do you want to skip installing the grafana binary distribution?
             
         # Make sure grafana was installed properly
         grafana_found = False
+        grafana_version = UNKNOWN_VALUE
+
         if grafana_cli_binary_file.is_file():
             try:
                 process_result = subprocess.run([
@@ -4412,21 +4405,18 @@ Do you want to skip installing the grafana binary distribution?
 
             except FileNotFoundError:
                 pass
-        
-        if not grafana_server_binary_file.is_file():
-            grafana_found = False
     
         if not grafana_found:
-            print(f'We could not find the grafana binary distribution from the installed '
+            log.error(f'We could not find the grafana binary distribution from the installed '
                 f'archive in {grafana_path}. We cannot continue.')
             return False
         else:
-            print(f'Grafana version {grafana_version} installed.')
+            log.info(f'Grafana version {grafana_version} installed.')
 
     # Check if config sample file exists
     grafana_source_config_file = grafana_path.joinpath('conf', 'sample.ini')
     if not grafana_source_config_file.is_file():
-        print(f'We could not find the grafana config sample file from the installed '
+        log.error(f'We could not find the grafana config sample file from the installed '
             f'archive in {grafana_path}. We cannot continue.')
         return False
 
@@ -4545,8 +4535,8 @@ providers:
         content_stream.close()
     
     if sample_config_content is None or sample_config_content == '':
-        print(f'We could not get the content of the grafana config sample file from the installed '
-            f'archive in {grafana_path}. We cannot continue.')
+        log.error(f'We could not get the content of the grafana config sample file from the '
+            f'installed archive in {grafana_path}. We cannot continue.')
         return False
     
     custom_config_content = sample_config_content
@@ -4590,7 +4580,7 @@ providers:
         config_file.write(custom_config_content)
 
     # Install required plugins
-    print('Installing required plugins for Grafana...')
+    log.info('Installing required plugins for Grafana...')
     process_result = subprocess.run([
         str(grafana_cli_binary_file), 'plugins', 'install', 'flant-statusmap-panel'
     ], cwd=str(grafana_bin_path))
@@ -4622,23 +4612,22 @@ providers:
 
     if not create_service(nssm_binary, grafana_service_name, grafana_server_binary_file,
         grafana_arguments, parameters):
-        print('There was an issue creating the grafana service. We cannot continue.')
+        log.error('There was an issue creating the grafana service. We cannot continue.')
         return False
 
-    print('Starting grafana service...')
+    log.info('Starting grafana service...')
     process_result = subprocess.run([
         str(nssm_binary), 'start', grafana_service_name
     ])
 
     delay = 15
-    print(f'We are giving {delay} seconds for the grafana service to start properly.')
+    log.info(f'We are giving {delay} seconds for the grafana service to start properly.')
     time.sleep(delay)
 
     # Verify proper Grafana service installation
     service_details = get_service_details(nssm_binary, grafana_service_name)
     if not service_details:
-        print('We could not find the grafana service we just created. '
-            'We cannot continue.')
+        log.error('We could not find the grafana service we just created. We cannot continue.')
         return False
 
     if not (
@@ -4672,7 +4661,7 @@ logs in:
         subprocess.run([
             str(nssm_binary), 'stop', grafana_service_name])
 
-        print(
+        log.info(
 f'''
 To examine your grafana service logs, inspect the following file:
 
@@ -4724,7 +4713,7 @@ in:
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your grafana service logs, inspect the following file:
 
@@ -4757,7 +4746,7 @@ in:
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your grafana service logs, inspect the following file:
 
@@ -4767,7 +4756,7 @@ To examine your grafana service logs, inspect the following file:
 
         return False
     
-    print(
+    log.info(
 f'''
 Grafana is installed and working properly.
 ''' )
