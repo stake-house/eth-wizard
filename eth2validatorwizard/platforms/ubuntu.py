@@ -171,13 +171,14 @@ Do you want to test your system?
 def test_disk_size():
     # Test disk size
 
+    log.info('Running df to test disk size...')
     process_result = subprocess.run([
         'df', '-h', '--output=avail', '-B1MB', '/var/lib'
         ], capture_output=True, text=True)
     
     if process_result.returncode != 0:
-        print(f'Unable to test disk size. Return code {process_result.returncode}')
-        print(f'{process_result.stdout}\n{process_result.stderr}')
+        log.error(f'Unable to test disk size. Return code {process_result.returncode}.\n'
+            f'StdOut: {process_result.stdout}\nStdErr: {process_result.stderr}')
         return False
     
     process_output = process_result.stdout
@@ -187,7 +188,8 @@ def test_disk_size():
         available_space_gb = int(result.group(1)) / 1000.0
 
     if available_space_gb is None:
-        print('Unable to test disk size. Unexpected output from df command. {process_output}')
+        log.error(f'Unable to test disk size. Unexpected output from df command. '
+            f'Output: {process_output}')
         return False
 
     if not available_space_gb >= MIN_AVAILABLE_DISK_SPACE_GB:
@@ -233,7 +235,7 @@ def test_disk_speed():
     # Test disk speed using fio tool
 
     # Install fio using APT
-    print('Installing fio...')
+    log.info('Installing fio to test disk speed...')
 
     subprocess.run([
         'apt', '-y', 'update'])
@@ -250,7 +252,7 @@ def test_disk_speed():
     fio_target_path = Path(fio_path, fio_target_filename)
     fio_output_path = Path(fio_path, fio_output_filename)
 
-    print('Executing fio...')
+    log.info('Executing fio to test disk speed...')
 
     process_result = subprocess.run([
         'fio', '--randrepeat=1', '--ioengine=libaio', '--direct=1', '--gtod_reduce=1',
@@ -260,7 +262,8 @@ def test_disk_speed():
         ], cwd=fio_path)
 
     if process_result.returncode != 0:
-        print(f'Error while running fio disk test. Return code {process_result.returncode}')
+        log.error(f'Error while running fio disk test. Return code {process_result.returncode}\n'
+            f'StdOut: {process_result.stdout}\nStdErr: {process_result.stderr}')
         return False
     
     # Remove test file
@@ -275,11 +278,11 @@ def test_disk_speed():
     fio_output_path.unlink()
 
     if results_json is None:
-        print('Could not read the results from fio output file.')
+        log.error('Could not read the results from fio output file.')
         return False
     
     if 'jobs' not in results_json or type(results_json['jobs']) is not list:
-        print('Unexpected structure from fio output file. No jobs list.')
+        log.error('Unexpected structure from fio output file. No jobs list.')
         return False
     
     jobs = results_json['jobs']
@@ -288,7 +291,7 @@ def test_disk_speed():
     test_job = None
     for job in jobs:
         if 'jobname' not in job:
-            print('Unexpected structure from fio output file. No jobname in a job.')
+            log.error('Unexpected structure from fio output file. No jobname in a job.')
             return False
         jobname = job['jobname']
         if jobname == 'test':
@@ -296,7 +299,7 @@ def test_disk_speed():
             break
 
     if test_job is None:
-        print('Unable to find our test job in fio output file.')
+        log.error('Unable to find our test job in fio output file.')
         return False
     
     if not (
@@ -306,7 +309,7 @@ def test_disk_speed():
         'write' in test_job and
         'iops' in test_job['write'] and
         type(test_job['write']['iops']) is float):
-        print('Unexpected structure from fio output file. No read or write iops.')
+        log.error('Unexpected structure from fio output file. No read or write iops.')
         return False
     
     k_read_iops = test_job['read']['iops'] / 1000.0
@@ -361,7 +364,7 @@ def test_internet_speed():
     # Test for internet speed
 
     # Downloading speedtest script
-    print('Downloading speedtest-cli script...')
+    log.info('Downloading speedtest-cli script to test internet speed...')
     download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
     download_path.mkdir(parents=True, exist_ok=True)
 
@@ -371,17 +374,17 @@ def test_internet_speed():
         with open(script_path, 'wb') as binary_file:
             with httpx.stream('GET', SPEEDTEST_SCRIPT_URL) as http_stream:
                 if http_stream.status_code != 200:
-                    print('HTTP error while downloading speedtest-cli script. '
+                    log.error('HTTP error while downloading speedtest-cli script. '
                         f'Status code {http_stream.status_code}')
                     return False
                 for data in http_stream.iter_bytes():
                     binary_file.write(data)
     except httpx.RequestError as exception:
-        print(f'Exception while downloading speedtest-cli script. {exception}')
+        log.error(f'Exception while downloading speedtest-cli script. {exception}')
         return False
     
     # Run speedtest script
-    print('Running speedtest...')
+    log.info('Running speedtest to test internet speed...')
 
     process_result = subprocess.run([
         'python3', script_path, '--secure', '--json'
@@ -391,8 +394,8 @@ def test_internet_speed():
     script_path.unlink()
 
     if process_result.returncode != 0:
-        print(f'Unable to run speedtest script. Return code {process_result.returncode}')
-        print(f'{process_result.stdout}\n{process_result.stderr}')
+        log.error(f'Unable to run speedtest script. Return code {process_result.returncode}\n'
+            f'StdOut: {process_result.stdout}\nStdErr: {process_result.stderr}')
         return False
 
     process_output = process_result.stdout
@@ -404,7 +407,7 @@ def test_internet_speed():
         'upload' not in speedtest_results or
         type(speedtest_results['upload']) is not float
     ):
-        print(f'Unexpected response from speedtest. \n {speedtest_results}')
+        log.error(f'Unexpected response from speedtest. \n {speedtest_results}')
         return False
     
     down_mbs = speedtest_results['download'] / 1000000.0 / 8.0
@@ -477,13 +480,14 @@ enough</b></style> to be a fully working validator. Here are your results:
 def test_available_ram():
     # Test available RAM
 
+    log.info('Inspecting /proc/meminfo for available RAM...')
     process_result = subprocess.run([
         'grep', 'MemTotal', '/proc/meminfo'
         ], capture_output=True, text=True)
     
     if process_result.returncode != 0:
-        print(f'Unable to get available total RAM. Return code {process_result.returncode}')
-        print(f'{process_result.stdout}\n{process_result.stderr}')
+        log.error(f'Unable to get available total RAM. Return code {process_result.returncode}\n'
+            f'StdOut: {process_result.stdout}\nStdErr: {process_result.stderr}')
         return False
     
     process_output = process_result.stdout
@@ -494,8 +498,8 @@ def test_available_ram():
     if result:
         total_available_ram_gb = int(result.group('memkb')) / 1000000.0
     else:
-        print(f'Unable to parse the output of /proc/meminfo to get available total RAM.')
-        print(f'{process_output}')
+        log.error(f'Unable to parse the output of /proc/meminfo to get available total RAM. '
+            f'Output: {process_output}')
         return False
     
     # Test if available RAM is above minimal values
@@ -764,11 +768,7 @@ Do you want to remove this directory first and start from nothing?
     
     # Wait a little before checking for Geth syncing since it can be slow to start
     delay = 30
-    print(
-f'''
-We are giving Geth {delay} seconds to start before testing it.
-'''
-    )
+    log.info(f'We are giving Geth {delay} seconds to start before testing it.')
     time.sleep(delay)
 
     # Verify proper Geth service installation
@@ -804,7 +804,7 @@ $ sudo journalctl -ru {geth_service_name}
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your geth service logs, type the following command:
 
@@ -851,7 +851,7 @@ $ sudo journalctl -ru {geth_service_name}
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your geth service logs, type the following command:
 
@@ -886,7 +886,7 @@ $ sudo journalctl -ru {geth_service_name}
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your geth service logs, type the following command:
 
@@ -1089,7 +1089,7 @@ Connected Peers: Unknown
     ).run()
     
     if not result:
-        print('Geth verification was cancelled.')
+        log.warning('Geth verification was cancelled.')
         return False
 
     if not result['exe_is_working']:
@@ -1114,7 +1114,7 @@ $ sudo journalctl -ru {geth_service_name}
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your geth service logs, type the following command:
 
@@ -1124,7 +1124,7 @@ $ sudo journalctl -ru {geth_service_name}
 
         return False
     
-    print(
+    log.info(
 f'''
 Geth is installed and working properly.
 
@@ -1293,18 +1293,18 @@ Do you want to skip installing the lighthouse binary?
         try:
             response = httpx.get(lighthouse_gh_release_url, headers=headers)
         except httpx.RequestError as exception:
-            print('Cannot connect to Github')
+            log.error(f'Exception while downloading lighthouse binary. {exception}')
             return False
 
         if response.status_code != 200:
-            # TODO: Better handling for network response issue
-            print('Github returned error code')
+            log.error(f'HTTP error while downloading lighthouse binary. '
+                f'Status code {response.status_code}')
             return False
         
         release_json = response.json()
 
         if 'assets' not in release_json:
-            # TODO: Better handling on unexpected response structure
+            log.error('No assets in Github release for lighthouse.')
             return False
         
         binary_asset = None
@@ -1331,8 +1331,7 @@ Do you want to skip installing the lighthouse binary?
                 }
 
         if binary_asset is None or signature_asset is None:
-            # TODO: Better handling of missing asset in latest release
-            print('Could not find binary or signature asset in Github release')
+            log.error('Could not find binary or signature asset in Github release')
             return False
         
         # Downloading latest Lighthouse release files
@@ -1344,10 +1343,14 @@ Do you want to skip installing the lighthouse binary?
         try:
             with open(binary_path, 'wb') as binary_file:
                 with httpx.stream('GET', binary_asset['file_url']) as http_stream:
+                    if http_stream.status_code != 200:
+                        log.error(f'HTTP error while downloading Lighthouse binary from Github. '
+                            f'Status code {http_stream.status_code}')
+                        return False
                     for data in http_stream.iter_bytes():
                         binary_file.write(data)
         except httpx.RequestError as exception:
-            print('Exception while downloading Lighthouse binary from Github')
+            log.error(f'Exception while downloading Lighthouse binary from Github. {exception}')
             return False
         
         signature_path = Path(download_path, signature_asset['file_name'])
@@ -1355,10 +1358,14 @@ Do you want to skip installing the lighthouse binary?
         try:
             with open(signature_path, 'wb') as signature_file:
                 with httpx.stream('GET', signature_asset['file_url']) as http_stream:
+                    if http_stream.status_code != 200:
+                        log.error(f'HTTP error while downloading Lighthouse signature from Github. '
+                            f'Status code {http_stream.status_code}')
+                        return False
                     for data in http_stream.iter_bytes():
                         signature_file.write(data)
         except httpx.RequestError as exception:
-            print('Exception while downloading Lighthouse signature from Github')
+            log.error(f'Exception while downloading Lighthouse signature from Github. {exception}')
             return False
 
         # Install gpg using APT
@@ -1378,25 +1385,26 @@ Do you want to skip installing the lighthouse binary?
             retry_index = 0
             while process_result.returncode != 0 and retry_index < retry_count:
                 retry_index = retry_index + 1
-                print('GPG failed to download the PGP key. We will wait 10 seconds and try again.')
-                time.sleep(10)
+                delay = 10
+                log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
+                    f'and try again.')
+                time.sleep(delay)
                 process_result = subprocess.run(command_line)
         
         if process_result.returncode != 0:
-            # TODO: Better handling of failed PGP key download
-            print(
+            log.error(
 f'''
-We failed to download the Sigma Prime\'s PGP key to verify the lighthouse
+We failed to download the Sigma Prime's PGP key to verify the lighthouse
 binary after {retry_count} retries.
 '''
-)
+            )
             return False
         
         process_result = subprocess.run([
             'gpg', '--verify', signature_path])
         if process_result.returncode != 0:
-            # TODO: Better handling of failed PGP signature
-            print('The lighthouse binary signature is wrong. We will stop here to protect you.')
+            log.error('The lighthouse binary signature is wrong. '
+                'We will stop here to protect you.')
             return False
         
         # Extracting the Lighthouse binary archive
@@ -1482,7 +1490,7 @@ Do you want to remove this directory first and start from nothing?
         'systemctl', 'enable', lighthouse_bn_service_name])
     
     delay = 30
-    print(
+    log.info(
 f'''
 We are giving the lighthouse beacon node {delay} seconds to start before
 testing it.
@@ -1528,7 +1536,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your lighthouse beacon node service logs, type the following
 command:
@@ -1573,7 +1581,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your lighthouse beacon node service logs, type the following
 command:
@@ -1608,7 +1616,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your lighthouse beacon node service logs, type the following
 command:
@@ -1808,7 +1816,7 @@ Connected Peers: Unknown
     ).run()
     
     if not result:
-        print('Lighthouse beacon node verification was cancelled.')
+        log.warning('Lighthouse beacon node verification was cancelled.')
         return False
 
     if not result['bn_is_working']:
@@ -1834,7 +1842,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your lighthouse beacon node service logs, type the following
 command:
@@ -1845,7 +1853,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
         return False
     
-    print(
+    log.info(
 f'''
 The lighthouse beacon node is installed and working properly.
 
@@ -2024,7 +2032,7 @@ Would you like to import your keys or generate them here?
             if (
                 imported_keys['deposit_data_path'] is None or
                 len(imported_keys['keystore_paths']) == 0):
-                print(f'No key has been found while importing them from {validator_keys_path}')
+                log.warning(f'No key has been found while importing them from {validator_keys_path}')
             else:
                 actual_keys = imported_keys
                 obtained_keys = True
@@ -2110,24 +2118,19 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
             try:
                 response = httpx.get(eth2_cli_gh_release_url, headers=headers)
             except httpx.RequestError as exception:
-                # TODO: Better handling for network response issue
-                print(
-f'Cannot get latest eth2.0-deposit-cli release from Github. Exception {exception}'
-                )
+                log.error(f'Cannot get latest eth2.0-deposit-cli release from Github. '
+                    f'Exception {exception}')
                 return False
 
             if response.status_code != 200:
-                # TODO: Better handling for network response issue
-                print(
-f'Cannot get latest eth2.0-deposit-cli release from Github. Error code {response.status_code}'
-                )
+                log.error(f'Cannot get latest eth2.0-deposit-cli release from Github. '
+                    f'Error code {response.status_code}')
                 return False
             
             release_json = response.json()
 
             if 'assets' not in release_json:
-                # TODO: Better handling on unexpected response structure
-                print('Unexpected response from Github API.')
+                log.error('No assets in Github release for eth2.0-deposit-cli.')
                 return False
             
             binary_asset = None
@@ -2154,15 +2157,13 @@ f'Cannot get latest eth2.0-deposit-cli release from Github. Error code {response
                     }
             
             if binary_asset is None:
-                # TODO: Better handling of missing binary in latest release
-                print('No eth2.0-deposit-cli binary found in Github release')
+                log.error('No eth2.0-deposit-cli binary found in Github release')
                 return False
             
             checksum_path = None
 
             if checksum_asset is None:
-                # TODO: Better handling of missing checksum in latest release
-                print('Warning: No eth2.0-deposit-cli checksum found in Github release')
+                log.warning('No eth2.0-deposit-cli checksum found in Github release')
             
             # Downloading latest eth2.0-deposit-cli release files
             download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
@@ -2174,33 +2175,45 @@ f'Cannot get latest eth2.0-deposit-cli release from Github. Error code {response
             try:
                 with open(binary_path, 'wb') as binary_file:
                     with httpx.stream('GET', binary_asset['file_url']) as http_stream:
+                        if http_stream.status_code != 200:
+                            log.error(f'HTTP error while downloading eth2.0-deposit-cli binary '
+                                f'from Github. Status code {http_stream.status_code}')
+                            return False
                         for data in http_stream.iter_bytes():
                             binary_file.write(data)
-                            binary_hash.update(data)
+                            if checksum_asset is not None:
+                                binary_hash.update(data)
             except httpx.RequestError as exception:
-                print('Exception while downloading eth2.0-deposit-cli binary from Github')
+                log.error(f'Exception while downloading eth2.0-deposit-cli binary from '
+                    f'Github. {exception}')
                 return False
 
             if checksum_asset is not None:
-                binary_hexdigest = binary_hash.hexdigest()
+                binary_hexdigest = binary_hash.hexdigest().lower()
 
                 checksum_path = Path(download_path, checksum_asset['file_name'])
 
                 try:
                     with open(checksum_path, 'wb') as signature_file:
                         with httpx.stream('GET', checksum_asset['file_url']) as http_stream:
+                            if http_stream.status_code != 200:
+                                log.error(f'HTTP error while downloading eth2.0-deposit-cli '
+                                    f'checksum from Github. Status code {http_stream.status_code}')
+                                return False
                             for data in http_stream.iter_bytes():
                                 signature_file.write(data)
                 except httpx.RequestError as exception:
-                    print('Exception while downloading eth2.0-deposit-cli checksum from Github')
+                    log.error(f'Exception while downloading eth2.0-deposit-cli checksum from '
+                    f'Github. {exception}')
                     return False
 
                 # Verify SHA256 signature
-                with open(checksum_path, 'r') as signature_file:
-                    if binary_hexdigest != signature_file.read(1024).strip():
+                with open(checksum_path, 'r') as checksum_file:
+                    checksum = checksum_file.read(1024).strip().lower()
+                    if binary_hexdigest != checksum:
                         # SHA256 checksum failed
-                        # TODO: Better handling of failed SHA256 checksum
-                        print('SHA256 checksum failed on eth2.0-deposit-cli binary from Github')
+                        log.error(f'SHA256 checksum failed on eth2.0-deposit-cli binary from '
+                            f'Github. Expected {checksum} but we got {binary_hexdigest}')
                         return False
             
             # Extracting the eth2.0-deposit-cli binary archive
@@ -2232,8 +2245,7 @@ f'Cannot get latest eth2.0-deposit-cli release from Github. Error code {response
         if (
             generated_keys['deposit_data_path'] is None or
             len(generated_keys['keystore_paths']) == 0):
-            # TODO: Better handling of no keys generated
-            print('No key has been generated with the eth2.0-deposit-cli tool.')
+            log.warning('No key has been generated with the eth2.0-deposit-cli tool.')
         else:
             actual_keys = generated_keys
             obtained_keys = True
@@ -2373,8 +2385,9 @@ this directory will also remove any key imported previously.
             '/usr/local/bin/lighthouse', '--network', network, 'account', 'validator', 'import',
             '--directory', keys['validator_keys_path'], '--datadir', lighthouse_datadir])
     else:
-        print('No keystore files found to import. We\'ll guess they were already imported for now.')
-        time.sleep(2)
+        log.warning('No keystore files found to import. We\'ll guess they were already imported '
+            'for now.')
+        time.sleep(5)
 
     # Check for correct keystore(s) import
     public_keys = []
@@ -2415,12 +2428,12 @@ validator client.
     subprocess.run([
         'chown', '-R', 'lighthousevalidator:lighthousevalidator', lighthouse_datadir_vc])
     
-    print(
+    log.info(
 f'''
 We found {len(public_keys)} key(s) imported into the lighthouse validator client.
 '''
     )
-    time.sleep(2)
+    time.sleep(5)
 
     # Setup Lighthouse validator client systemd service
     with open('/etc/systemd/system/' + lighthouse_vc_service_name, 'w') as service_file:
@@ -2433,9 +2446,10 @@ We found {len(public_keys)} key(s) imported into the lighthouse validator client
         'systemctl', 'enable', lighthouse_vc_service_name])
 
     # Verify proper Lighthouse validator client installation
-    print(
-'''
-We are giving the lighthouse validator client a few seconds to start before
+    delay = 6
+    log.info(
+f'''
+We are giving the lighthouse validator client {delay} seconds to start before
 testing it.
 
 You might see some error and warn messages about your beacon node not being
@@ -2443,7 +2457,7 @@ synced or about a failure to download validator duties. Those message are
 normal to see while your beacon node is syncing.
 '''
     )
-    time.sleep(6)
+    time.sleep(delay)
     try:
         subprocess.run([
             'journalctl', '-fu', lighthouse_vc_service_name
@@ -2485,7 +2499,7 @@ $ sudo journalctl -ru {lighthouse_vc_service_name}
             ]
         ).run()
 
-        print(
+        log.info(
 f'''
 To examine your lighthouse validator client service logs, type the following
 command:
@@ -2551,16 +2565,14 @@ When you are done with the deposit(s), click the "I'm done" button below.
             public_keys.append('0x' + public_key)
     
     if len(public_keys) == 0:
-        # TODO: Better handling of no public keys in deposit data file
-        print('No public key(s) found in the deposit file.')
+        log.error('No public key(s) found in the deposit file.')
         return False
 
     # Verify that the deposit was done correctly using beaconcha.in API
     validator_deposits = get_bc_validator_deposits(network, public_keys)
 
     if type(validator_deposits) is not list and not validator_deposits:
-        # TODO: Better handling of unability to get validator(s) deposits from beaconcha.in
-        print('Unability to get validator(s) deposits from beaconcha.in')
+        log.error('Unable to get validator(s) deposits from beaconcha.in')
         return False
 
     while len(validator_deposits) == 0:
@@ -2598,8 +2610,7 @@ deposit(s).
         validator_deposits = get_bc_validator_deposits(network, public_keys)
 
         if type(validator_deposits) is not list and not validator_deposits:
-            # TODO: Better handling of unability to get validator(s) deposits from beaconcha.in
-            print('Unability to get validator(s) deposits from beaconcha.in')
+            log.error('Unable to get validator(s) deposits from beaconcha.in')
             return False
     
     # Check if all the deposit(s) were done for each validator
@@ -2637,8 +2648,7 @@ deposit(s).
         validator_deposits = get_bc_validator_deposits(network, public_keys)
 
         if type(validator_deposits) is not list and not validator_deposits:
-            # TODO: Better handling of unability to get validator(s) deposits from beaconcha.in
-            print('Unability to get validator(s) deposits from beaconcha.in')
+            log.error('Unable to get validator(s) deposits from beaconcha.in')
             return False
 
     # Clean up deposit data file

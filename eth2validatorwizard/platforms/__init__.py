@@ -69,7 +69,7 @@ def has_su_perm(platform):
         has_su = os.geteuid() == 0
         if not has_su:
             from eth2validatorwizard.platforms.ubuntu import log
-            log.warn('Running without super user (root or sudo) permissions')
+            log.warning('Running without super user (root or sudo) permissions')
         return has_su
 
     elif platform == PLATFORM_WINDOWS10:
