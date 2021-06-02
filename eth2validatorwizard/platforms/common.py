@@ -43,7 +43,7 @@ from prompt_toolkit.widgets import (
     ValidationToolbar,
 )
 
-def select_network():
+def select_network(log):
     # Prompt for the selection on which network to perform the installation
 
     unknown_joining_queue = '(No join queue information found)'
@@ -65,11 +65,11 @@ def select_network():
             try:
                 response = await client.get(beaconcha_in_queue_query_url, headers=headers)
             except httpx.RequestError as exception:
-                print(f'Exception: {exception} while querying beaconcha.in.')
+                log.error(f'Exception: {exception} while querying beaconcha.in.')
                 return None
 
             if response.status_code != 200:
-                print(f'Status code: {response.status_code} while querying beaconcha.in.')
+                log.error(f'Status code: {response.status_code} while querying beaconcha.in.')
                 return None
 
             response_json = response.json()
@@ -265,7 +265,7 @@ should also be different from the one you choose for Ethereum 1 node.
     
     return ports
 
-def select_initial_state(network):
+def select_initial_state(network, log):
     # Prompt the user for initial state provider (weak subjectivity checkpoint)
 
     infura_bn_domain = INFURA_BEACON_NODE_DOMAINS[network]
@@ -360,7 +360,7 @@ Enter those values separated by a colon in this format:
                     ).finalize(
                     ).unsplit()
                 
-                valid_url = beacon_node_url_validator(network, initial_state_url)
+                valid_url = beacon_node_url_validator(network, initial_state_url, log)
 
             if input_canceled:
                 # User clicked the cancel button
@@ -404,7 +404,7 @@ Eth2 Beacon Node API. It should implement these endpoints:
             
                 initial_state_url = entered_url
                 
-                valid_url = beacon_node_url_validator(network, initial_state_url)
+                valid_url = beacon_node_url_validator(network, initial_state_url, log)
 
             if input_canceled:
                 # User clicked the cancel button
@@ -416,7 +416,7 @@ Eth2 Beacon Node API. It should implement these endpoints:
 
     return initial_state_url
 
-def beacon_node_url_validator(network, url):
+def beacon_node_url_validator(network, url, log):
     # Return true if this is a beacon chain endpoint for the network
 
     if not uri_validator(url):
@@ -433,13 +433,13 @@ def beacon_node_url_validator(network, url):
         response = httpx.get(deposit_contract_url, headers=headers)
 
         if response.status_code != 200:
-            print(f'Beacon node returned an unexpected status code: {response.status_code}')
+            log.error(f'Beacon node returned an unexpected status code: {response.status_code}')
             return False
         
         response_json = response.json()
 
         if not response_json:
-            print(f'Unexpected response from beacon node.')
+            log.error(f'Unexpected response from beacon node.')
             return False
 
         if (
@@ -447,24 +447,25 @@ def beacon_node_url_validator(network, url):
             'chain_id' not in response_json['data'] or
             'address' not in response_json['data']
         ):
-            print('Unexpected response from beacon node.')
+            log.error('Unexpected response from beacon node.')
             return False
         
         chain_id = response_json['data']['chain_id']
         deposit_contract = response_json['data']['address']
 
         if int(chain_id) != BN_CHAIN_IDS[network]:
-            print(f'Unexpected chain_id ({chain_id}) from beacon node. We expected another value '
-                f'({BN_CHAIN_IDS[network]}) for this network ({network}).')
+            log.error(f'Unexpected chain_id ({chain_id}) from beacon node. We expected another '
+                f'value ({BN_CHAIN_IDS[network]}) for this network ({network}).')
             return False
         
         if deposit_contract.lower() != BN_DEPOSIT_CONTRACTS[network].lower():
-            print(f'Unexpected deposit contract address ({deposit_contract}) from beacon node. '
-                f'We expected another value ({BN_DEPOSIT_CONTRACTS[network]}) for this network ({network}).')
+            log.error(f'Unexpected deposit contract address ({deposit_contract}) from beacon '
+                f'node. We expected another value ({BN_DEPOSIT_CONTRACTS[network]}) for this '
+                f'network ({network}).')
             return False
         
     except httpx.RequestError as exception:
-        print(f'Exception during request to beacon node: {exception}')
+        log.error(f'Exception during request to beacon node: {exception}')
         return False
 
     return True
@@ -850,7 +851,7 @@ def search_for_generated_keys(validator_keys_path):
         'password_paths': password_paths
     }
 
-def get_bc_validator_deposits(network, public_keys):
+def get_bc_validator_deposits(network, public_keys, log):
     # Return the validator deposits from the beaconcha.in API
 
     pubkey_arg = ','.join(public_keys)
@@ -868,18 +869,18 @@ def get_bc_validator_deposits(network, public_keys):
         try:
             response = httpx.get(bc_api_query_url, headers=headers)
         except httpx.RequestError as exception:
-            print(f'Exception {exception} when trying to get {bc_api_query_url}')
+            log.error(f'Exception {exception} when trying to get {bc_api_query_url}')
 
             retry_index = retry_index + 1
-            print(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
             time.sleep(retry_delay)
             continue
 
         if response.status_code != 200:
-            print(f'Error code {response.status_code} when trying to get {bc_api_query_url}')
+            log.error(f'Error code {response.status_code} when trying to get {bc_api_query_url}')
             
             retry_index = retry_index + 1
-            print(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
             time.sleep(retry_delay)
             continue
         
@@ -890,17 +891,18 @@ def get_bc_validator_deposits(network, public_keys):
             response_json['status'] != 'OK' or
             'data' not in response_json
             ):
-            print(f'Unexpected response data or structure from {bc_api_query_url}: {response_json}')
+            log.error(f'Unexpected response data or structure from {bc_api_query_url}: '
+                f'{response_json}')
             
             retry_index = retry_index + 1
-            print(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
             time.sleep(retry_delay)
             continue
         
         keep_retrying = False
     
     if keep_retrying:
-        print(f'We failed to get the validator deposits from the beaconcha.in API after '
+        log.error(f'We failed to get the validator deposits from the beaconcha.in API after '
             f'{retry_count} retries.')
         time.sleep(5)
         return False
@@ -913,7 +915,7 @@ def get_bc_validator_deposits(network, public_keys):
 
     return validator_deposits
 
-def test_open_ports(ports):
+def test_open_ports(ports, log):
     # Test the selected ports to make sure they are opened and exposed to the internet
 
     params = {
@@ -924,11 +926,11 @@ def test_open_ports(ports):
 
     all_ports_opened = False
 
-    print('Checking for open ports...')
+    log.info('Checking for open ports...')
 
     while not all_ports_opened:
         try:
-            print('Connecting to StakeHouse Port Checker...')
+            log.info('Connecting to StakeHouse Port Checker...')
             response = httpx.get(STAKEHOUSE_PORT_CHECKER_URL, params=params)
 
             if response.status_code != 200:
@@ -1079,9 +1081,9 @@ Would you like to retry?
                 break
     
     if all_ports_opened:
-        print('Open ports are configured correctly.')
+        log.info('Open ports are configured correctly.')
     else:
-        print('We could not confirm that open ports are configured correctly.')
+        log.warning('We could not confirm that open ports are configured correctly.')
 
     time.sleep(5)
     return True
@@ -1170,12 +1172,12 @@ to get in touch with the ethstaker community on:
         ]
     ).run()
 
-def show_public_keys(network, keys, public_keys):
+def show_public_keys(network, keys, public_keys, log):
     beaconcha_in_url = BEACONCHA_IN_URLS[network]
 
     newline = '\n'
 
-    print(
+    log.info(
 f'''
 Eth2 Validator Wizard completed!
 

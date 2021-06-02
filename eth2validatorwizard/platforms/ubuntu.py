@@ -56,7 +56,7 @@ def installation_steps():
             # User asked to quit
             quit_install()
 
-    selected_network = select_network()
+    selected_network = select_network(log)
     if not selected_network:
         # User asked to quit
         quit_install()
@@ -84,7 +84,7 @@ def installation_steps():
         # User asked to quit or error
         quit_install()
 
-    if not test_open_ports(selected_ports):
+    if not test_open_ports(selected_ports, log):
         # User asked to quit or error
         quit_install()
 
@@ -108,7 +108,7 @@ def installation_steps():
 
     show_whats_next(selected_network, obtained_keys, public_keys)
 
-    show_public_keys(selected_network, obtained_keys, public_keys)
+    show_public_keys(selected_network, obtained_keys, public_keys, log)
 
 def quit_install():
     log.info(f'Quitting eth2-validator-wizard')
@@ -2569,7 +2569,7 @@ When you are done with the deposit(s), click the "I'm done" button below.
         return False
 
     # Verify that the deposit was done correctly using beaconcha.in API
-    validator_deposits = get_bc_validator_deposits(network, public_keys)
+    validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
     if type(validator_deposits) is not list and not validator_deposits:
         log.error('Unable to get validator(s) deposits from beaconcha.in')
@@ -2607,7 +2607,7 @@ deposit(s).
         if not result:
             return result
 
-        validator_deposits = get_bc_validator_deposits(network, public_keys)
+        validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
         if type(validator_deposits) is not list and not validator_deposits:
             log.error('Unable to get validator(s) deposits from beaconcha.in')
@@ -2645,7 +2645,7 @@ deposit(s).
         if not result:
             return result
 
-        validator_deposits = get_bc_validator_deposits(network, public_keys)
+        validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
         if type(validator_deposits) is not list and not validator_deposits:
             log.error('Unable to get validator(s) deposits from beaconcha.in')
