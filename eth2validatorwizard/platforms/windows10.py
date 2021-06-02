@@ -133,7 +133,7 @@ def quit_install():
     print('Press enter to quit')
     input()
     
-    log.info(f'Quitting eth2-validator-wizard version {__version__}')
+    log.info(f'Quitting eth2-validator-wizard')
     sys.exit()
 
 def handle_exception(exc_type, exc_value, exc_traceback):

@@ -63,9 +63,15 @@ def supported_platform():
     return False
 
 def has_su_perm(platform):
+    # Check to see if the script has super user (root, sudo or elevated) permissions
+
     if platform == PLATFORM_UBUNTU:
-        # Check to see if the script has super user (root or sudo) permissions
-        return os.geteuid() == 0
+        has_su = os.geteuid() == 0
+        if not has_su:
+            from eth2validatorwizard.platforms.ubuntu import log
+            log.warn('Running without super user (root or sudo) permissions')
+        return has_su
+
     elif platform == PLATFORM_WINDOWS10:
         perform_elevation = False
         try:
@@ -105,6 +111,7 @@ def init_logging(platform):
     if platform == PLATFORM_UBUNTU:
         from eth2validatorwizard.platforms.ubuntu import init_logging
         return init_logging()
+
     elif platform == PLATFORM_WINDOWS10:
         from eth2validatorwizard.platforms.windows10 import init_logging
         return init_logging()
@@ -115,6 +122,7 @@ def quit_install(platform):
     if platform == PLATFORM_UBUNTU:
         from eth2validatorwizard.platforms.ubuntu import quit_install
         return quit_install()
+
     elif platform == PLATFORM_WINDOWS10:
         from eth2validatorwizard.platforms.windows10 import quit_install
         return quit_install()
@@ -125,6 +133,7 @@ def get_install_steps(platform):
     if platform == PLATFORM_UBUNTU:
         from eth2validatorwizard.platforms.ubuntu import installation_steps as ubuntu_steps
         return ubuntu_steps
+
     elif platform == PLATFORM_WINDOWS10:
         from eth2validatorwizard.platforms.windows10 import installation_steps as windows10_steps
         return windows10_steps

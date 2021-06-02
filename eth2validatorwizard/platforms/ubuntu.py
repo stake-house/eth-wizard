@@ -4,12 +4,16 @@ import httpx
 import hashlib
 import shutil
 import time
+import sys
 import stat
 import json
 import re
 import logging
+import logging.handlers
 
 from pathlib import Path
+
+from eth2validatorwizard import __version__
 
 from eth2validatorwizard.constants import *
 
@@ -107,11 +111,36 @@ def installation_steps():
     show_public_keys(selected_network, obtained_keys, public_keys)
 
 def quit_install():
+    log.info(f'Quitting eth2-validator-wizard')
     quit()
 
+def handle_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    
+    log.critical('Uncaught exception', exc_info=(exc_type, exc_value, exc_traceback))
+
 def init_logging():
-    # TODO: Initialize logging
-    pass
+    # Initialize logging
+    log.setLevel(logging.INFO)
+
+    # Handle uncaught exception and log them
+    sys.excepthook = handle_exception
+
+    # Console handler to log into the console
+    ch = logging.StreamHandler()
+    log.addHandler(ch)
+
+    # SysLog handler to log into syslog
+    slh = logging.handlers.SysLogHandler(address='/dev/log')
+
+    formatter = logging.Formatter('%(name)s[%(process)d]: %(levelname)s - %(message)s')
+    slh.setFormatter(formatter)
+
+    log.addHandler(slh)
+
+    log.info(f'Starting eth2-validator-wizard version {__version__}')
 
 def show_test_overview():
     # Show the overall tests to perform
