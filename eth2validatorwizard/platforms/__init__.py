@@ -77,6 +77,9 @@ def has_su_perm(platform):
             perform_elevation = True
         
         if perform_elevation:
+            from eth2validatorwizard.platforms.windows10 import log
+            log.info('Performing privilege elevation')
+
             pythonpath_env = rf'$env:PYTHONPATH = "{";".join(sys.path)}";'
             encoding_change = (
                 '$OutputEncoding = [console]::InputEncoding = '
@@ -95,6 +98,26 @@ def has_su_perm(platform):
         
         # End the unprivileged process
         sys.exit()
+    
+    return False
+
+def init_logging(platform):
+    if platform == PLATFORM_UBUNTU:
+        from eth2validatorwizard.platforms.ubuntu import init_logging
+        return init_logging()
+    elif platform == PLATFORM_WINDOWS10:
+        from eth2validatorwizard.platforms.windows10 import init_logging
+        return init_logging()
+    
+    return False
+
+def quit_install(platform):
+    if platform == PLATFORM_UBUNTU:
+        from eth2validatorwizard.platforms.ubuntu import quit_install
+        return quit_install()
+    elif platform == PLATFORM_WINDOWS10:
+        from eth2validatorwizard.platforms.windows10 import quit_install
+        return quit_install()
     
     return False
 

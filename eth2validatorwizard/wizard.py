@@ -5,7 +5,13 @@ from eth2validatorwizard import __version__
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog
 
-from eth2validatorwizard.platforms import get_install_steps, supported_platform, has_su_perm
+from eth2validatorwizard.platforms import (
+    get_install_steps,
+    supported_platform,
+    has_su_perm,
+    init_logging,
+    quit_install
+)
 from eth2validatorwizard.platforms import resume_step
 
 def run():
@@ -16,27 +22,29 @@ def run():
     if not platform:
         # This is not a supported platform
         show_unsupported_platform()
-        quit_install()
+        quit_install(platform)
+    
+    init_logging(platform)
 
     if not has_su_perm(platform):
         # User is not a super user
         show_not_su()
-        quit_install()
+        quit_install(platform)
     
     # TODO: Detect if installation is already started and resume if needed
     if resume_step(platform):
         # We have resumed from a previous step, skip other steps
-        quit_install()
+        quit_install(platform)
 
     if not show_welcome():
         # User asked to quit
-        quit_install()
+        quit_install(platform)
 
     self_update()
 
     if not explain_overview():
         # User asked to quit
-        quit_install()
+        quit_install(platform)
 
     steps = get_install_steps(platform)
     if not steps:
@@ -46,9 +54,6 @@ def run():
     
     # Execute the platform dependent steps
     steps()
-
-def quit_install():
-    sys.exit()
 
 def show_welcome():
     # Show a welcome message about this wizard

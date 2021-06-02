@@ -7,6 +7,7 @@ import time
 import stat
 import json
 import re
+import logging
 
 from pathlib import Path
 
@@ -28,31 +29,33 @@ from eth2validatorwizard.platforms.common import (
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog, radiolist_dialog, input_dialog
 
+log = logging.getLogger(__name__)
+
 def installation_steps():
 
     want_to_test = show_test_overview()
     if not want_to_test:
         # User asked to quit
-        quit()
+        quit_install()
 
     if want_to_test == 1:
         if not test_disk_size():
             # User asked to quit
-            quit()
+            quit_install()
         if not test_disk_speed():
             # User asked to quit
-            quit()
+            quit_install()
         if not test_available_ram():
             # User asked to quit
-            quit()
+            quit_install()
         if not test_internet_speed():
             # User asked to quit
-            quit()
+            quit_install()
 
     selected_network = select_network()
     if not selected_network:
         # User asked to quit
-        quit()
+        quit_install()
     
     selected_ports = {
         'eth1': DEFAULT_GETH_PORT,
@@ -62,33 +65,33 @@ def installation_steps():
     selected_ports = select_custom_ports(selected_ports)
     if not selected_ports:
         # User asked to quit or error
-        quit()
+        quit_install()
 
     if not install_geth(selected_network, selected_ports):
         # User asked to quit or error
-        quit()
+        quit_install()
 
     selected_eth1_fallbacks = select_eth1_fallbacks(selected_network)
     if type(selected_eth1_fallbacks) is not list and not selected_eth1_fallbacks:
         # User asked to quit
-        quit()
+        quit_install()
 
     if not install_lighthouse(selected_network, selected_eth1_fallbacks, selected_ports):
         # User asked to quit or error
-        quit()
+        quit_install()
 
     if not test_open_ports(selected_ports):
         # User asked to quit or error
-        quit()
+        quit_install()
 
     obtained_keys = obtain_keys(selected_network)
     if not obtained_keys:
         # User asked to quit or error
-        quit()
+        quit_install()
 
     if not install_lighthouse_validator(selected_network, obtained_keys):
         # User asked to quit or error
-        quit()
+        quit_install()
 
     # TODO: Check time synchronization and configure it if needed
 
@@ -97,11 +100,18 @@ def installation_steps():
     public_keys = initiate_deposit(selected_network, obtained_keys)
     if not public_keys:
         # User asked to quit or error
-        quit()
+        quit_install()
 
     show_whats_next(selected_network, obtained_keys, public_keys)
 
     show_public_keys(selected_network, obtained_keys, public_keys)
+
+def quit_install():
+    quit()
+
+def init_logging():
+    # TODO: Initialize logging
+    pass
 
 def show_test_overview():
     # Show the overall tests to perform

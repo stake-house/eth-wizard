@@ -9,6 +9,7 @@ import json
 import hashlib
 import winreg
 import io
+import logging
 
 from pathlib import Path
 
@@ -27,6 +28,8 @@ from zipfile import ZipFile
 from collections.abc import Collection
 
 from functools import partial
+
+from eth2validatorwizard import __version__
 
 from eth2validatorwizard.constants import *
 
@@ -49,6 +52,8 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog, input_dialog
 
 RESUME_CHOCOLATEY = 'resume_chocolatey'
+
+log = logging.getLogger(__name__)
 
 def installation_steps(*args, **kwargs):
 
@@ -127,7 +132,42 @@ def installation_steps(*args, **kwargs):
 def quit_install():
     print('Press enter to quit')
     input()
+    
+    log.info(f'Quitting eth2-validator-wizard version {__version__}')
     sys.exit()
+
+def handle_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    
+    log.critical('Uncaught exception', exc_info=(exc_type, exc_value, exc_traceback))
+
+def init_logging():
+    # Initialize logging
+    log.setLevel(logging.INFO)
+
+    # Handle uncaught exception and log them
+    sys.excepthook = handle_exception
+
+    # Console handler to log into the console
+    ch = logging.StreamHandler()
+    log.addHandler(ch)
+
+    # File handler to log into a file
+    app_data = Path(os.getenv('LOCALAPPDATA', os.getenv('APPDATA', '')))
+    if app_data.is_dir():
+        log_dir = app_data.joinpath('eth2-validator-wizard')
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir.joinpath('app.log')
+        fh = logging.FileHandler(log_file, encoding='utf8')
+
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        fh.setFormatter(formatter)
+
+        log.addHandler(fh)
+
+    log.info(f'Starting eth2-validator-wizard version {__version__}')
 
 def create_firewall_rule(ports):
     # Add rules to Windows Firewall to make sure we can accept connections on clients ports
