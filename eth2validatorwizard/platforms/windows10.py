@@ -45,8 +45,12 @@ from eth2validatorwizard.platforms.common import (
     get_bc_validator_deposits,
     test_open_ports,
     show_whats_next,
-    show_public_keys
+    show_public_keys,
+    Step,
+    test_context_variable
 )
+
+from typing import Optional
 
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog, input_dialog
@@ -55,10 +59,32 @@ log = logging.getLogger(__name__)
 
 def installation_steps(*args, **kwargs):
 
-    selected_directory = select_directory()
-    if not selected_directory:
-        # User asked to quit
-        quit_install()
+    def select_directory_function(step, context, step_sequence):
+        # Context variables
+        selected_directory = CTX_SELECTED_DIRECTORY
+
+        if selected_directory not in context:
+            context[selected_directory] = select_directory()
+            step_sequence.save_state(step.step_id, context)
+
+        if not context[selected_directory]:
+            # User asked to quit
+            del context[selected_directory]
+            step_sequence.save_state(step.step_id, context)
+
+            quit_install()
+        
+        return context
+
+    select_directory_step = Step(
+        step_id=SELECT_DIRECTORY_STEP_ID,
+        display_name='Select ethereum directory',
+        exc_function=select_directory_function
+    )
+
+    return [
+        select_directory_step
+    ]
 
     selected_network = select_network(log)
     if not selected_network:
@@ -128,12 +154,50 @@ def installation_steps(*args, **kwargs):
     quit_install()
 
 def save_state(step_id: str, context: dict) -> bool:
-    # TODO: Implement save_state
+    # Save wizard state
+
+    data_to_save = {
+        'step': step_id,
+        'context': context
+    }
+
+    app_data = Path(os.getenv('LOCALAPPDATA', os.getenv('APPDATA', '')))
+    if not app_data.is_dir():
+        return False
+    
+    app_dir = app_data.joinpath('eth2-validator-wizard')
+    app_dir.mkdir(parents=True, exist_ok=True)
+    save_file = app_dir.joinpath(STATE_FILE)
+
+    with open(str(save_file), 'w', encoding='utf8') as output_file:
+        json.dump(data_to_save, output_file)
+
     return True
 
 def load_state() -> Optional[dict]:
-    # TODO: Implement load_state
-    return None
+    # Load wizard state
+
+    app_data = Path(os.getenv('LOCALAPPDATA', os.getenv('APPDATA', '')))
+    if not app_data.is_dir():
+        return None
+    
+    app_dir = app_data.joinpath('eth2-validator-wizard')
+    if not app_dir.is_dir():
+        return None
+    
+    save_file = app_dir.joinpath(STATE_FILE)
+    if not save_file.is_file():
+        return None
+    
+    loaded_data = None
+
+    try:
+        with open(str(save_file), 'r', encoding='utf8') as input_file:
+            loaded_data = json.load(input_file)
+    except ValueError:
+        return None
+    
+    return loaded_data
 
 def quit_install():
     print('Press enter to quit')
@@ -163,9 +227,9 @@ def init_logging():
     # File handler to log into a file
     app_data = Path(os.getenv('LOCALAPPDATA', os.getenv('APPDATA', '')))
     if app_data.is_dir():
-        log_dir = app_data.joinpath('eth2-validator-wizard')
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = log_dir.joinpath('app.log')
+        app_dir = app_data.joinpath('eth2-validator-wizard')
+        app_dir.mkdir(parents=True, exist_ok=True)
+        log_file = app_dir.joinpath('app.log')
         fh = logging.FileHandler(log_file, encoding='utf8')
 
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
