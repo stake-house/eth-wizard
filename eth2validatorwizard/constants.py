@@ -34,6 +34,35 @@ MIN_AVAILABLE_RAM_GB = 12.0
 BN_MIN_FEW_PEERS = 10.0
 EXE_MIN_FEW_PEERS = 10.0
 
+LINUX_SAVE_DIRECTORY = '/var/lib/eth2validatorwizard'
+STATE_FILE = 'wizardstate.json'
+
+CTX_WANT_TO_TEST = 'want_to_test'
+CTX_DISK_SIZE_TESTED = 'disk_size_tested'
+CTX_DISK_SPEED_TESTED = 'disk_speed_tested'
+CTX_AVAILABLE_RAM_TESTED = 'available_ram_tested'
+CTX_INTERNET_SPEED_TESTED = 'internet_speed_tested'
+CTX_SELECTED_NETWORK = 'selected_network'
+CTX_SELECTED_PORTS = 'selected_ports'
+CTX_SELECTED_ETH1_FALLBACKS = 'selected_eth1_fallbacks'
+CTX_OBTAINED_KEYS = 'obtained_keys'
+CTX_PUBLIC_KEYS = 'public_keys'
+
+TEST_SYSTEM_STEP_ID = 'test_system_step'
+SELECT_NETWORK_STEP_ID = 'select_network_step'
+SELECT_CUSTOM_PORTS_STEP_ID = 'select_custom_ports_step'
+INSTALL_GETH_STEP_ID = 'install_geth_step'
+SELECT_ETH1_FALLBACKS_STEP_ID = 'select_eth1_fallbacks_step'
+INSTALL_LIGHTHOUSE_STEP_ID = 'install_lighthouse_step'
+TEST_OPEN_PORTS_STEP_ID = 'test_open_ports_step'
+OBTAIN_KEYS_STEP_ID = 'obtain_keys_step'
+INSTALL_LIGHTHOUSE_VALIDATOR_STEP_ID = 'install_lighthouse_validator_step'
+INITIATE_DEPOSIT_STEP_ID = 'initiate_deposit_step'
+SHOW_WHATS_NEXT_STEP_ID = 'show_whats_next_step'
+SHOW_PUBLIC_KEYS_STEP_ID = 'show_public_keys_step'
+
+WIZARD_COMPLETED_STEP_ID = 'wizard_completed'
+
 UNKNOWN_VALUE = 'Unknown'
 
 CHOCOLATEY_DEFAULT_BIN_PATH = r'C:\ProgramData\chocolatey\bin'

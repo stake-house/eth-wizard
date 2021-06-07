@@ -27,8 +27,12 @@ from eth2validatorwizard.platforms.common import (
     get_bc_validator_deposits,
     test_open_ports,
     show_whats_next,
-    show_public_keys
+    show_public_keys,
+    Step,
+    test_context_variable
 )
+
+from typing import Optional
 
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog, radiolist_dialog, input_dialog
@@ -37,78 +41,409 @@ log = logging.getLogger(__name__)
 
 def installation_steps():
 
-    want_to_test = show_test_overview()
-    if not want_to_test:
-        # User asked to quit
-        quit_install()
+    def test_system_function(step, context, step_sequence):
+        # Context variables
+        want_to_test = CTX_WANT_TO_TEST
+        disk_size_tested = CTX_DISK_SIZE_TESTED
+        disk_speed_tested = CTX_DISK_SPEED_TESTED
+        available_ram_tested = CTX_AVAILABLE_RAM_TESTED
+        internet_speed_tested = CTX_INTERNET_SPEED_TESTED
 
-    if want_to_test == 1:
-        if not test_disk_size():
+        if want_to_test not in context:
+            context[want_to_test] = show_test_overview()
+            step_sequence.save_state(step.step_id, context)
+
+        if not context[want_to_test]:
             # User asked to quit
-            quit_install()
-        if not test_disk_speed():
-            # User asked to quit
-            quit_install()
-        if not test_available_ram():
-            # User asked to quit
-            quit_install()
-        if not test_internet_speed():
-            # User asked to quit
+            del context[want_to_test]
+            step_sequence.save_state(step.step_id, context)
+
             quit_install()
 
-    selected_network = select_network(log)
-    if not selected_network:
-        # User asked to quit
-        quit_install()
+        if context[want_to_test] == 1:
+            if not context.get(disk_size_tested, False):
+                if not test_disk_size():
+                    # User asked to quit
+                    quit_install()
+                
+                context[disk_size_tested] = True
+                step_sequence.save_state(step.step_id, context)
+
+            if not context.get(disk_speed_tested, False):
+                if not test_disk_speed():
+                    # User asked to quit
+                    quit_install()
+                
+                context[disk_speed_tested] = True
+                step_sequence.save_state(step.step_id, context)
+            
+            if not context.get(available_ram_tested, False):
+                if not test_available_ram():
+                    # User asked to quit
+                    quit_install()
+                
+                context[available_ram_tested] = True
+                step_sequence.save_state(step.step_id, context)
+
+            if not context.get(internet_speed_tested, False):
+                if not test_internet_speed():
+                    # User asked to quit
+                    quit_install()
+                
+                context[internet_speed_tested] = True
+                step_sequence.save_state(step.step_id, context)
+        
+        return context
+
+    test_system_step = Step(
+        step_id=TEST_SYSTEM_STEP_ID,
+        display_name='Testing your system',
+        exc_function=test_system_function
+    )
+
+    def select_network_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+
+        if selected_network not in context:
+            context[selected_network] = select_network(log)
+            step_sequence.save_state(step.step_id, context)
+
+        if not context[selected_network]:
+            # User asked to quit
+            del context[selected_network]
+            step_sequence.save_state(step.step_id, context)
+
+            quit_install()
+        
+        return context
     
-    selected_ports = {
-        'eth1': DEFAULT_GETH_PORT,
-        'eth2_bn': DEFAULT_LIGHTHOUSE_BN_PORT
-    } 
+    select_network_step = Step(
+        step_id=SELECT_NETWORK_STEP_ID,
+        display_name='Network selection',
+        exc_function=select_network_function
+    )
 
-    selected_ports = select_custom_ports(selected_ports)
-    if not selected_ports:
-        # User asked to quit or error
-        quit_install()
+    def select_custom_ports_function(step, context, step_sequence):
+        # Context variables
+        selected_ports = CTX_SELECTED_PORTS
 
-    if not install_geth(selected_network, selected_ports):
-        # User asked to quit or error
-        quit_install()
+        if selected_ports not in context:
+            context[selected_ports] = {
+                'eth1': DEFAULT_GETH_PORT,
+                'eth2_bn': DEFAULT_LIGHTHOUSE_BN_PORT
+            }
+        
+        context[selected_ports] = select_custom_ports(context[selected_ports])
+        if not context[selected_ports]:
+            # User asked to quit or error
+            del context[selected_ports]
+            step_sequence.save_state(step.step_id, context)
 
-    selected_eth1_fallbacks = select_eth1_fallbacks(selected_network)
-    if type(selected_eth1_fallbacks) is not list and not selected_eth1_fallbacks:
-        # User asked to quit
-        quit_install()
+            quit_install()
+        
+        return context
 
-    if not install_lighthouse(selected_network, selected_eth1_fallbacks, selected_ports):
-        # User asked to quit or error
-        quit_install()
+    select_custom_ports_step = Step(
+        step_id=SELECT_CUSTOM_PORTS_STEP_ID,
+        display_name='Open ports configuration',
+        exc_function=select_custom_ports_function
+    )
 
-    if not test_open_ports(selected_ports, log):
-        # User asked to quit or error
-        quit_install()
+    def install_geth_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        selected_ports = CTX_SELECTED_PORTS
 
-    obtained_keys = obtain_keys(selected_network)
-    if not obtained_keys:
-        # User asked to quit or error
-        quit_install()
+        if not (
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, selected_ports, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
 
-    if not install_lighthouse_validator(selected_network, obtained_keys):
-        # User asked to quit or error
-        quit_install()
+        if not install_geth(context[selected_network], context[selected_ports]):
+            # User asked to quit or error
+            quit_install()
 
-    # TODO: Check time synchronization and configure it if needed
+        return context
+    
+    install_geth_step = Step(
+        step_id=INSTALL_GETH_STEP_ID,
+        display_name='Geth installation',
+        exc_function=install_geth_function
+    )
 
-    # TODO: Monitoring setup
+    def select_eth1_fallbacks_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        selected_eth1_fallbacks = CTX_SELECTED_ETH1_FALLBACKS
 
-    public_keys = initiate_deposit(selected_network, obtained_keys)
-    if not public_keys:
-        # User asked to quit or error
-        quit_install()
+        if not (
+            test_context_variable(context, selected_network, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
 
-    show_whats_next(selected_network, obtained_keys, public_keys)
+        if selected_eth1_fallbacks not in context:
+            context[selected_eth1_fallbacks] = select_eth1_fallbacks(context[selected_network])
+            step_sequence.save_state(step.step_id, context)
 
-    show_public_keys(selected_network, obtained_keys, public_keys, log)
+        if (
+            type(context[selected_eth1_fallbacks]) is not list and
+            not context[selected_eth1_fallbacks]):
+            # User asked to quit
+            del context[selected_eth1_fallbacks]
+            step_sequence.save_state(step.step_id, context)
+
+            quit_install()
+
+        return context
+
+    select_eth1_fallbacks_step = Step(
+        step_id=SELECT_ETH1_FALLBACKS_STEP_ID,
+        display_name='Adding Eth1 fallback nodes',
+        exc_function=select_eth1_fallbacks_function
+    )
+
+    def install_lighthouse_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        selected_ports = CTX_SELECTED_PORTS
+        selected_eth1_fallbacks = CTX_SELECTED_ETH1_FALLBACKS
+
+        if not (
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, selected_ports, log) and
+            test_context_variable(context, selected_eth1_fallbacks, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+        
+        if not install_lighthouse(context[selected_network], context[selected_eth1_fallbacks],
+            context[selected_ports]):
+            # User asked to quit or error
+            quit_install()
+
+        return context
+    
+    install_lighthouse_step = Step(
+        step_id=INSTALL_LIGHTHOUSE_STEP_ID,
+        display_name='Lighthouse installation',
+        exc_function=install_lighthouse_function
+    )
+
+    def test_open_ports_function(step, context, step_sequence):
+        # Context variables
+        selected_ports = CTX_SELECTED_PORTS
+
+        if not (
+            test_context_variable(context, selected_ports, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+        
+        if not test_open_ports(context[selected_ports], log):
+            # User asked to quit or error
+            quit_install()
+
+        return context
+
+    test_open_ports_step = Step(
+        step_id=TEST_OPEN_PORTS_STEP_ID,
+        display_name='Testing open ports',
+        exc_function=test_open_ports_function
+    )
+
+    def obtain_keys_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        obtained_keys = CTX_OBTAINED_KEYS
+
+        if not (
+            test_context_variable(context, selected_network, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+        
+        if obtained_keys not in context:
+            context[obtained_keys] = obtain_keys(context[selected_network])
+            step_sequence.save_state(step.step_id, context)
+
+        if not context[obtained_keys]:
+            # User asked to quit
+            del context[obtained_keys]
+            step_sequence.save_state(step.step_id, context)
+
+            quit_install()
+
+        return context
+
+    obtain_keys_step = Step(
+        step_id=OBTAIN_KEYS_STEP_ID,
+        display_name='Importing or generating keys',
+        exc_function=obtain_keys_function
+    )
+
+    def install_lighthouse_validator_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        obtained_keys = CTX_OBTAINED_KEYS
+
+        if not (
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, obtained_keys, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+        
+        if not install_lighthouse_validator(context[selected_network], context[obtained_keys]):
+            # User asked to quit or error
+            quit_install()
+
+        return context
+    
+    install_lighthouse_validator_step = Step(
+        step_id=INSTALL_LIGHTHOUSE_VALIDATOR_STEP_ID,
+        display_name='Lighthouse validator client installation',
+        exc_function=install_lighthouse_validator_function
+    )
+
+    def initiate_deposit_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        obtained_keys = CTX_OBTAINED_KEYS
+        public_keys = CTX_PUBLIC_KEYS
+
+        if not (
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, obtained_keys, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+        
+        if public_keys not in context:
+            context[public_keys] = initiate_deposit(context[selected_network],
+                context[obtained_keys])
+            step_sequence.save_state(step.step_id, context)
+
+        if not context[public_keys]:
+            # User asked to quit
+            del context[public_keys]
+            step_sequence.save_state(step.step_id, context)
+
+            quit_install()
+
+        return context
+
+    initiate_deposit_step = Step(
+        step_id=INITIATE_DEPOSIT_STEP_ID,
+        display_name='Deposit on the launchpad',
+        exc_function=initiate_deposit_function
+    )
+
+    def show_whats_next_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        obtained_keys = CTX_OBTAINED_KEYS
+        public_keys = CTX_PUBLIC_KEYS
+
+        if not (
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, obtained_keys, log) and
+            test_context_variable(context, public_keys, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+
+        show_whats_next(context[selected_network], context[obtained_keys], context[public_keys])
+
+        return context
+    
+    show_whats_next_step = Step(
+        step_id=SHOW_WHATS_NEXT_STEP_ID,
+        display_name='Installation completed',
+        exc_function=show_whats_next_function
+    )
+
+    def show_public_keys_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        obtained_keys = CTX_OBTAINED_KEYS
+        public_keys = CTX_PUBLIC_KEYS
+
+        if not (
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, obtained_keys, log) and
+            test_context_variable(context, public_keys, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+        
+        show_public_keys(selected_network, obtained_keys, public_keys, log)
+
+        return context
+    
+    show_public_keys_step = Step(
+        step_id=SHOW_PUBLIC_KEYS_STEP_ID,
+        display_name='Show public keys',
+        exc_function=show_public_keys_function
+    )
+
+    return [
+        test_system_step,
+        select_network_step,
+        select_custom_ports_step,
+        install_geth_step,
+        select_eth1_fallbacks_step,
+        install_lighthouse_step,
+        test_open_ports_step,
+        obtain_keys_step,
+        install_lighthouse_validator_step,
+        # TODO: Check time synchronization and configure it if needed
+        # TODO: Monitoring setup
+        initiate_deposit_step,
+        show_whats_next_step,
+        show_public_keys_step
+    ]
+
+def save_state(step_id: str, context: dict) -> bool:
+    # Save wizard state
+
+    data_to_save = {
+        'step': step_id,
+        'context': context
+    }
+
+    save_directory = Path(LINUX_SAVE_DIRECTORY)
+    if not save_directory.is_dir():
+        save_directory.mkdir(parents=True, exist_ok=True)
+    save_file = save_directory.joinpath(STATE_FILE)
+
+    with open(str(save_file), 'w', encoding='utf8') as output_file:
+        json.dump(data_to_save, output_file)
+
+    return True
+
+def load_state() -> Optional[dict]:
+    # Load wizard state
+
+    save_directory = Path(LINUX_SAVE_DIRECTORY)
+    if not save_directory.is_dir():
+        return None
+    save_file = save_directory.joinpath(STATE_FILE)
+    if not save_file.is_file():
+        return None
+    
+    loaded_data = None
+
+    try:
+        with open(str(save_file), 'r', encoding='utf8') as input_file:
+            loaded_data = json.load(input_file)
+    except ValueError:
+        return None
+    
+    return loaded_data
 
 def quit_install():
     log.info(f'Quitting eth2-validator-wizard')
@@ -2301,7 +2636,7 @@ client?
             'systemctl', 'stop', lighthouse_vc_service_name])
 
     result = button_dialog(
-        title='Lighthouse validator client',
+        title='Lighthouse validator client installation',
         text=(HTML(
 '''
 This next step will import your keystore(s) to be used with the Lighthouse

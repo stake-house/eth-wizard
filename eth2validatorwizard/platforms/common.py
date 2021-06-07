@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import httpx
 import json
 import os
@@ -9,6 +11,8 @@ from rfc3986 import urlparse, builder as urlbuilder
 
 from datetime import timedelta
 
+from dataclasses import dataclass
+
 from pathlib import Path
 
 from eth2validatorwizard.constants import *
@@ -19,7 +23,7 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import radiolist_dialog, button_dialog, input_dialog
 from prompt_toolkit.shortcuts.dialogs import _return_none, _create_app
 
-from typing import Optional, Callable
+from typing import Optional, Callable, List
 
 from prompt_toolkit.application import Application
 from prompt_toolkit.application.current import get_app
@@ -42,6 +46,88 @@ from prompt_toolkit.widgets import (
     TextArea,
     ValidationToolbar,
 )
+
+
+@dataclass
+class Step():
+    step_id: str
+    display_name: str
+    exc_function: Callable[[Step, dict, StepSequence], dict]
+
+
+@dataclass
+class StepSequence():
+    steps: List[Step]
+    save_state: Callable[[str, dict], bool]
+    context_factory: Optional[Callable[[], dict]] = None
+    _steps_index: Optional[dict] = None
+
+    def run_from_start(self, context: Optional[dict] = None) -> bool:
+        if self.steps is None or len(self.steps) == 0:
+            return False
+        
+        return self._run_from_index(0, context)
+
+    def run_from_step(self, step_id: str, context: Optional[dict] = None) -> bool:
+        if self._steps_index is None:
+            self._build_steps_index()
+        
+        if step_id not in self._steps_index:
+            return False
+        
+        step_index = self._steps_index[step_id]
+
+        return self._run_from_index(step_index, context)
+    
+    def get_step(self, step_id: str) -> Optional[Step]:
+        if self._steps_index is None:
+            self._build_steps_index()
+        
+        if step_id not in self._steps_index:
+            return None
+
+        step_index = self._steps_index[step_id]
+
+        return self.steps[step_index]
+
+    def _build_steps_index(self):
+        self._steps_index = {}
+
+        if self.steps is None:
+            return
+        
+        for index, step in enumerate(self.steps):
+            self._steps_index[step.step_id] = index
+
+    def _run_from_index(self, step_index: int, context: Optional[dict] = None) -> bool:
+        if self.steps is None or len(self.steps) == 0:
+            return False
+        
+        if step_index < 0 or step_index >= len(self.steps):
+            return False
+        
+        if context is None:
+            if self.context_factory is None:
+                context = {}
+            else:
+                context = self.context_factory()
+
+        for index in range(step_index, len(self.steps)):
+            current_step = self.steps[index]
+            self.save_state(current_step.step_id, context)
+
+            context = current_step.exc_function(current_step, context, self)
+
+        self.save_state(WIZARD_COMPLETED_STEP_ID, context)
+
+        return True
+
+def is_completed_state(state):
+    return (
+        state is not None and
+        'step' in state and
+        'context' in state and
+        state['step'] == WIZARD_COMPLETED_STEP_ID)
 
 def select_network(log):
     # Prompt for the selection on which network to perform the installation
@@ -830,6 +916,8 @@ def search_for_generated_keys(validator_keys_path):
     keystore_paths = []
     password_paths = []
 
+    validator_keys_path = Path(validator_keys_path)
+
     if validator_keys_path.is_dir():
         with os.scandir(validator_keys_path) as dir_it:
             for entry in dir_it:
@@ -845,7 +933,7 @@ def search_for_generated_keys(validator_keys_path):
                     password_paths.append(entry.path)
     
     return {
-        'validator_keys_path': validator_keys_path,
+        'validator_keys_path': str(validator_keys_path),
         'deposit_data_path': deposit_data_path,
         'keystore_paths': keystore_paths,
         'password_paths': password_paths
@@ -1192,3 +1280,11 @@ Make sure to check the beaconcha.in website for more details about your
 validator(s):
 {beaconcha_in_url}
 ''' )
+
+def test_context_variable(context, variable, log):
+    if variable not in context:
+        log.error(f'We expected {variable} to be in the context at this point but we could not '
+            f'find it. Here is the full context: {json.dumps(context)}')
+        return False
+    
+    return True

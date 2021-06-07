@@ -10,9 +10,12 @@ from eth2validatorwizard.platforms import (
     supported_platform,
     has_su_perm,
     init_logging,
-    quit_install
+    quit_install,
+    get_save_state,
+    get_load_state
 )
-from eth2validatorwizard.platforms import resume_step
+
+from eth2validatorwizard.platforms.common import StepSequence, is_completed_state
 
 def run():
     # Main entry point for the wizard.
@@ -31,29 +34,56 @@ def run():
         show_not_su()
         quit_install(platform)
     
-    # TODO: Detect if installation is already started and resume if needed
-    if resume_step(platform):
-        # We have resumed from a previous step, skip other steps
-        quit_install(platform)
-
     if not show_welcome():
         # User asked to quit
         quit_install(platform)
 
     self_update()
 
-    if not explain_overview():
-        # User asked to quit
-        quit_install(platform)
-
     steps = get_install_steps(platform)
     if not steps:
         # Steps were not found for the current platform
         print('No steps found for current platform')
-        quit_install()
+        quit_install(platform)
     
-    # Execute the platform dependent steps
-    steps()
+    save_state = get_save_state(platform)
+    if not save_state:
+        # save_state was not found for the current platform
+        print('No save state found for current platform')
+        quit_install(platform)
+    
+    sequence = StepSequence(steps=steps(), save_state=save_state)
+
+    # Detect if installation is already started and resume if needed
+    saved_state = get_load_state(platform)()
+    if (
+        saved_state is not None and
+        'step' in saved_state and
+        'context' in saved_state
+        ):
+        # We might be able to resume from an earlier execution
+        if is_completed_state(saved_state):
+            # TODO: Add features for when we already completed the wizard
+            print('Wizard was already completed.')
+            quit_install(platform)
+        
+        saved_step = sequence.get_step(saved_state['step'])
+        if saved_step is not None:
+            # Prompt the user to see if he wants to resume from saved_step
+            resume_result = prompt_resume(saved_step)
+            if not resume_result:
+                # User asked to quit
+                quit_install(platform)
+            elif resume_result == 1:
+                return sequence.run_from_step(saved_step.step_id, saved_state['context'])
+
+    # Start a brand new installation
+    if not explain_overview():
+        # User asked to quit
+        quit_install(platform)
+
+    # Execute the platform dependent steps from the start
+    return sequence.run_from_start()
 
 def show_welcome():
     # Show a welcome message about this wizard
@@ -77,6 +107,29 @@ to get in touch with the ethstaker community on:
         buttons=[
             ('Start', True),
             ('Quit', False)
+        ]
+    ).run()
+
+    return result
+
+def prompt_resume(step):
+    # Show prompt for user to resume from a previous step
+
+    result = button_dialog(
+        title='Previous installation found',
+        text=(HTML(
+f'''
+It seems like you already started the wizard previously.
+
+You were at following step: <b>{step.display_name}</b>
+
+Would you like to resume at this step or restart the full setup from the
+beginning?
+'''     )),
+        buttons=[
+            ('Resume', 1),
+            ('Restart', 2),
+            ('Quit', False),
         ]
     ).run()
 

@@ -51,8 +51,6 @@ from eth2validatorwizard.platforms.common import (
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog, input_dialog
 
-RESUME_CHOCOLATEY = 'resume_chocolatey'
-
 log = logging.getLogger(__name__)
 
 def installation_steps(*args, **kwargs):
@@ -128,6 +126,14 @@ def installation_steps(*args, **kwargs):
     show_public_keys(selected_network, obtained_keys, public_keys, log)
 
     quit_install()
+
+def save_state(step_id: str, context: dict) -> bool:
+    # TODO: Implement save_state
+    return True
+
+def load_state() -> Optional[dict]:
+    # TODO: Implement load_state
+    return None
 
 def quit_install():
     print('Press enter to quit')

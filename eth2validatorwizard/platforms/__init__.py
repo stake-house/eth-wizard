@@ -140,13 +140,24 @@ def get_install_steps(platform):
     
     return False
 
-def resume_step(platform):
-    if platform == PLATFORM_WINDOWS10:
-        from eth2validatorwizard.platforms.windows10 import RESUME_CHOCOLATEY
-        if RESUME_CHOCOLATEY in sys.argv:
-            from eth2validatorwizard.platforms.windows10 import installation_steps as windows10_steps
-            windows10_steps(resume_chocolatey=True)
-            return True
+def get_save_state(platform):
+    if platform == PLATFORM_UBUNTU:
+        from eth2validatorwizard.platforms.ubuntu import save_state as ubuntu_save_state
+        return ubuntu_save_state
+
+    elif platform == PLATFORM_WINDOWS10:
+        from eth2validatorwizard.platforms.windows10 import save_state as windows10_save_state
+        return windows10_save_state
     
     return False
-        
+
+def get_load_state(platform):
+    if platform == PLATFORM_UBUNTU:
+        from eth2validatorwizard.platforms.ubuntu import load_state as ubuntu_load_state
+        return ubuntu_load_state
+
+    elif platform == PLATFORM_WINDOWS10:
+        from eth2validatorwizard.platforms.windows10 import load_state as windows10_load_state
+        return windows10_load_state
+    
+    return False
