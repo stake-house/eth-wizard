@@ -380,7 +380,8 @@ def installation_steps():
             # We are missing context variables, we cannot continue
             quit_install()
         
-        show_public_keys(selected_network, obtained_keys, public_keys, log)
+        show_public_keys(context[selected_network], context[obtained_keys], context[public_keys],
+            log)
 
         return context
     
