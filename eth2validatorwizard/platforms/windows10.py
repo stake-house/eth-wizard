@@ -78,57 +78,232 @@ def installation_steps(*args, **kwargs):
 
     select_directory_step = Step(
         step_id=SELECT_DIRECTORY_STEP_ID,
-        display_name='Select ethereum directory',
+        display_name='Ethereum directory selection',
         exc_function=select_directory_function
     )
 
+    def select_network_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+
+        if selected_network not in context:
+            context[selected_network] = select_network(log)
+            step_sequence.save_state(step.step_id, context)
+
+        if not context[selected_network]:
+            # User asked to quit
+            del context[selected_network]
+            step_sequence.save_state(step.step_id, context)
+
+            quit_install()
+        
+        return context
+    
+    select_network_step = Step(
+        step_id=SELECT_NETWORK_STEP_ID,
+        display_name='Network selection',
+        exc_function=select_network_function
+    )
+
+    def select_custom_ports_function(step, context, step_sequence):
+        # Context variables
+        selected_ports = CTX_SELECTED_PORTS
+
+        if selected_ports not in context:
+            context[selected_ports] = {
+                'eth1': DEFAULT_GETH_PORT,
+                'eth2_bn': DEFAULT_LIGHTHOUSE_BN_PORT
+            }
+        
+        context[selected_ports] = select_custom_ports(context[selected_ports])
+        if not context[selected_ports]:
+            # User asked to quit or error
+            del context[selected_ports]
+            step_sequence.save_state(step.step_id, context)
+
+            quit_install()
+        
+        return context
+
+    select_custom_ports_step = Step(
+        step_id=SELECT_CUSTOM_PORTS_STEP_ID,
+        display_name='Open ports configuration',
+        exc_function=select_custom_ports_function
+    )
+
+    def create_firewall_rule_function(step, context, step_sequence):
+        # Context variables
+        selected_ports = CTX_SELECTED_PORTS
+
+        if not (
+            test_context_variable(context, selected_ports, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+        
+        if not create_firewall_rule(context[selected_ports]):
+            # User asked to quit or error
+            quit_install()
+        
+        return context
+
+    create_firewall_rule_step = Step(
+        step_id=CREATE_FIREWALL_RULE_STEP_ID,
+        display_name='Firewall rules creation',
+        exc_function=create_firewall_rule_function
+    )
+
+    def install_chocolatey_function(step, context, step_sequence):
+
+        if not install_chocolatey():
+            # We could not install chocolatey
+            quit_install()
+
+        return context
+
+    install_chocolatey_step = Step(
+        step_id=INSTALL_CHOCOLATEY_STEP_ID,
+        display_name='Chocolatey installation',
+        exc_function=install_chocolatey_function
+    )
+
+    def install_nssm_function(step, context, step_sequence):
+
+        if not install_nssm():
+            # We could not install nssm
+            quit_install()
+
+        return context
+    
+    install_nssm_step = Step(
+        step_id=INSTALL_NSSM_STEP_ID,
+        display_name='NSSM installation',
+        exc_function=install_nssm_function
+    )
+
+    def install_geth_function(step, context, step_sequence):
+        # Context variables
+        selected_directory = CTX_SELECTED_DIRECTORY
+        selected_network = CTX_SELECTED_NETWORK
+        selected_ports = CTX_SELECTED_PORTS
+
+        if not (
+            test_context_variable(context, selected_directory, log) and
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, selected_ports, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+
+        if not install_geth(context[selected_directory], context[selected_network],
+            context[selected_ports]):
+            # User asked to quit or error
+            quit_install()
+
+        return context
+    
+    install_geth_step = Step(
+        step_id=INSTALL_GETH_STEP_ID,
+        display_name='Geth installation',
+        exc_function=install_geth_function
+    )
+
+    def obtain_keys_function(step, context, step_sequence):
+        # Context variables
+        selected_directory = CTX_SELECTED_DIRECTORY
+        selected_network = CTX_SELECTED_NETWORK
+        obtained_keys = CTX_OBTAINED_KEYS
+
+        if not (
+            test_context_variable(context, selected_directory, log) and
+            test_context_variable(context, selected_network, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+        
+        if obtained_keys not in context:
+            context[obtained_keys] = obtain_keys(context[selected_directory],
+                context[selected_network])
+            step_sequence.save_state(step.step_id, context)
+
+        if not context[obtained_keys]:
+            # User asked to quit
+            del context[obtained_keys]
+            step_sequence.save_state(step.step_id, context)
+
+            quit_install()
+
+        return context
+
+    obtain_keys_step = Step(
+        step_id=OBTAIN_KEYS_STEP_ID,
+        display_name='Importing or generating keys',
+        exc_function=obtain_keys_function
+    )
+
+    def install_teku_function(step, context, step_sequence):
+        # Context variables
+        selected_directory = CTX_SELECTED_DIRECTORY
+        selected_network = CTX_SELECTED_NETWORK
+        obtained_keys = CTX_OBTAINED_KEYS
+        selected_ports = CTX_SELECTED_PORTS
+
+        if not (
+            test_context_variable(context, selected_directory, log) and
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, obtained_keys, log) and
+            test_context_variable(context, selected_ports, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+        
+        if not install_teku(context[selected_directory], context[selected_network],
+            context[obtained_keys], context[selected_ports]):
+            # User asked to quit or error
+            quit_install()
+
+        return context
+    
+    install_teku_step = Step(
+        step_id=INSTALL_TEKU_STEP_ID,
+        display_name='Teku installation',
+        exc_function=install_teku_function
+    )
+
+    def test_open_ports_function(step, context, step_sequence):
+        # Context variables
+        selected_ports = CTX_SELECTED_PORTS
+
+        if not (
+            test_context_variable(context, selected_ports, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+        
+        if not test_open_ports(context[selected_ports], log):
+            # User asked to quit or error
+            quit_install()
+
+        return context
+
+    test_open_ports_step = Step(
+        step_id=TEST_OPEN_PORTS_STEP_ID,
+        display_name='Testing open ports',
+        exc_function=test_open_ports_function
+    )
+
     return [
-        select_directory_step
+        select_directory_step,
+        select_network_step,
+        select_custom_ports_step,
+        create_firewall_rule_step,
+        install_chocolatey_step,
+        install_nssm_step,
+        install_geth_step,
+        obtain_keys_step,
+        install_teku_step,
+        test_open_ports_step
     ]
-
-    selected_network = select_network(log)
-    if not selected_network:
-        # User asked to quit
-        quit_install()
-
-    selected_ports = {
-        'eth1': DEFAULT_GETH_PORT,
-        'eth2_bn': DEFAULT_TEKU_BN_PORT
-    }
-
-    selected_ports = select_custom_ports(selected_ports)
-    if not selected_ports:
-        # User asked to quit or error
-        quit_install()
-
-    if not create_firewall_rule(selected_ports):
-        # User asked to quit or error
-        quit_install()
-    
-    if not install_chocolatey():
-        # We could not install chocolatey
-        quit_install()
-
-    if not install_nssm():
-        # We could not install nssm
-        quit_install()
-
-    if not install_geth(selected_directory, selected_network, selected_ports):
-        # User asked to quit or error
-        quit_install()
-    
-    obtained_keys = obtain_keys(selected_directory, selected_network)
-    if not obtained_keys:
-        # User asked to quit or error
-        quit_install()
-
-    if not install_teku(selected_directory, selected_network, obtained_keys, selected_ports):
-        # User asked to quit or error
-        quit_install()
-    
-    if not test_open_ports(selected_ports, log):
-        # User asked to quit or error
-        quit_install()
 
     if not install_monitoring(selected_directory):
         # User asked to quit or error
@@ -477,7 +652,7 @@ If the directory does not exist, we will attempt to create it for you.
         # User clicked the cancel button
         return False
 
-    return Path(selected_directory)
+    return selected_directory
 
 def directory_validator(directory):
     try:
