@@ -811,6 +811,8 @@ def get_nssm_binary():
 def install_geth(base_directory, network, ports):
     # Install geth for the selected network
 
+    base_directory = Path(base_directory)
+
     nssm_binary = get_nssm_binary()
     if not nssm_binary:
         return False
@@ -1907,6 +1909,8 @@ Do you want to skip installing the JRE?
 def install_teku(base_directory, network, keys, ports):
     # Install Teku for the selected network
 
+    base_directory = Path(base_directory)
+
     nssm_binary = get_nssm_binary()
     if not nssm_binary:
         return False
@@ -2670,6 +2674,8 @@ Connected Peers: {result['bn_connected_peers']}
 def obtain_keys(base_directory, network):
     # Obtain validator keys for the selected network
 
+    base_directory = Path(base_directory)
+
     # Check if there are keys already created
     keys_path = base_directory.joinpath('var', 'lib', 'eth2', 'keys')
 
@@ -3134,6 +3140,8 @@ the local system account can access the keys and the password file.
 def initiate_deposit(base_directory, network, keys):
     # Initiate and explain the deposit on launchpad
 
+    base_directory = Path(base_directory)
+
     launchpad_url = LAUNCHPAD_URLS[network]
     currency = NETWORK_CURRENCY[network]
 
@@ -3408,6 +3416,8 @@ Would you like to disable automatic Windows updates?
     return True
 
 def install_monitoring(base_directory):
+
+    base_directory = Path(base_directory)
 
     result = button_dialog(
         title='Monitoring installation',
