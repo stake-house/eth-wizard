@@ -35,11 +35,11 @@ BN_MIN_FEW_PEERS = 10.0
 EXE_MIN_FEW_PEERS = 10.0
 
 PGP_KEY_SERVERS = [
-    'pool.sks-keyservers.net',
-    'pgp.mit.edu',
-    'keyserver.ubuntu.com',
-    'keys.gnupg.net',
-    'pgp.key-server.io'
+    'hkp://pool.sks-keyservers.net',
+    'hkps://pgp.mit.edu',
+    'hkps://keyserver.ubuntu.com',
+    'hkp://keys.gnupg.net',
+    'hkps://pgp.key-server.io'
 ]
 
 LINUX_SAVE_DIRECTORY = '/var/lib/eth2validatorwizard'
