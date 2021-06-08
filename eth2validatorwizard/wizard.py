@@ -75,7 +75,9 @@ def run():
                 # User asked to quit
                 quit_install(platform)
             elif resume_result == 1:
-                return sequence.run_from_step(saved_step.step_id, saved_state['context'])
+                # Execute the platform dependent steps from the saved step
+                sequence.run_from_step(saved_step.step_id, saved_state['context'])
+                quit_install(platform)
 
     # Start a brand new installation
     if not explain_overview():
@@ -83,7 +85,8 @@ def run():
         quit_install(platform)
 
     # Execute the platform dependent steps from the start
-    return sequence.run_from_start()
+    sequence.run_from_start()
+    quit_install(platform)
 
 def show_welcome():
     # Show a welcome message about this wizard

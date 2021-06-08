@@ -292,6 +292,138 @@ def installation_steps(*args, **kwargs):
         exc_function=test_open_ports_function
     )
 
+    def install_monitoring_function(step, context, step_sequence):
+        # Context variables
+        selected_directory = CTX_SELECTED_DIRECTORY
+
+        if not (
+            test_context_variable(context, selected_directory, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+        
+        if not install_monitoring(context[selected_directory]):
+            # User asked to quit or error
+            quit_install()
+
+        return context
+    
+    install_monitoring_step = Step(
+        step_id=INSTALL_MONITORING_STEP_ID,
+        display_name='Monitoring installation',
+        exc_function=install_monitoring_function
+    )
+
+    def improve_time_sync_function(step, context, step_sequence):
+        if not improve_time_sync():
+            # User asked to quit or error
+            quit_install()
+
+        return context
+
+    improve_time_sync_step = Step(
+        step_id=IMPROVE_TIME_SYNC_STEP_ID,
+        display_name='Improve time synchronization',
+        exc_function=improve_time_sync_function
+    )
+
+    def disable_windows_updates_function(step, context, step_sequence):
+        if not disable_windows_updates():
+            # User asked to quit or error
+            quit_install()
+
+        return context
+
+    disable_windows_updates_step = Step(
+        step_id=DISABLE_WINDOWS_UPDATES_STEP_ID,
+        display_name='Disable automatic Windows updates',
+        exc_function=disable_windows_updates_function
+    )
+
+    def initiate_deposit_function(step, context, step_sequence):
+        # Context variables
+        selected_directory = CTX_SELECTED_DIRECTORY
+        selected_network = CTX_SELECTED_NETWORK
+        obtained_keys = CTX_OBTAINED_KEYS
+        public_keys = CTX_PUBLIC_KEYS
+
+        if not (
+            test_context_variable(context, selected_directory, log) and
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, obtained_keys, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+        
+        if public_keys not in context:
+            context[public_keys] = initiate_deposit(context[selected_directory],
+                context[selected_network], context[obtained_keys])
+            step_sequence.save_state(step.step_id, context)
+
+        if not context[public_keys]:
+            # User asked to quit
+            del context[public_keys]
+            step_sequence.save_state(step.step_id, context)
+
+            quit_install()
+
+        return context
+
+    initiate_deposit_step = Step(
+        step_id=INITIATE_DEPOSIT_STEP_ID,
+        display_name='Deposit on the launchpad',
+        exc_function=initiate_deposit_function
+    )
+
+    def show_whats_next_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        obtained_keys = CTX_OBTAINED_KEYS
+        public_keys = CTX_PUBLIC_KEYS
+
+        if not (
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, obtained_keys, log) and
+            test_context_variable(context, public_keys, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+
+        show_whats_next(context[selected_network], context[obtained_keys], context[public_keys])
+
+        return context
+    
+    show_whats_next_step = Step(
+        step_id=SHOW_WHATS_NEXT_STEP_ID,
+        display_name='Installation completed',
+        exc_function=show_whats_next_function
+    )
+
+    def show_public_keys_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        obtained_keys = CTX_OBTAINED_KEYS
+        public_keys = CTX_PUBLIC_KEYS
+
+        if not (
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, obtained_keys, log) and
+            test_context_variable(context, public_keys, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+        
+        show_public_keys(context[selected_network], context[obtained_keys], context[public_keys],
+            log)
+
+        return context
+    
+    show_public_keys_step = Step(
+        step_id=SHOW_PUBLIC_KEYS_STEP_ID,
+        display_name='Show public keys',
+        exc_function=show_public_keys_function
+    )
+
     return [
         select_directory_step,
         select_network_step,
@@ -302,31 +434,14 @@ def installation_steps(*args, **kwargs):
         install_geth_step,
         obtain_keys_step,
         install_teku_step,
-        test_open_ports_step
+        test_open_ports_step,
+        install_monitoring_step,
+        improve_time_sync_step,
+        disable_windows_updates_step,
+        initiate_deposit_step,
+        show_whats_next_step,
+        show_public_keys_step
     ]
-
-    if not install_monitoring(selected_directory):
-        # User asked to quit or error
-        quit_install()
-    
-    if not improve_time_sync():
-        # User asked to quit or error
-        quit_install()
-    
-    if not disable_windows_updates():
-        # User asked to quit or error
-        quit_install()
-    
-    public_keys = initiate_deposit(selected_directory, selected_network, obtained_keys)
-    if not public_keys:
-        # User asked to quit or error
-        quit_install()
-
-    show_whats_next(selected_network, obtained_keys, public_keys)
-
-    show_public_keys(selected_network, obtained_keys, public_keys, log)
-
-    quit_install()
 
 def save_state(step_id: str, context: dict) -> bool:
     # Save wizard state
