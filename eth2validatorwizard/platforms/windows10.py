@@ -2263,7 +2263,7 @@ Do you want to remove this directory first and start from nothing?
         str(nssm_binary), 'start', teku_service_name
     ])
 
-    delay = 15
+    delay = 30
     log.info(f'We are giving {delay} seconds for the teku service to start properly.')
     time.sleep(delay)
 
