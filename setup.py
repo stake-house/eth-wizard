@@ -61,6 +61,8 @@ def include_requirements(target_path):
             
             if entry.name.startswith('humanize'):
                 continue
+            if entry.name.startswith('setuptools'):
+                continue
 
             if entry.name.endswith('.dist-info'):
                 shutil.rmtree(entry.path)
