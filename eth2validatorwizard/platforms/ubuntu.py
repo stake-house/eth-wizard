@@ -1711,20 +1711,28 @@ Do you want to skip installing the lighthouse binary?
             'apt', '-y', 'install', 'gpg'])
 
         # Verify PGP signature
-        command_line = ['gpg', '--keyserver', 'pool.sks-keyservers.net', '--recv-keys',
+
+        retry_index = 0
+        retry_count = 10
+
+        key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+        command_line = ['gpg', '--keyserver', key_server, '--recv-keys',
             LIGHTHOUSE_PRIME_PGP_KEY_ID]
         process_result = subprocess.run(command_line)
 
-        retry_count = 5
         if process_result.returncode != 0:
             # GPG failed to download Sigma Prime's PGP key, let's wait and retry a few times
-            retry_index = 0
             while process_result.returncode != 0 and retry_index < retry_count:
                 retry_index = retry_index + 1
-                delay = 10
+                delay = 15
                 log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
                     f'and try again.')
                 time.sleep(delay)
+
+                key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+                command_line = ['gpg', '--keyserver', key_server, '--recv-keys',
+                    LIGHTHOUSE_PRIME_PGP_KEY_ID]
+
                 process_result = subprocess.run(command_line)
         
         if process_result.returncode != 0:

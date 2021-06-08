@@ -34,6 +34,14 @@ MIN_AVAILABLE_RAM_GB = 12.0
 BN_MIN_FEW_PEERS = 10.0
 EXE_MIN_FEW_PEERS = 10.0
 
+PGP_KEY_SERVERS = [
+    'pool.sks-keyservers.net',
+    'pgp.mit.edu',
+    'keyserver.ubuntu.com',
+    'keys.gnupg.net',
+    'pgp.key-server.io'
+]
+
 LINUX_SAVE_DIRECTORY = '/var/lib/eth2validatorwizard'
 STATE_FILE = 'wizardstate.json'
 
