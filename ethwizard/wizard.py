@@ -1,11 +1,11 @@
 import sys
 
-from eth2validatorwizard import __version__
+from ethwizard import __version__
 
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog
 
-from eth2validatorwizard.platforms import (
+from ethwizard.platforms import (
     get_install_steps,
     supported_platform,
     has_su_perm,
@@ -15,7 +15,7 @@ from eth2validatorwizard.platforms import (
     get_load_state
 )
 
-from eth2validatorwizard.platforms.common import StepSequence, is_completed_state
+from ethwizard.platforms.common import StepSequence, is_completed_state
 
 def run():
     # Main entry point for the wizard.
@@ -92,13 +92,13 @@ def show_welcome():
     # Show a welcome message about this wizard
 
     result = button_dialog(
-        title='Eth2 Validator Wizard',
+        title='Ethereum Wizard',
         text=(
 '''
-Welcome to the Eth2 Validator Wizard!
+Welcome to the Ethereum Wizard!
 
 This setup assistant is meant to guide anyone through the different steps
-to become a fully functional validator on the Ethereum 2.0 network. It will
+to become a fully functional validator on the Ethereum network. It will
 install and configure all the software needed to become a validator.
 
 If you have any question or if you need additional support, make sure
@@ -150,8 +150,8 @@ def show_not_su():
         title='Not a super user',
         text=(
 '''
-The Eth2 Validator Wizard needs to have super user permissions in order
-to proceed.
+The Ethereum Wizard needs to have super user permissions in order to
+proceed.
 
 A simple way to give the wizard these permissions is to start it with sudo.
 '''     ),
@@ -168,14 +168,14 @@ def explain_overview():
         text=(
 '''
 Here is an overview of the different steps required to become an active
-validator on an Ethereum 2.0 network.
+validator on an Ethereum network.
 
 * Consolidate 32 ETH for each active validator you want (You can have
 a large amount of active validators using a single machine and this setup)
 * Install an Eth1 client and let it synchronize
 * Generate your validator(s) keys
-* Install an Eth2 beacon node and let it synchronize
-* Install an Eth2 validator client and import your key(s)
+* Install an Ethereum beacon node and let it synchronize
+* Install an Ethereum validator client and import your key(s)
 * Perform the 32 ETH deposit for each validator
 * Wait for your validator(s) to become active (can take a few hours/days)
 '''     ),
@@ -194,7 +194,7 @@ def show_unsupported_platform():
         title='Platform not supported',
         text=(HTML(
 '''
-The Eth2 Validator Wizard has no support for your platform. We only support
+The Ethereum Wizard has no support for your platform. We only support
 the following platforms:
 
 * <b>Ubuntu 20.04</b> (x86_64)

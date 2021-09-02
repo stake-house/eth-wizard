@@ -1,11 +1,11 @@
-# eth2-validator-wizard
-An Eth2 validator installation wizard meant to guide anyone through the different steps to become a fully functional validator on the Ethereum 2.0 network. It will install and configure all the software needed to become a validator.
+# eth-wizard
+An Ethereum validator installation wizard meant to guide anyone through the different steps to become a fully functional validator on the Ethereum network. It will install and configure all the software needed to become a validator.
 
 This project is part of [the larger StakeHouse community](https://github.com/stake-house/stakehouse).
 
 ## Disclaimer
 
-The eth2-validator-wizard should be stable enough to be used by everyone. It was never audited and it might still have some issues. Support is offered through [the EthStaker community](https://ethstaker.cc/).
+The eth-wizard should be stable enough to be used by everyone. It was never audited and it might still have some issues. Support is offered through [the EthStaker community](https://ethstaker.cc/).
 
 ## Goals
 
@@ -27,16 +27,16 @@ The eth2-validator-wizard should be stable enough to be used by everyone. It was
 You can use something like this in a terminal, to start the wizard:
 
 ```
-wget https://github.com/stake-house/eth2-validator-wizard/releases/download/v0.7.1/eth2validatorwizard-0.7.1.pyz && sudo python3 eth2validatorwizard-0.7.1.pyz
+wget https://github.com/stake-house/eth-wizard/releases/download/v0.7.1/eth2validatorwizard-0.7.1.pyz && sudo python3 eth2validatorwizard-0.7.1.pyz
 ```
 
 ### On Windows 10
 
 Please note that some antivirus software might detect the wizard binary as a threat and delete it or prevent its execution.
 
-Download and run [the wizard binary](https://github.com/stake-house/eth2-validator-wizard/releases/download/v0.7.1/eth2validatorwizard-0.7.1.exe)
+Download and run [the wizard binary](https://github.com/stake-house/eth-wizard/releases/download/v0.7.1/eth2validatorwizard-0.7.1.exe)
 
-As an alternative, you can download and install [a recent version of Python](https://www.python.org/downloads/) (make sure to select the option for file associations which is included in the default *Install Now* option), download [the latest pyz bundle](https://github.com/stake-house/eth2-validator-wizard/releases/download/v0.7.1/eth2validatorwizard-0.7.1.pyz) and double-click on it. This alternative is less likely to trigger your antivirus software.
+As an alternative, you can download and install [a recent version of Python](https://www.python.org/downloads/) (make sure to select the option for file associations which is included in the default *Install Now* option), download [the latest pyz bundle](https://github.com/stake-house/eth-wizard/releases/download/v0.7.1/eth2validatorwizard-0.7.1.pyz) and double-click on it. This alternative is less likely to trigger your antivirus software.
 
 ## Support
 

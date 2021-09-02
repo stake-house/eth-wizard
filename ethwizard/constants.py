@@ -178,9 +178,9 @@ ADOPTOPENJDK_11_API_PARAMs = {
 }
 
 TEKU_SERVICE_DISPLAY_NAME = {
-    NETWORK_MAINNET: 'Teku Eth2 Client (Mainnet)',
-    NETWORK_PYRMONT: 'Teku Eth2 Client (Pyrmont)',
-    NETWORK_PRATER: 'Teku Eth2 Client (Prater)'
+    NETWORK_MAINNET: 'Teku Ethereum Client (Mainnet)',
+    NETWORK_PYRMONT: 'Teku Ethereum Client (Pyrmont)',
+    NETWORK_PRATER: 'Teku Ethereum Client (Prater)'
 }
 
 TEKU_ARGUMENTS = {
@@ -41620,7 +41620,7 @@ LIGHTHOUSE_BN_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (
 '''
 [Unit]
-Description=Lighthouse Eth2 Client Beacon Node (Mainnet)
+Description=Lighthouse Ethereum Client Beacon Node (Mainnet)
 Wants=network-online.target
 After=network-online.target
 
@@ -41638,7 +41638,7 @@ WantedBy=multi-user.target
     NETWORK_PYRMONT: (
 '''
 [Unit]
-Description=Lighthouse Eth2 Client Beacon Node (Pyrmont)
+Description=Lighthouse Ethereum Client Beacon Node (Pyrmont)
 Wants=network-online.target
 After=network-online.target
 
@@ -41656,7 +41656,7 @@ WantedBy=multi-user.target
     NETWORK_PRATER: (
 '''
 [Unit]
-Description=Lighthouse Eth2 Client Beacon Node (Prater)
+Description=Lighthouse Ethereum Client Beacon Node (Prater)
 Wants=network-online.target
 After=network-online.target
 
@@ -41677,7 +41677,7 @@ LIGHTHOUSE_VC_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (
 '''
 [Unit]
-Description=Lighthouse Eth2 Client Validator Client (Mainnet)
+Description=Lighthouse Ethereum Client Validator Client (Mainnet)
 Wants=network-online.target
 After=network-online.target
 
@@ -41695,7 +41695,7 @@ WantedBy=multi-user.target
     NETWORK_PYRMONT: (
 '''
 [Unit]
-Description=Lighthouse Eth2 Client Validator Client (Pyrmont)
+Description=Lighthouse Ethereum Client Validator Client (Pyrmont)
 Wants=network-online.target
 After=network-online.target
 
@@ -41713,7 +41713,7 @@ WantedBy=multi-user.target
     NETWORK_PRATER: (
 '''
 [Unit]
-Description=Lighthouse Eth2 Client Validator Client (Prater)
+Description=Lighthouse Ethereum Client Validator Client (Prater)
 Wants=network-online.target
 After=network-online.target
 

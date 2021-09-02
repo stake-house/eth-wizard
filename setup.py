@@ -8,7 +8,7 @@ from pathlib import Path
 
 from setuptools import Command
 
-with open('eth2validatorwizard/__init__.py', 'rt') as f:
+with open('ethwizard/__init__.py', 'rt') as f:
     version = re.search(r'__version__ = \'(.*?)\'', f.read()).group(1)
 
 def get_python_binary():
@@ -69,7 +69,7 @@ def include_requirements(target_path):
 
 def create_zipapp():
     project_path = Path(os.getcwd())
-    src_package_path = Path(project_path, 'eth2validatorwizard')
+    src_package_path = Path(project_path, 'ethwizard')
 
     python_binary = get_python_binary()
 
@@ -81,7 +81,7 @@ def create_zipapp():
     build_path.mkdir(parents=True, exist_ok=True)
 
     # Copy package into build dir
-    build_package_path = Path(build_path, 'eth2validatorwizard')
+    build_package_path = Path(build_path, 'ethwizard')
     shutil.copytree(src_package_path, build_package_path)
 
     # Copy __main__.py into build root
@@ -95,7 +95,7 @@ def create_zipapp():
     dist_path = Path(project_path, 'dist')
     dist_path.mkdir(parents=True, exist_ok=True)
 
-    bundle_name = f'eth2validatorwizard-{version}.pyz'
+    bundle_name = f'ethwizard-{version}.pyz'
     bundle_path = Path(dist_path, bundle_name)
     if bundle_path.is_file():
         bundle_path.unlink()
@@ -127,7 +127,7 @@ class Bundle(Command):
         dist_path = Path(project_path, 'dist')
         dist_path.mkdir(parents=True, exist_ok=True)
 
-        bundle_name = f'eth2validatorwizard-{version}.pyz'
+        bundle_name = f'ethwizard-{version}.pyz'
 
         # Sign bundle with GPG key
         bundle_sign_name = f'{bundle_name}.asc'
@@ -181,7 +181,7 @@ class BundleWin(Command):
             return
 
         project_path = Path(os.getcwd())
-        src_package_path = Path(project_path, 'eth2validatorwizard')
+        src_package_path = Path(project_path, 'ethwizard')
 
         build_path = Path(project_path, 'build')
         if build_path.is_dir():
@@ -194,9 +194,9 @@ class BundleWin(Command):
             config_file.write(
 f'''
 ;!@Install@!UTF-8!
-Title="Eth2 Validator Wizard {version}"
+Title="Ethereum Wizard {version}"
 ExecuteFile="python.exe"
-ExecuteParameters="-m eth2validatorwizard"
+ExecuteParameters="-m ethwizard"
 ;!@InstallEnd@!
 '''         )
 
@@ -266,7 +266,7 @@ ExecuteParameters="-m eth2validatorwizard"
             return
         
         # Copy package into archive dir
-        archive_package_path = archive_dir_path.joinpath('eth2validatorwizard')
+        archive_package_path = archive_dir_path.joinpath('ethwizard')
         shutil.copytree(src_package_path, archive_package_path)
 
         include_requirements(archive_dir_path)
@@ -282,7 +282,7 @@ ExecuteParameters="-m eth2validatorwizard"
         dist_path = Path(project_path, 'dist')
         dist_path.mkdir(parents=True, exist_ok=True)
 
-        dist_binary = dist_path.joinpath(f'eth2validatorwizard-{version}.exe')
+        dist_binary = dist_path.joinpath(f'ethwizard-{version}.exe')
         if dist_binary.is_file():
             dist_binary.unlink()
         

@@ -13,11 +13,11 @@ import logging.handlers
 
 from pathlib import Path
 
-from eth2validatorwizard import __version__
+from ethwizard import __version__
 
-from eth2validatorwizard.constants import *
+from ethwizard.constants import *
 
-from eth2validatorwizard.platforms.common import (
+from ethwizard.platforms.common import (
     select_network,
     select_custom_ports,
     select_eth1_fallbacks,
@@ -579,7 +579,7 @@ def test_disk_speed():
         'apt', '-y', 'install', 'fio'])
     
     # Run fio test
-    fio_path = Path(Path.home(), 'eth2validatorwizard', 'fio')
+    fio_path = Path(Path.home(), 'ethwizard', 'fio')
     fio_path.mkdir(parents=True, exist_ok=True)
 
     fio_target_filename = 'random_read_write.fio'
@@ -701,7 +701,7 @@ def test_internet_speed():
 
     # Downloading speedtest script
     log.info('Downloading speedtest-cli script to test internet speed...')
-    download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
+    download_path = Path(Path.home(), 'ethwizard', 'downloads')
     download_path.mkdir(parents=True, exist_ok=True)
 
     script_path = Path(download_path, 'speedtest-cli')
@@ -1671,7 +1671,7 @@ Do you want to skip installing the lighthouse binary?
             return False
         
         # Downloading latest Lighthouse release files
-        download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
+        download_path = Path(Path.home(), 'ethwizard', 'downloads')
         download_path.mkdir(parents=True, exist_ok=True)
 
         binary_path = Path(download_path, binary_asset['file_name'])
@@ -2212,7 +2212,7 @@ def obtain_keys(network):
     # Obtain validator keys for the selected network
 
     # Check if there are keys already imported
-    eth2_deposit_cli_path = Path(Path.home(), 'eth2validatorwizard', 'eth2depositcli')
+    eth2_deposit_cli_path = Path(Path.home(), 'ethwizard', 'eth2depositcli')
     validator_keys_path = Path(eth2_deposit_cli_path, 'validator_keys')
 
     lighthouse_datadir = Path('/var/lib/lighthouse')
@@ -2510,7 +2510,7 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
                 log.warning('No eth2.0-deposit-cli checksum found in Github release')
             
             # Downloading latest eth2.0-deposit-cli release files
-            download_path = Path(Path.home(), 'eth2validatorwizard', 'downloads')
+            download_path = Path(Path.home(), 'ethwizard', 'downloads')
             download_path.mkdir(parents=True, exist_ok=True)
 
             binary_path = Path(download_path, binary_asset['file_name'])
@@ -2880,7 +2880,7 @@ during the key generation step. A copy of your deposit file can be found in
 
 {deposit_file_copy_path}
 
-On the Eth2 Launchpad website, you will be asked a few questions and it
+On the Ethereum Launchpad website, you will be asked a few questions and it
 will explain some of the risks and mitigation strategies. Make sure to read
 everything carefully and make sure you understand it all. When you are
 ready, go to the following URL in your browser:

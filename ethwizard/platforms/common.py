@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from pathlib import Path
 
-from eth2validatorwizard.constants import *
+from ethwizard.constants import *
 
 from asyncio import get_event_loop
 
@@ -475,8 +475,8 @@ f'''
 Please enter your beacon node URL:
 
 It usually starts with 'https://' and it should point to the root of a
-running beacon node on the <b>{network.capitalize()}</b> Ethereum 2.0 network that supports the
-Eth2 Beacon Node API. It should implement these endpoints:
+running beacon node on the <b>{network.capitalize()}</b> Ethereum network that supports the
+Ethereum Beacon Node API. It should implement these endpoints:
 
 - {BN_DEPOSIT_CONTRACT_URL}
 - {BN_FINALIZED_STATE_URL}
@@ -1267,7 +1267,7 @@ def show_public_keys(network, keys, public_keys, log):
 
     log.info(
 f'''
-Eth2 Validator Wizard completed!
+Ethereum Wizard completed!
 
 Network: {network.capitalize()}
 Number of validator(s): {len(keys['keystore_paths'])}

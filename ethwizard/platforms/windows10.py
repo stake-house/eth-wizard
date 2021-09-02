@@ -29,11 +29,11 @@ from collections.abc import Collection
 
 from functools import partial
 
-from eth2validatorwizard import __version__
+from ethwizard import __version__
 
-from eth2validatorwizard.constants import *
+from ethwizard.constants import *
 
-from eth2validatorwizard.platforms.common import (
+from ethwizard.platforms.common import (
     select_network,
     select_custom_ports,
     select_initial_state,
@@ -455,7 +455,7 @@ def save_state(step_id: str, context: dict) -> bool:
     if not app_data.is_dir():
         return False
     
-    app_dir = app_data.joinpath('eth2-validator-wizard')
+    app_dir = app_data.joinpath('eth-wizard')
     app_dir.mkdir(parents=True, exist_ok=True)
     save_file = app_dir.joinpath(STATE_FILE)
 
@@ -471,7 +471,7 @@ def load_state() -> Optional[dict]:
     if not app_data.is_dir():
         return None
     
-    app_dir = app_data.joinpath('eth2-validator-wizard')
+    app_dir = app_data.joinpath('eth-wizard')
     if not app_dir.is_dir():
         return None
     
@@ -493,7 +493,7 @@ def quit_install():
     print('Press enter to quit')
     input()
     
-    log.info(f'Quitting eth2-validator-wizard')
+    log.info(f'Quitting eth-wizard')
     sys.exit()
 
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -517,7 +517,7 @@ def init_logging():
     # File handler to log into a file
     app_data = Path(os.getenv('LOCALAPPDATA', os.getenv('APPDATA', '')))
     if app_data.is_dir():
-        app_dir = app_data.joinpath('eth2-validator-wizard')
+        app_dir = app_data.joinpath('eth-wizard')
         app_dir.mkdir(parents=True, exist_ok=True)
         log_file = app_dir.joinpath('app.log')
         fh = logging.FileHandler(log_file, encoding='utf8')
@@ -527,7 +527,7 @@ def init_logging():
 
         log.addHandler(fh)
 
-    log.info(f'Starting eth2-validator-wizard version {__version__}')
+    log.info(f'Starting eth-wizard version {__version__}')
 
 def create_firewall_rule(ports):
     # Add rules to Windows Firewall to make sure we can accept connections on clients ports
@@ -1968,7 +1968,7 @@ Do you want to skip installing teku and its service?
         title='Teku installation',
         text=(
 '''
-This next step will install Teku, an Eth2 client that includes a
+This next step will install Teku, an Ethereum client that includes a
 beacon node and a validator client in the same binary distribution.
 
 It will install AdoptOpenJDK, a Java Runtime Environment, it will download
@@ -2684,7 +2684,7 @@ def obtain_keys(base_directory, network):
     base_directory = Path(base_directory)
 
     # Check if there are keys already created
-    keys_path = base_directory.joinpath('var', 'lib', 'eth2', 'keys')
+    keys_path = base_directory.joinpath('var', 'lib', 'eth', 'keys')
 
     # Ensure we currently have ACL permission to read from the keys path
     if keys_path.is_dir():
@@ -2693,7 +2693,7 @@ def obtain_keys(base_directory, network):
         ])
 
     # Check if there are keys already created
-    deposit_data_directory = base_directory.joinpath('var', 'lib', 'eth2', 'deposit')
+    deposit_data_directory = base_directory.joinpath('var', 'lib', 'eth', 'deposit')
     target_deposit_data_path = deposit_data_directory.joinpath('deposit_data.json')
 
     generated_keys = search_for_generated_keys(keys_path)
@@ -3153,7 +3153,7 @@ def initiate_deposit(base_directory, network, keys):
     currency = NETWORK_CURRENCY[network]
 
     # Find the deposit file
-    deposit_file_path = base_directory.joinpath('var', 'lib', 'eth2', 'deposit',
+    deposit_file_path = base_directory.joinpath('var', 'lib', 'eth', 'deposit',
         'deposit_data.json')
     if not deposit_file_path.is_file():
         log.warning(f'We could not find the deposit data file in {deposit_file_path} . If you '
