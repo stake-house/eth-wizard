@@ -860,8 +860,8 @@ def progress_log_dialog(
         title=title,
         body=HSplit(
             [
-                Box(Label(text=text), padding=D.exact(1)),
-                Box(text_area, padding=D.exact(1)),
+                Box(Label(text=text)),
+                Box(text_area),
                 Box(status, padding=D.exact(1)),
                 progressbar,
             ]
