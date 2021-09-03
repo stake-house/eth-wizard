@@ -1252,7 +1252,7 @@ validator(s) on the beaconcha.in website at the following URL:
 If you have any question or if you need additional support, make sure
 to get in touch with the ethstaker community on:
 
-* Discord: discord.gg/e84CFep
+* Discord: discord.io/ethstaker
 * Reddit: reddit.com/r/ethstaker
 '''     ),
         buttons=[

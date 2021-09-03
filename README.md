@@ -42,7 +42,7 @@ As an alternative, you can download and install [a recent version of Python](htt
 
 If you have any question or if you need additional support, make sure to get in touch with the ethstaker community on:
 
-* Discord: [discord.gg/e84CFep](https://discord.gg/e84CFep)
+* Discord: [discord.io/ethstaker](https://discord.io/ethstaker)
 * Reddit: [reddit.com/r/ethstaker](https://www.reddit.com/r/ethstaker/)
 
 ## Credits

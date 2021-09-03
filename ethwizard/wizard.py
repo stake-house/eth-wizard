@@ -104,7 +104,7 @@ install and configure all the software needed to become a validator.
 If you have any question or if you need additional support, make sure
 to get in touch with the ethstaker community on:
 
-* Discord: discord.gg/e84CFep
+* Discord: discord.io/ethstaker
 * Reddit: reddit.com/r/ethstaker
 '''     ),
         buttons=[
