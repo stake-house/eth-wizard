@@ -42,7 +42,7 @@ PGP_KEY_SERVERS = [
     'hkps://pgp.key-server.io'
 ]
 
-LINUX_SAVE_DIRECTORY = '/var/lib/eth2validatorwizard'
+LINUX_SAVE_DIRECTORY = '/var/lib/ethwizard'
 STATE_FILE = 'wizardstate.json'
 
 CTX_SELECTED_DIRECTORY = 'selected_directory'
