@@ -3159,7 +3159,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
             else:
                 if type(bn_sync_distance) == int and type(bn_head_slot) == int:
                     max_head = bn_sync_distance + bn_head_slot
-                    set_percentage(round(bn_head_slot / max_head))
+                    set_percentage(round(bn_head_slot / max_head) * 100)
                 else:
                     set_percentage(1)
 
