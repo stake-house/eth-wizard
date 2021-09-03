@@ -3075,8 +3075,6 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
                 if not first_display and process_output[0] != '\n':
                     process_output = '\n' + process_output
                 log_text(process_output)
-
-            time.sleep(1)
             
             lighthouse_bn_syncing_query = BN_SYNCING_EP
             lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_syncing_query
@@ -3185,6 +3183,8 @@ Connected Peers: {bn_connected_peers}
                     'bn_sync_distance': bn_sync_distance,
                     'bn_connected_peers': bn_connected_peers
                 })
+            
+            time.sleep(1)
 
     unknown_joining_queue = 'no join queue information found'
 
@@ -3221,14 +3221,14 @@ Connected Peers: {bn_connected_peers}
 
     result = progress_log_dialog(
         title='Verifying Lighthouse beacon node syncing status',
-        text=(
+        text=(HTML(
 f'''
 It is a good idea to wait for your beacon node to be in sync before doing
 the deposit so you do not miss any reward. Activating a validator after the
-deposit usually take around 15 hours unless the join queue is
-longer. There is currently {network_queue_info} for
-the <b>{network.capitalize()}</b> Ethereum network. 
-'''     ),
+deposit usually take around 15 hours unless the join queue is longer. There
+is currently {network_queue_info} for the
+<b>{network.capitalize()}</b> Ethereum network. 
+'''     )),
         status_text=(
 '''
 Syncing: Unknown (Head slot: Unknown, Sync distance: Unknown)
