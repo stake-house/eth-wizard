@@ -194,8 +194,8 @@ def select_network(log):
         text=(
 '''
 This wizard supports installing and configuring software for various
-Ethereum 2.0 networks. Mainnet is the main network with real value. The
-others are mostly for testing and they do not use anything of real value.
+Ethereum networks. Mainnet is the main network with real value. The others
+are mostly for testing and they do not use anything of real value.
 
 Joining a beacon chain network as a validator can take extra time if many
 validators are trying to join at the same time. The amount of validators in
@@ -376,7 +376,7 @@ https://infura.io/
 
 If you have access to a custom beacon node, you can enter your own URL to
 that beacon node with the custom option. That beacon node should be on the
-<b>{network.capitalize()}</b> Ethereum 2.0 network.
+<b>{network.capitalize()}</b> Ethereum network.
 
 Do you want add an initial state provider?
 '''             )),
@@ -1241,7 +1241,7 @@ def show_whats_next(network, keys, public_keys):
         text=(
 f'''
 You just completed all the steps needed to become an active validator on
-the {network.capitalize()} Ethereum 2.0 network. You created {len(keys['keystore_paths'])} validator(s)
+the {network.capitalize()} Ethereum network. You created {len(keys['keystore_paths'])} validator(s)
 that will soon be activated.
 
 You can monitor your activation period and all the details about your

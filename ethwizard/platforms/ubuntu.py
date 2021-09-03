@@ -1555,8 +1555,8 @@ and extract it for easy use.
 Once installed locally, it will create a systemd service that will
 automatically start the Lighthouse beacon node on reboot or if it crashes.
 The beacon node will be started and you will slowly start syncing with the
-Ethereum 2.0 network. This syncing process can take a few hours or days
-even with good hardware and good internet.
+Ethereum network. This syncing process can take a few hours or days even
+with good hardware and good internet.
 '''     ),
         buttons=[
             ('Install', True),

@@ -1978,7 +1978,7 @@ provide an initial state to fast-track syncing.
 
 Once installed locally, it will create a service that will automatically
 start Teku on reboot or if it crashes. The Teku client will be started and
-you will start syncing with the Ethereum 2.0 network. The Teku client will
+you will start syncing with the Ethereum network. The Teku client will
 automatically start validating once syncing is completed and your
 validator(s) are activated.
 '''     ),
