@@ -1269,12 +1269,14 @@ $ sudo journalctl -ru {geth_service_name}
 
             # Output logs
             command = []
+            first_display = True
             if journalctl_cursor is None:
                 command = ['journalctl', '--no-pager', '--show-cursor', '-q', '-n', '25',
                     '-u', geth_service_name]
             else:
                 command = ['journalctl', '--no-pager', '--show-cursor', '-q',
                     '--after-cursor=' + journalctl_cursor, '-u', geth_service_name]
+                first_display = False
 
             process_result = subprocess.run(command, capture_output=True, text=True)
 
@@ -1298,6 +1300,8 @@ $ sudo journalctl -ru {geth_service_name}
                     log_length = len(process_output)
 
             if log_length > 0:
+                if not first_display and process_output[0] != '\n':
+                    process_output = '\n' + process_output
                 log_text(process_output)
 
             time.sleep(1)
@@ -2006,12 +2010,14 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
             # Output logs
             command = []
+            first_display = True
             if journalctl_cursor is None:
                 command = ['journalctl', '--no-pager', '--show-cursor', '-q', '-n', '25',
                     '-u', lighthouse_bn_service_name]
             else:
                 command = ['journalctl', '--no-pager', '--show-cursor', '-q',
                     '--after-cursor=' + journalctl_cursor, '-u', lighthouse_bn_service_name]
+                first_display = False
 
             process_result = subprocess.run(command, capture_output=True, text=True)
 
@@ -2035,6 +2041,8 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
                     log_length = len(process_output)
 
             if log_length > 0:
+                if not first_display and process_output[0] != '\n':
+                    process_output = '\n' + process_output
                 log_text(process_output)
 
             time.sleep(1)
