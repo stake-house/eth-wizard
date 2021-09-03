@@ -202,7 +202,7 @@ def installation_steps():
 
     select_eth1_fallbacks_step = Step(
         step_id=SELECT_ETH1_FALLBACKS_STEP_ID,
-        display_name='Adding Eth1 fallback nodes',
+        display_name='Adding Ethereum execution fallback nodes',
         exc_function=select_eth1_fallbacks_function
     )
 

@@ -557,7 +557,7 @@ def beacon_node_url_validator(network, url, log):
     return True
 
 def select_eth1_fallbacks(network):
-    # Prompt the user for eth1 fallback nodes
+    # Prompt the user for ethereum execution fallback nodes
     eth1_fallbacks = []
 
     add_more_fallbacks = True
@@ -570,24 +570,24 @@ def select_eth1_fallbacks(network):
             skip_done_button_label = 'Done'
 
         result = button_dialog(
-            title='Adding Eth1 fallback nodes',
+            title='Adding Ethereum execution fallback nodes',
             text=(
 f'''
-Having eth1 fallback nodes is highly recommended for your beacon node. It
-will provide eth1 data even when your Geth client is syncing, out of sync
-or when it is down.
+Having Ethereum execution fallback nodes is highly recommended for your
+beacon node. It will provide execution data even when your Geth client is
+out of sync, in maintenance or when it is down.
 
-You can find a good list of public eth1 nodes available on:
+You can find a good list of public ethereum execution nodes available on:
 
 https://ethereumnodes.com/
 
 We recommend creating a free account with at least Infura and Alchemy and
-adding their endpoints as your eth1 fallback nodes. Make sure to choose the
-correct eth1 network in your project: {eth1_network_name} .
+adding their endpoints as your Ethereum execution fallback nodes. Make sure
+to choose the correct Ethereum network in your project: {eth1_network_name} .
 
-{len(eth1_fallbacks)} eth1 fallback node(s) added so far.
+{len(eth1_fallbacks)} Ethereum execution fallback node(s) added so far.
 
-Do you want add one or more eth1 fallback node?
+Do you want add one or more Ethereum execution fallback node?
 '''         ),
             buttons=[
                 ('Add more', 1),
@@ -617,10 +617,10 @@ Do you want add one or more eth1 fallback node?
                 )
 
             eth1_fallback = input_dialog(
-                title='New Eth1 fallback node',
+                title='New Ethereum execution fallback node',
                 text=(HTML(
 f'''
-Please enter your Eth1 fallback endpoint:
+Please enter your Ethereum execution fallback endpoint:
 
 It usually starts with 'https://' and it usally includes a unique id which
 you should keep secret if you used a service that requires an account.
@@ -652,11 +652,11 @@ you should keep secret if you used a service that requires an account.
             response = httpx.post(eth1_fallback, json=request_json, headers=headers)
         except httpx.RequestError as exception:
             result = button_dialog(
-                title='Cannot connect to Eth1 fallback endpoint',
+                title='Cannot connect to Ethereum execution fallback endpoint',
                 text=(
 f'''
-We could not connect to this Eth1 fallback endpoint. Here are some details
-for this last test we tried to perform:
+We could not connect to this Ethereum execution fallback endpoint. Here are
+some details for this last test we tried to perform:
 
 URL: {eth1_fallback}
 Method: POST
@@ -675,11 +675,11 @@ Make sure you enter your endpoint correctly.
 
         if response.status_code != 200:
             result = button_dialog(
-                title='Cannot connect to Eth1 fallback endpoint',
+                title='Cannot connect to Ethereum execution fallback endpoint',
                 text=(
 f'''
-We could not connect to this eth1 fallback endpoint. Here are some details
-for this last test we tried to perform:
+We could not connect to this execution fallback endpoint. Here are some
+details for this last test we tried to perform:
 
 URL: {eth1_fallback}
 Method: POST
@@ -704,13 +704,13 @@ Make sure you enter your endpoint correctly.
             not response_json['result'] or
             type(response_json['result']) is not str
         ):
-            # We could not get a proper result from the eth1 endpoint
+            # We could not get a proper result from the Ethereum execution endpoint
             result = button_dialog(
-                title='Unexpected response from Eth1 fallback endpoint',
+                title='Unexpected response from Ethereum execution fallback endpoint',
                 text=(
 f'''
-We received an unexpected response from this eth1 fallback endpoint. Here
-are some details for this last test we tried to perform:
+We received an unexpected response from this execution fallback endpoint.
+Here are some details for this last test we tried to perform:
 
 URL: {eth1_fallback}
 Method: POST
@@ -732,17 +732,17 @@ endpoint.
 
         if eth1_fallback_chainid != eth1_network_chainid:
             result = button_dialog(
-                title='Unexpected chain id from Eth1 fallback endpoint',
+                title='Unexpected chain id from Ethereum execution fallback endpoint',
                 text=(
 f'''
-We received an unexpected chain id response from this eth1 fallback
+We received an unexpected chain id response from this execution fallback
 endpoint. Here are some details for this:
 
 Expected chain id: {eth1_network_chainid}
 Received chain id: {eth1_fallback_chainid}
 
-Did you select an eth1 endpoint with the proper network? It should be the
-eth1 network: {eth1_network_name}
+Did you select an execution endpoint with the proper network? It should be the
+ethereum network: {eth1_network_name}
 
 Make sure you enter your endpoint network is matching the network you
 selected at the beginning of this wizard.

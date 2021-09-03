@@ -2211,7 +2211,7 @@ Do you want to remove this directory first and start from nothing?
     if type(initial_state_url) is not str and not initial_state_url:
         return False
 
-    # Get eth1 fallbacks from user
+    # Get execution fallbacks from user
     eth1_fallbacks = select_eth1_fallbacks(network)
     if type(eth1_fallbacks) is not list and not eth1_fallbacks:
         return False
