@@ -3223,10 +3223,9 @@ Connected Peers: {bn_connected_peers}
         title='Verifying Lighthouse beacon node syncing status',
         text=(
 f'''
-Before doing the deposit, it's a good idea to wait for your beacon node to
-be in sync so you do not miss any reward. The logs should show an estimated
-remaining time before your beacon node is in sync. Activating a validator
-after the deposit usually take around 15 hours unless the join queue is
+It is a good idea to wait for your beacon node to be in sync before doing
+the deposit so you do not miss any reward. Activating a validator after the
+deposit usually take around 15 hours unless the join queue is
 longer. There is currently {network_queue_info} for
 the <b>{network.capitalize()}</b> Ethereum network. 
 '''     ),
@@ -3236,6 +3235,7 @@ Syncing: Unknown (Head slot: Unknown, Sync distance: Unknown)
 Connected Peers: Unknown
 '''
         ).strip(),
+        quit_text='Proceed',
         run_callback=verifying_callback
     ).run()
     
