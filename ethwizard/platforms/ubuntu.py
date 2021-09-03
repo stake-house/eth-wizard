@@ -1293,7 +1293,7 @@ $ sudo journalctl -ru {geth_service_name}
                     process_output = (
                         process_output[:result.start()] +
                         process_output[result.end():])
-                    process_output = process_output.strip()
+                    process_output = process_output.rstrip()
             
                     log_length = len(process_output)
 
@@ -2029,7 +2029,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
                     process_output = (
                         process_output[:result.start()] +
                         process_output[result.end():])
-                    process_output = process_output.strip()
+                    process_output = process_output.rstrip()
             
                     log_length = len(process_output)
 
