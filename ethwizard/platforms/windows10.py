@@ -3174,7 +3174,7 @@ during the key generation step. Your deposit file can be found in
 
 {deposit_file_path}
 
-On the Eth2 Launchpad website, you will be asked a few questions and it
+On the Ethereum Launchpad website, you will be asked a few questions and it
 will explain some of the risks and mitigation strategies. Make sure to read
 everything carefully and make sure you understand it all. When you are
 ready, go to the following URL in your browser:
