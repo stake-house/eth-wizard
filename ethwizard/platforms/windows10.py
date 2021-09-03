@@ -863,16 +863,16 @@ Do you want to skip installing geth and its service?
         title='Geth installation',
         text=(
 '''
-This next step will install Geth, an Eth1 client.
+This next step will install Geth, an Ethereum execution client.
 
 It will download the official binary, verify its PGP signature and extract
 it for easy use.
 
 Once the installation is completed, it will create a system service that
 will automatically start Geth on reboot or if it crashes. Geth will be
-started and you will slowly start syncing with the Ethereum 1.0 network.
-This syncing process can take a few hours or days even with good hardware
-and good internet. We will perform a few tests to make sure Geth is running
+started and you will slowly start syncing with the Ethereum network. This
+syncing process can take a few hours or days even with good hardware and
+good internet. We will perform a few tests to make sure Geth is running
 properly.
 '''     ),
         buttons=[
