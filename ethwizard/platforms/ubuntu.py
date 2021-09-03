@@ -3131,7 +3131,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
                 'data' in syncing_json and
                 'head_slot' in syncing_json['data']
                 ):
-                bn_head_slot = syncing_json['data']['head_slot']
+                bn_head_slot = int(syncing_json['data']['head_slot'])
             else:
                 bn_head_slot = UNKNOWN_VALUE
 
@@ -3140,7 +3140,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
                 'data' in syncing_json and
                 'sync_distance' in syncing_json['data']
                 ):
-                bn_sync_distance = syncing_json['data']['sync_distance']
+                bn_sync_distance = int(syncing_json['data']['sync_distance'])
             else:
                 bn_sync_distance = UNKNOWN_VALUE
 
@@ -3151,7 +3151,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
                 'connected' in peer_count_json['data']
                 ):
                 bn_connected_peers = int(peer_count_json['data']['connected'])
-            
+
             bn_is_fully_sync = bn_sync_distance == 0
 
             if bn_is_fully_sync:
