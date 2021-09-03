@@ -1550,8 +1550,8 @@ Do you want to skip installing lighthouse and its beacon node service?
         title='Lighthouse installation',
         text=(
 '''
-This next step will install Lighthouse, an Eth2 client that includes a
-beacon node and a validator client in the same binary.
+This next step will install Lighthouse, an Ethereum consensus client that
+includes a beacon node and a validator client in the same binary.
 
 It will download the official binary from GitHub, verify its PGP signature
 and extract it for easy use.

@@ -1968,8 +1968,9 @@ Do you want to skip installing teku and its service?
         title='Teku installation',
         text=(
 '''
-This next step will install Teku, an Ethereum client that includes a
-beacon node and a validator client in the same binary distribution.
+This next step will install Teku, an Ethereum consensus client that
+includes a beacon node and a validator client in the same binary
+distribution.
 
 It will install AdoptOpenJDK, a Java Runtime Environment, it will download
 the official Teku binary distribution from GitHub, it will verify its
