@@ -3229,8 +3229,8 @@ Connected Peers: {bn_connected_peers}
 f'''
 It is a good idea to wait for your beacon node to be in sync before doing
 the deposit so you do not miss any reward. Activating a validator after the
-deposit usually take around 15 hours unless the join queue is longer. There
-is currently {network_queue_info} for the <b>{network.capitalize()}</b>
+deposit takes around 15 hours unless the join queue is longer. There is
+currently {network_queue_info} for the <b>{network.capitalize()}</b>
 Ethereum network.
 '''         )),
             status_text=(
@@ -3263,7 +3263,9 @@ Connected Peers: {result['bn_connected_peers']}
 
 <style bg="red" fg="black"><b>WARNING</b></style>: Proceeding with the deposit without having a beacon node fully in
 sync has the potential to make you miss some reward between the time your
-validator is activated and your beacon node is fully in sync.
+validator is activated and your beacon node is fully in sync. Your validator
+will only be able to perform its duties when your beacon node is fully in
+sync.
 
 You can choose to quit the wizard here and resume it in a few hours.
 '''             )),
