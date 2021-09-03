@@ -3264,6 +3264,8 @@ Connected Peers: {result['bn_connected_peers']}
 <style bg="red" fg="black"><b>WARNING</b></style>: Proceeding with the deposit without having a beacon node fully in
 sync has the potential to make you miss some reward between the time your
 validator is activated and your beacon node is fully in sync.
+
+You can choose to quit the wizard here and resume it in a few hours.
 '''             )),
                 buttons=[
                     ('Wait', 1),
