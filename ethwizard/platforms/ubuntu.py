@@ -3008,248 +3008,252 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
         return False
     
-    # Verify proper Lighthouse beacon node syncing
-    def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
-        bn_is_fully_sync = False
-        bn_is_syncing = False
-        bn_connected_peers = 0
-        bn_head_slot = UNKNOWN_VALUE
-        bn_sync_distance = UNKNOWN_VALUE
+    is_fully_sync = False
 
-        set_result({
-            'bn_is_fully_sync': bn_is_fully_sync,
-            'bn_is_syncing': bn_is_syncing,
-            'bn_head_slot': bn_head_slot,
-            'bn_sync_distance': bn_sync_distance,
-            'bn_connected_peers': bn_connected_peers
-        })
+    while not is_fully_sync:
 
-        set_percentage(1)
-
-        journalctl_cursor = None
-
-        while True:
-
-            if get_exited():
-                return {
-                    'bn_is_fully_sync': bn_is_fully_sync,
-                    'bn_is_syncing': bn_is_syncing,
-                    'bn_head_slot': bn_head_slot,
-                    'bn_sync_distance': bn_sync_distance,
-                    'bn_connected_peers': bn_connected_peers
-                }
-
-            # Output logs
-            command = []
-            first_display = True
-            if journalctl_cursor is None:
-                command = ['journalctl', '--no-pager', '--show-cursor', '-q', '-n', '25',
-                    '-u', lighthouse_bn_service_name]
-            else:
-                command = ['journalctl', '--no-pager', '--show-cursor', '-q',
-                    '--after-cursor=' + journalctl_cursor, '-u', lighthouse_bn_service_name]
-                first_display = False
-
-            process_result = subprocess.run(command, capture_output=True, text=True)
-
-            process_output = ''
-            if process_result.returncode == 0:
-                process_output = process_result.stdout
-            else:
-                log_text(f'Return code: {process_result.returncode} while calling journalctl.')
-
-            # Parse journalctl cursor and remove it from process_output
-            log_length = len(process_output)
-            if log_length > 0:
-                result = re.search(r'-- cursor: (?P<cursor>[^\n]+)', process_output)
-                if result:
-                    journalctl_cursor = result.group('cursor')
-                    process_output = (
-                        process_output[:result.start()] +
-                        process_output[result.end():])
-                    process_output = process_output.rstrip()
-            
-                    log_length = len(process_output)
-
-            if log_length > 0:
-                if not first_display and process_output[0] != '\n':
-                    process_output = '\n' + process_output
-                log_text(process_output)
-            
-            lighthouse_bn_syncing_query = BN_SYNCING_EP
-            lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_syncing_query
-            headers = {
-                'accept': 'application/json'
-            }
-            try:
-                response = httpx.get(lighthouse_bn_query_url, headers=headers)
-            except httpx.RequestError as exception:
-                log_text(f'Exception: {exception} while querying Lighthouse beacon node.')
-                continue
-
-            if response.status_code != 200:
-                log_text(
-                    f'Status code: {response.status_code} while querying Lighthouse beacon node.')
-                continue
-        
-            response_json = response.json()
-            syncing_json = response_json
-
-            lighthouse_bn_peer_count_query = BN_PEER_COUNT_EP
-            lighthouse_bn_query_url = (
-                local_lighthouse_bn_http_base + lighthouse_bn_peer_count_query)
-            headers = {
-                'accept': 'application/json'
-            }
-            try:
-                response = httpx.get(lighthouse_bn_query_url, headers=headers)
-            except httpx.RequestError as exception:
-                log_text(f'Exception: {exception} while querying Lighthouse beacon node.')
-                continue
-
-            if response.status_code != 200:
-                log_text(
-                    f'Status code: {response.status_code} while querying Lighthouse beacon node.')
-                continue
-
-            response_json = response.json()
-            peer_count_json = response_json
-
-            if (
-                syncing_json and
-                'data' in syncing_json and
-                'is_syncing' in syncing_json['data']
-                ):
-                bn_is_syncing = bool(syncing_json['data']['is_syncing'])
-            else:
-                bn_is_syncing = False
-            
-            if (
-                syncing_json and
-                'data' in syncing_json and
-                'head_slot' in syncing_json['data']
-                ):
-                bn_head_slot = int(syncing_json['data']['head_slot'])
-            else:
-                bn_head_slot = UNKNOWN_VALUE
-
-            if (
-                syncing_json and
-                'data' in syncing_json and
-                'sync_distance' in syncing_json['data']
-                ):
-                bn_sync_distance = int(syncing_json['data']['sync_distance'])
-            else:
-                bn_sync_distance = UNKNOWN_VALUE
-
+        # Verify proper Lighthouse beacon node syncing
+        def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
+            bn_is_fully_sync = False
+            bn_is_syncing = False
             bn_connected_peers = 0
-            if (
-                peer_count_json and
-                'data' in peer_count_json and
-                'connected' in peer_count_json['data']
-                ):
-                bn_connected_peers = int(peer_count_json['data']['connected'])
+            bn_head_slot = UNKNOWN_VALUE
+            bn_sync_distance = UNKNOWN_VALUE
 
-            bn_is_fully_sync = bn_sync_distance == 0
+            set_result({
+                'bn_is_fully_sync': bn_is_fully_sync,
+                'bn_is_syncing': bn_is_syncing,
+                'bn_head_slot': bn_head_slot,
+                'bn_sync_distance': bn_sync_distance,
+                'bn_connected_peers': bn_connected_peers
+            })
 
-            if bn_is_fully_sync:
-                set_percentage(100)
-            else:
-                if type(bn_sync_distance) == int and type(bn_head_slot) == int:
-                    max_head = bn_sync_distance + bn_head_slot
-                    set_percentage(round(bn_head_slot / max_head * 100.0))
+            set_percentage(1)
+
+            journalctl_cursor = None
+
+            while True:
+
+                if get_exited():
+                    return {
+                        'bn_is_fully_sync': bn_is_fully_sync,
+                        'bn_is_syncing': bn_is_syncing,
+                        'bn_head_slot': bn_head_slot,
+                        'bn_sync_distance': bn_sync_distance,
+                        'bn_connected_peers': bn_connected_peers
+                    }
+
+                # Output logs
+                command = []
+                first_display = True
+                if journalctl_cursor is None:
+                    command = ['journalctl', '--no-pager', '--show-cursor', '-q', '-n', '25',
+                        '-u', lighthouse_bn_service_name]
                 else:
-                    set_percentage(1)
+                    command = ['journalctl', '--no-pager', '--show-cursor', '-q',
+                        '--after-cursor=' + journalctl_cursor, '-u', lighthouse_bn_service_name]
+                    first_display = False
 
-            change_status((
+                process_result = subprocess.run(command, capture_output=True, text=True)
+
+                process_output = ''
+                if process_result.returncode == 0:
+                    process_output = process_result.stdout
+                else:
+                    log_text(f'Return code: {process_result.returncode} while calling journalctl.')
+
+                # Parse journalctl cursor and remove it from process_output
+                log_length = len(process_output)
+                if log_length > 0:
+                    result = re.search(r'-- cursor: (?P<cursor>[^\n]+)', process_output)
+                    if result:
+                        journalctl_cursor = result.group('cursor')
+                        process_output = (
+                            process_output[:result.start()] +
+                            process_output[result.end():])
+                        process_output = process_output.rstrip()
+                
+                        log_length = len(process_output)
+
+                if log_length > 0:
+                    if not first_display and process_output[0] != '\n':
+                        process_output = '\n' + process_output
+                    log_text(process_output)
+                
+                lighthouse_bn_syncing_query = BN_SYNCING_EP
+                lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_syncing_query
+                headers = {
+                    'accept': 'application/json'
+                }
+                try:
+                    response = httpx.get(lighthouse_bn_query_url, headers=headers)
+                except httpx.RequestError as exception:
+                    log_text(f'Exception: {exception} while querying Lighthouse beacon node.')
+                    continue
+
+                if response.status_code != 200:
+                    log_text(
+                        f'Status code: {response.status_code} while querying Lighthouse beacon node.')
+                    continue
+            
+                response_json = response.json()
+                syncing_json = response_json
+
+                lighthouse_bn_peer_count_query = BN_PEER_COUNT_EP
+                lighthouse_bn_query_url = (
+                    local_lighthouse_bn_http_base + lighthouse_bn_peer_count_query)
+                headers = {
+                    'accept': 'application/json'
+                }
+                try:
+                    response = httpx.get(lighthouse_bn_query_url, headers=headers)
+                except httpx.RequestError as exception:
+                    log_text(f'Exception: {exception} while querying Lighthouse beacon node.')
+                    continue
+
+                if response.status_code != 200:
+                    log_text(
+                        f'Status code: {response.status_code} while querying Lighthouse beacon node.')
+                    continue
+
+                response_json = response.json()
+                peer_count_json = response_json
+
+                if (
+                    syncing_json and
+                    'data' in syncing_json and
+                    'is_syncing' in syncing_json['data']
+                    ):
+                    bn_is_syncing = bool(syncing_json['data']['is_syncing'])
+                else:
+                    bn_is_syncing = False
+                
+                if (
+                    syncing_json and
+                    'data' in syncing_json and
+                    'head_slot' in syncing_json['data']
+                    ):
+                    bn_head_slot = int(syncing_json['data']['head_slot'])
+                else:
+                    bn_head_slot = UNKNOWN_VALUE
+
+                if (
+                    syncing_json and
+                    'data' in syncing_json and
+                    'sync_distance' in syncing_json['data']
+                    ):
+                    bn_sync_distance = int(syncing_json['data']['sync_distance'])
+                else:
+                    bn_sync_distance = UNKNOWN_VALUE
+
+                bn_connected_peers = 0
+                if (
+                    peer_count_json and
+                    'data' in peer_count_json and
+                    'connected' in peer_count_json['data']
+                    ):
+                    bn_connected_peers = int(peer_count_json['data']['connected'])
+
+                bn_is_fully_sync = bn_sync_distance == 0
+
+                if bn_is_fully_sync:
+                    set_percentage(100)
+                else:
+                    if type(bn_sync_distance) == int and type(bn_head_slot) == int:
+                        max_head = bn_sync_distance + bn_head_slot
+                        set_percentage(round(bn_head_slot / max_head * 100.0))
+                    else:
+                        set_percentage(1)
+
+                change_status((
 f'''
 Syncing: {bn_is_syncing} (Head slot: {bn_head_slot}, Sync distance: {bn_sync_distance})
 Connected Peers: {bn_connected_peers}
-'''         ).strip())
+'''             ).strip())
 
-            if bn_is_fully_sync:
-                return {
-                    'bn_is_fully_sync': bn_is_fully_sync,
-                    'bn_is_syncing': bn_is_syncing,
-                    'bn_head_slot': bn_head_slot,
-                    'bn_sync_distance': bn_sync_distance,
-                    'bn_connected_peers': bn_connected_peers
-                }
+                if bn_is_fully_sync:
+                    return {
+                        'bn_is_fully_sync': bn_is_fully_sync,
+                        'bn_is_syncing': bn_is_syncing,
+                        'bn_head_slot': bn_head_slot,
+                        'bn_sync_distance': bn_sync_distance,
+                        'bn_connected_peers': bn_connected_peers
+                    }
+                else:
+                    set_result({
+                        'bn_is_fully_sync': bn_is_fully_sync,
+                        'bn_is_syncing': bn_is_syncing,
+                        'bn_head_slot': bn_head_slot,
+                        'bn_sync_distance': bn_sync_distance,
+                        'bn_connected_peers': bn_connected_peers
+                    })
+                
+                time.sleep(1)
+
+        unknown_joining_queue = 'no join queue information found'
+
+        network_queue_info = unknown_joining_queue
+
+        headers = {
+            'accept': 'application/json'
+        }
+
+        beaconcha_in_queue_query_url = (
+            BEACONCHA_IN_URLS[network] + BEACONCHA_VALIDATOR_QUEUE_API_URL)
+        try:
+            response = httpx.get(beaconcha_in_queue_query_url, headers=headers)
+
+            if response.status_code != 200:
+                log.error(f'Status code: {response.status_code} while querying beaconcha.in.')
             else:
-                set_result({
-                    'bn_is_fully_sync': bn_is_fully_sync,
-                    'bn_is_syncing': bn_is_syncing,
-                    'bn_head_slot': bn_head_slot,
-                    'bn_sync_distance': bn_sync_distance,
-                    'bn_connected_peers': bn_connected_peers
-                })
-            
-            time.sleep(1)
+                response_json = response.json()
+                if (
+                    response_json and
+                    'data' in response_json and
+                    'beaconchain_entering' in response_json['data']):
 
-    unknown_joining_queue = 'no join queue information found'
+                    validators_entering = int(response_json['data']['beaconchain_entering'])
+                    waiting_td = timedelta(days=validators_entering / 900.0)
 
-    network_queue_info = unknown_joining_queue
+                    network_queue_info = (
+                        f'{validators_entering} validators waiting to join '
+                        f'[{humanize.naturaldelta(waiting_td)}]'
+                    )
 
-    headers = {
-        'accept': 'application/json'
-    }
+        except httpx.RequestError as exception:
+            log.error(f'Exception: {exception} while querying beaconcha.in.')
 
-    beaconcha_in_queue_query_url = (
-        BEACONCHA_IN_URLS[network] + BEACONCHA_VALIDATOR_QUEUE_API_URL)
-    try:
-        response = httpx.get(beaconcha_in_queue_query_url, headers=headers)
-
-        if response.status_code != 200:
-            log.error(f'Status code: {response.status_code} while querying beaconcha.in.')
-        else:
-            response_json = response.json()
-            if (
-                response_json and
-                'data' in response_json and
-                'beaconchain_entering' in response_json['data']):
-
-                validators_entering = int(response_json['data']['beaconchain_entering'])
-                waiting_td = timedelta(days=validators_entering / 900.0)
-
-                network_queue_info = (
-                    f'{validators_entering} validators waiting to join '
-                    f'[{humanize.naturaldelta(waiting_td)}]'
-                )
-
-    except httpx.RequestError as exception:
-        log.error(f'Exception: {exception} while querying beaconcha.in.')
-
-    result = progress_log_dialog(
-        title='Verifying Lighthouse beacon node syncing status',
-        text=(HTML(
+        result = progress_log_dialog(
+            title='Verifying Lighthouse beacon node syncing status',
+            text=(HTML(
 f'''
 It is a good idea to wait for your beacon node to be in sync before doing
 the deposit so you do not miss any reward. Activating a validator after the
 deposit usually take around 15 hours unless the join queue is longer. There
 is currently {network_queue_info} for the <b>{network.capitalize()}</b>
 Ethereum network.
-'''     )),
-        status_text=(
+'''         )),
+            status_text=(
 '''
 Syncing: Unknown (Head slot: Unknown, Sync distance: Unknown)
 Connected Peers: Unknown
 '''
-        ).strip(),
-        quit_text='Proceed',
-        run_callback=verifying_callback
-    ).run()
-    
-    if not result:
-        log.warning('Lighthouse beacon node syncing wait was cancelled.')
-        return False
-    
-    syncing_status = result
+            ).strip(),
+            quit_text='Proceed',
+            run_callback=verifying_callback
+        ).run()
+        
+        if not result:
+            log.warning('Lighthouse beacon node syncing wait was cancelled.')
+            return False
+        
+        syncing_status = result
 
-    if not result['bn_is_fully_sync']:
-        # We could not get a proper result from Lighthouse
-        result = button_dialog(
-            title='Lighthouse beacon node syncing wait interrupted',
-            text=(
+        if not result['bn_is_fully_sync']:
+            # We could not get a proper result from Lighthouse
+            result = button_dialog(
+                title='Lighthouse beacon node syncing wait interrupted',
+                text=(HTML(
 f'''
 We were interrupted before we could confirm the lighthouse beacon node
 was in sync. Here are some results for the last tests we performed:
@@ -3257,18 +3261,24 @@ was in sync. Here are some results for the last tests we performed:
 Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
 Connected Peers: {result['bn_connected_peers']}
 
-Proceeding with the deposit without having a beacon node fully in sync has
-the potential to make you miss some reward between the time your validator
-is activated and your beacon node is fully in sync.
-'''         ),
-            buttons=[
-                ('Quit', False),
-                ('Proceed', True)
-            ]
-        ).run()
+<style bg="red" fg="black"><b>WARNING</b></style>: Proceeding with the deposit without having a beacon node fully in
+sync has the potential to make you miss some reward between the time your
+validator is activated and your beacon node is fully in sync.
+'''             )),
+                buttons=[
+                    ('Wait', 1),
+                    ('Proceed', 2),
+                    ('Quit', False),
+                ]
+            ).run()
 
-        if not result:
-            return False
+            if not result:
+                return False
+            
+            if result == 2:
+                break
+        else:
+            is_fully_sync = True
 
     # Log beacon node status before prompting for deposit
     log.info(
