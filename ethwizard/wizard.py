@@ -172,7 +172,7 @@ validator on an Ethereum network.
 
 * Consolidate 32 ETH for each active validator you want (You can have
 a large amount of active validators using a single machine and this setup)
-* Install an Eth1 client and let it synchronize
+* Install an Ethereum execution client and let it synchronize
 * Generate your validator(s) keys
 * Install an Ethereum beacon node and let it synchronize
 * Install an Ethereum validator client and import your key(s)
