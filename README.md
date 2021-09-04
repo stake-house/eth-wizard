@@ -5,7 +5,7 @@ This project is part of [the larger StakeHouse community](https://github.com/sta
 
 ## Disclaimer
 
-The eth-wizard should be stable enough to be used by everyone. It was never audited and it might still have some issues. Support is offered through [the EthStaker community](https://ethstaker.cc/).
+The eth-wizard should be stable enough to be used by everyone. It was never audited and it might still have some issues. Support is offered through [the ETHStaker community](https://ethstaker.cc/).
 
 ## Goals
 
@@ -40,7 +40,7 @@ As an alternative, you can download and install [a recent version of Python](htt
 
 ## Support
 
-If you have any question or if you need additional support, make sure to get in touch with the ethstaker community on:
+If you have any question or if you need additional support, make sure to get in touch with the ETHStaker community on:
 
 * Discord: [discord.io/ethstaker](https://discord.io/ethstaker)
 * Reddit: [reddit.com/r/ethstaker](https://www.reddit.com/r/ethstaker/)
