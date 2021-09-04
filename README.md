@@ -1,5 +1,5 @@
 # eth-wizard
-An Ethereum validator installation wizard meant to guide anyone through the different steps to become a fully functional validator on the Ethereum network. It will install and configure all the software needed to become a validator.
+An Ethereum validator installation wizard meant to guide anyone through the different steps to become a fully functional validator on the Ethereum network. It will install and configure all the software needed to become a validator. It will test your installation and it will try to make sure you avoid the common pitfalls.
 
 This project is part of [the larger StakeHouse community](https://github.com/stake-house/stakehouse).
 
