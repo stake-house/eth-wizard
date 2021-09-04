@@ -3239,7 +3239,7 @@ Syncing: Unknown (Head slot: Unknown, Sync distance: Unknown)
 Connected Peers: Unknown
 '''
             ).strip(),
-            quit_text='Proceed',
+            quit_text='Skip',
             run_callback=verifying_callback
         ).run()
         
