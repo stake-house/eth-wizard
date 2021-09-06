@@ -140,6 +140,8 @@ class Bundle(Command):
             '--armor', '--output', bundle_sign_path, '--detach-sig', bundle_path
         ])
 
+        # gpg --default-key 6EEC4CD326C4BBC79F51F55AE68A0CC47982CB5F --sign --armor --output ethwizard-0.7.2.exe.asc --detach-sig ethwizard-0.7.2.exe
+
 class BundleWin(Command):
     ''' Create a Windows bundle for release
     '''
