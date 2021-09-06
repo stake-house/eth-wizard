@@ -1035,26 +1035,26 @@ Do you want to skip installing the geth binary?
         # Verify PGP signature
         gpg_binary_path = base_directory.joinpath('bin', 'gpg.exe')
 
-        log.info('Downloading geth Windows Builder PGP key...')
-
         retry_index = 0
         retry_count = 10
 
         key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+        log.info(f'Downloading Geth Windows Builder PGP key from {key_server} ...')
         command_line = [str(gpg_binary_path), '--keyserver', key_server,
             '--recv-keys', GETH_WINDOWS_PGP_KEY_ID]
         process_result = subprocess.run(command_line)
 
         if process_result.returncode != 0:
-            # GPG failed to download Sigma Prime's PGP key, let's wait and retry a few times
+            # GPG failed to download Geth Windows Builder PGP key, let's wait and retry a few times
             while process_result.returncode != 0 and retry_index < retry_count:
                 retry_index = retry_index + 1
-                delay = 15
+                delay = 5
                 log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
-                    f'and try again.')
+                    f'and try again from a different server.')
                 time.sleep(delay)
 
                 key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+                log.info(f'Downloading Geth Windows Builder PGP key from {key_server} ...')
                 command_line = [str(gpg_binary_path), '--keyserver', key_server,
                     '--recv-keys', GETH_WINDOWS_PGP_KEY_ID]
 

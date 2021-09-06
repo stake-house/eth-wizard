@@ -35,9 +35,9 @@ BN_MIN_FEW_PEERS = 10.0
 EXE_MIN_FEW_PEERS = 10.0
 
 PGP_KEY_SERVERS = [
-    'hkp://pool.sks-keyservers.net',
     'hkps://pgp.mit.edu',
     'hkps://keyserver.ubuntu.com',
+    'hkp://pool.sks-keyservers.net',
     'hkp://keys.gnupg.net',
     'hkps://pgp.key-server.io'
 ]
