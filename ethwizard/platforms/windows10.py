@@ -2,6 +2,7 @@ import subprocess
 import time
 import sys
 import httpx
+import humanize
 import re
 import os
 import shutil
@@ -15,7 +16,7 @@ from pathlib import Path
 
 from urllib.parse import urljoin, urlparse
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from defusedxml import ElementTree
 
@@ -112,7 +113,7 @@ def installation_steps(*args, **kwargs):
         if selected_ports not in context:
             context[selected_ports] = {
                 'eth1': DEFAULT_GETH_PORT,
-                'eth2_bn': DEFAULT_LIGHTHOUSE_BN_PORT
+                'eth2_bn': DEFAULT_TEKU_BN_PORT
             }
         
         context[selected_ports] = select_custom_ports(context[selected_ports])
@@ -3145,7 +3146,415 @@ def initiate_deposit(base_directory, network, keys):
 
     base_directory = Path(base_directory)
 
-    # TODO: Check for syncing status before prompting for deposit
+    nssm_binary = get_nssm_binary()
+    if not nssm_binary:
+        return False
+
+    # Check for syncing status before prompting for deposit
+
+    teku_service_name = 'teku'
+    log_path = base_directory.joinpath('var', 'log')
+
+    teku_stdout_log_path = log_path.joinpath('teku-service-stdout.log')
+    teku_stderr_log_path = log_path.joinpath('teku-service-stderr.log')
+
+    # Check if Teku service is still running
+    service_details = get_service_details(nssm_binary, teku_service_name)
+    if not service_details:
+        log.error('We could not find the teku service we created. '
+            'We cannot continue.')
+        return False
+
+    if not (
+        service_details['status'] == WINDOWS_SERVICE_RUNNING):
+
+        result = button_dialog(
+            title='Teku service not running properly',
+            text=(
+f'''
+The teku service we created seems to have issues. Here are some details
+found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+We cannot proceed if the teku service cannot be started properly. Make sure
+to check the logs and fix any issue found there. You can see the logs in:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your teku service logs, inspect the following files:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''
+        )
+
+        return False
+
+    # Verify proper Teku installation and syncing
+    local_teku_http_base = 'http://127.0.0.1:5051'
+    
+    teku_version_query = BN_VERSION_EP
+    teku_query_url = local_teku_http_base + teku_version_query
+    headers = {
+        'accept': 'application/json'
+    }
+    try:
+        response = httpx.get(teku_query_url, headers=headers)
+    except httpx.RequestError as exception:
+
+        result = button_dialog(
+            title='Cannot connect to Teku',
+            text=(
+f'''
+We could not connect to teku HTTP server. Here are some details for this
+last test we tried to perform:
+
+URL: {teku_query_url}
+Method: GET
+Headers: {headers}
+Exception: {exception}
+
+We cannot proceed if the teku HTTP server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your teku service logs, inspect the following files:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''
+        )
+
+        return False
+
+    if response.status_code != 200:
+        result = button_dialog(
+            title='Cannot connect to Teku',
+            text=(
+f'''
+We could not connect to teku HTTP server. Here are some details for this
+last test we tried to perform:
+
+URL: {teku_query_url}
+Method: GET
+Headers: {headers}
+Status code: {response.status_code}
+
+We cannot proceed if the teku HTTP server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your teku service logs, inspect the following files:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''
+        )
+
+        return False
+    
+    is_fully_sync = False
+
+    while not is_fully_sync:
+
+        # Verify proper Teku syncing
+        def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
+            bn_is_fully_sync = False
+            bn_is_syncing = False
+            bn_connected_peers = 0
+            bn_head_slot = UNKNOWN_VALUE
+            bn_sync_distance = UNKNOWN_VALUE
+
+            set_result({
+                'bn_is_fully_sync': bn_is_fully_sync,
+                'bn_is_syncing': bn_is_syncing,
+                'bn_head_slot': bn_head_slot,
+                'bn_sync_distance': bn_sync_distance,
+                'bn_connected_peers': bn_connected_peers
+            })
+
+            set_percentage(1)
+
+            out_log_read_index = 0
+            err_log_read_index = 0
+
+            while True:
+
+                if get_exited():
+                    return {
+                        'bn_is_fully_sync': bn_is_fully_sync,
+                        'bn_is_syncing': bn_is_syncing,
+                        'bn_head_slot': bn_head_slot,
+                        'bn_sync_distance': bn_sync_distance,
+                        'bn_connected_peers': bn_connected_peers
+                    }
+
+                # Output logs
+                out_log_text = ''
+                with open(teku_stdout_log_path, 'r', encoding='utf8') as log_file:
+                    log_file.seek(out_log_read_index)
+                    out_log_text = log_file.read()
+                    out_log_read_index = log_file.tell()
+                
+                err_log_text = ''
+                with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
+                    log_file.seek(err_log_read_index)
+                    err_log_text = log_file.read()
+                    err_log_read_index = log_file.tell()
+                
+                out_log_length = len(out_log_text)
+                if out_log_length > 0:
+                    log_text(out_log_text)
+
+                err_log_length = len(err_log_text)
+                if err_log_length > 0:
+                    log_text(err_log_text)
+                
+                teku_syncing_query = BN_SYNCING_EP
+                teku_query_url = local_teku_http_base + teku_syncing_query
+                headers = {
+                    'accept': 'application/json'
+                }
+                try:
+                    response = httpx.get(teku_query_url, headers=headers)
+                except httpx.RequestError as exception:
+                    log_text(f'Exception: {exception} while querying Teku.')
+                    continue
+
+                if response.status_code != 200:
+                    log_text(f'Status code: {response.status_code} while querying Teku.')
+                    continue
+            
+                response_json = response.json()
+                syncing_json = response_json
+
+                teku_peers_query = BN_PEERS_EP
+                teku_query_url = local_teku_http_base + teku_peers_query
+                headers = {
+                    'accept': 'application/json'
+                }
+                try:
+                    response = httpx.get(teku_query_url, headers=headers)
+                except httpx.RequestError as exception:
+                    log_text(f'Exception: {exception} while querying Teku.')
+                    continue
+
+                if response.status_code != 200:
+                    log_text(f'Status code: {response.status_code} while querying Teku.')
+                    continue
+
+                response_json = response.json()
+                peers_json = response_json
+
+                if (
+                    syncing_json and
+                    'data' in syncing_json and
+                    'is_syncing' in syncing_json['data']
+                    ):
+                    bn_is_syncing = bool(syncing_json['data']['is_syncing'])
+                else:
+                    bn_is_syncing = False
+                
+                if (
+                    syncing_json and
+                    'data' in syncing_json and
+                    'head_slot' in syncing_json['data']
+                    ):
+                    bn_head_slot = int(syncing_json['data']['head_slot'])
+                else:
+                    bn_head_slot = UNKNOWN_VALUE
+
+                if (
+                    syncing_json and
+                    'data' in syncing_json and
+                    'sync_distance' in syncing_json['data']
+                    ):
+                    bn_sync_distance = int(syncing_json['data']['sync_distance'])
+                else:
+                    bn_sync_distance = UNKNOWN_VALUE
+
+                bn_connected_peers = 0
+                if (
+                    peers_json and
+                    'data' in peers_json and
+                    type(peers_json['data']) is list
+                    ):
+                    for peer in peers_json['data']:
+                        if 'state' not in peer:
+                            continue
+                        if peer['state'] == 'connected':
+                            bn_connected_peers = bn_connected_peers + 1
+                
+                bn_is_fully_sync = bn_sync_distance == 0
+
+                if bn_is_fully_sync:
+                    set_percentage(100)
+                else:
+                    if type(bn_sync_distance) == int and type(bn_head_slot) == int:
+                        max_head = bn_sync_distance + bn_head_slot
+                        set_percentage(round(bn_head_slot / max_head * 100.0))
+                    else:
+                        set_percentage(1)
+
+                change_status((
+f'''
+Syncing: {bn_is_syncing} (Head slot: {bn_head_slot}, Sync distance: {bn_sync_distance})
+Connected Peers: {bn_connected_peers}
+'''         ).strip())
+
+                if bn_is_fully_sync:
+                    return {
+                        'bn_is_fully_sync': bn_is_fully_sync,
+                        'bn_is_syncing': bn_is_syncing,
+                        'bn_head_slot': bn_head_slot,
+                        'bn_sync_distance': bn_sync_distance,
+                        'bn_connected_peers': bn_connected_peers
+                    }
+                else:
+                    set_result({
+                        'bn_is_fully_sync': bn_is_fully_sync,
+                        'bn_is_syncing': bn_is_syncing,
+                        'bn_head_slot': bn_head_slot,
+                        'bn_sync_distance': bn_sync_distance,
+                        'bn_connected_peers': bn_connected_peers
+                    })
+                
+                time.sleep(1)
+
+        unknown_joining_queue = 'no join queue information found'
+
+        network_queue_info = unknown_joining_queue
+
+        headers = {
+            'accept': 'application/json'
+        }
+
+        beaconcha_in_queue_query_url = (
+            BEACONCHA_IN_URLS[network] + BEACONCHA_VALIDATOR_QUEUE_API_URL)
+        try:
+            response = httpx.get(beaconcha_in_queue_query_url, headers=headers)
+
+            if response.status_code != 200:
+                log.error(f'Status code: {response.status_code} while querying beaconcha.in.')
+            else:
+                response_json = response.json()
+                if (
+                    response_json and
+                    'data' in response_json and
+                    'beaconchain_entering' in response_json['data']):
+
+                    validators_entering = int(response_json['data']['beaconchain_entering'])
+                    waiting_td = timedelta(days=validators_entering / 900.0)
+
+                    network_queue_info = (
+                        f'{validators_entering} validators waiting to join '
+                        f'[{humanize.naturaldelta(waiting_td)}]'
+                    )
+
+        except httpx.RequestError as exception:
+            log.error(f'Exception: {exception} while querying beaconcha.in.')
+
+        result = progress_log_dialog(
+            title='Verifying Teku syncing status',
+            text=(HTML(
+f'''
+It is a good idea to wait for your beacon node to be in sync before doing
+the deposit so you do not miss any reward. Activating a validator after the
+deposit takes around 15 hours unless the join queue is longer. There is
+currently {network_queue_info} for the <b>{network.capitalize()}</b>
+Ethereum network.
+'''         )),
+            status_text=(
+'''
+Syncing: Unknown (Head slot: Unknown, Sync distance: Unknown)
+Connected Peers: Unknown
+'''
+            ).strip(),
+            quit_text='Skip',
+            run_callback=verifying_callback
+        ).run()
+        
+        if not result:
+            log.warning('Teku syncing wait was cancelled.')
+            return False
+
+        syncing_status = result
+
+        if not result['bn_is_fully_sync']:
+            # We could not get a proper result from the Teku
+            result = button_dialog(
+                title='Teku beacon node syncing wait interrupted',
+                text=(HTML(
+f'''
+We were interrupted before we could confirm the Teku beacon node
+was in sync. Here are some results for the last tests we performed:
+
+Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
+Connected Peers: {result['bn_connected_peers']}
+
+<style bg="red" fg="black"><b>WARNING</b></style>: Proceeding with the deposit without having a beacon node fully in
+sync has the potential to make you miss some reward between the time your
+validator is activated and your beacon node is fully in sync. Your validator
+will only be able to perform its duties when your beacon node is fully in
+sync.
+
+You can choose to quit the wizard here and resume it in a few hours.
+'''             )),
+                buttons=[
+                    ('Wait', 1),
+                    ('Proceed', 2),
+                    ('Quit', False),
+                ]
+            ).run()
+
+            if not result:
+                return False
+            
+            if result == 2:
+                break
+        else:
+            is_fully_sync = True
+
+    log.info(
+f'''
+Here is your beacon node status before doing the deposit:
+
+Syncing: {syncing_status['bn_is_syncing']} (Head slot: {syncing_status['bn_head_slot']}, Sync distance: {syncing_status['bn_sync_distance']})
+Connected Peers: {syncing_status['bn_connected_peers']}
+''' )
 
     launchpad_url = LAUNCHPAD_URLS[network]
     currency = NETWORK_CURRENCY[network]

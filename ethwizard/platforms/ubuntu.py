@@ -2871,12 +2871,6 @@ def initiate_deposit(network, keys):
 
     # Check for syncing status before prompting for deposit
 
-    # Response example from Lighthouse Beacon Node /eth​/v1​/node​/syncing API
-    # {"data":{"is_syncing":true,"head_slot":"23040","sync_distance":"1159516"}}
-    # {"data":{"is_syncing":true,"head_slot":"29760","sync_distance":"1152846"}}
-    # {"data":{"is_syncing":true,"head_slot":"38656","sync_distance":"1144017"}}
-    # {"data":{"is_syncing":false,"head_slot":"1182703","sync_distance":"0"}}
-
     # Check if the Lighthouse beacon node service is still running
     lighthouse_bn_service_name = 'lighthousebeacon.service'
 
