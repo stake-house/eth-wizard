@@ -1215,6 +1215,10 @@ correct network: {network.capitalize()}
             input_canceled = True
             break
     
+        tilde_index = entered_directory.find('~')
+        if tilde_index != -1:
+            entered_directory = entered_directory.replace('~', str(Path.home()), 1)
+
         entered_directory = Path(entered_directory)
 
         if not entered_directory.is_dir():
