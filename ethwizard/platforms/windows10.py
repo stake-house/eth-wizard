@@ -1036,7 +1036,7 @@ Do you want to skip installing the geth binary?
         gpg_binary_path = base_directory.joinpath('bin', 'gpg.exe')
 
         retry_index = 0
-        retry_count = 10
+        retry_count = 15
 
         key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
         log.info(f'Downloading Geth Windows Builder PGP key from {key_server} ...')

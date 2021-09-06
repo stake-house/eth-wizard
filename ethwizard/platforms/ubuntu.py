@@ -1715,7 +1715,7 @@ Do you want to skip installing the lighthouse binary?
         # Verify PGP signature
 
         retry_index = 0
-        retry_count = 10
+        retry_count = 15
 
         key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
         log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
