@@ -171,10 +171,11 @@ GETH_ARGUMENTS = {
 WINDOWS_SERVICE_RUNNING = 'SERVICE_RUNNING'
 WINDOWS_SERVICE_START_PENDING = 'SERVICE_START_PENDING'
 
-ADOPTOPENJDK_11_API_URL = 'https://api.adoptopenjdk.net/v3/assets/feature_releases/11/ga'
-ADOPTOPENJDK_11_API_PARAMs = {
+ADOPTIUM_11_API_URL = 'https://api.adoptium.net/v3/assets/latest/11/hotspot'
+ADOPTIUM_11_API_PARAMS = {
+    'release': 'latest',
     'jvm_impl': 'hotspot',
-    'vendor': 'adoptopenjdk'
+    'vendor': 'adoptium'
 }
 
 TEKU_SERVICE_DISPLAY_NAME = {

@@ -1712,7 +1712,7 @@ def install_gpg(base_directory):
     return True
 
 def install_jre(base_directory):
-    # Install adoptopenjdk jre
+    # Install Adoptium JRE
 
     # Check if jre is already installed
     jre_path = base_directory.joinpath('bin', 'jre')
@@ -1768,10 +1768,10 @@ Do you want to skip installing the JRE?
         try:
             log.info('Getting JRE builds...')
 
-            response = httpx.get(ADOPTOPENJDK_11_API_URL, params=ADOPTOPENJDK_11_API_PARAMs)
+            response = httpx.get(ADOPTIUM_11_API_URL, params=ADOPTIUM_11_API_PARAMS)
 
             if response.status_code != 200:
-                log.error(f'Cannot connect to JRE builds URL {ADOPTOPENJDK_11_API_URL}.\n'
+                log.error(f'Cannot connect to JRE builds URL {ADOPTIUM_11_API_URL}.\n'
                     f'Unexpected status code {response.status_code}')
                 return False
             
@@ -1780,13 +1780,15 @@ Do you want to skip installing the JRE?
             if (
                 type(response_json) is not list or
                 len(response_json) == 0 or
-                type(response_json[0]) is not dict or
-                'binaries' not in response_json[0]):
-                log.error(f'Unexpected response from JRE builds URL {ADOPTOPENJDK_11_API_URL}')
+                type(response_json[0]) is not dict):
+                log.error(f'Unexpected response from JRE builds URL {ADOPTIUM_11_API_URL}')
                 return False
             
-            binaries = response_json[0]['binaries']
+            binaries = response_json
             for binary in binaries:
+                if 'binary' not in binary:
+                    continue
+                binary = binary['binary']
                 if (
                     'architecture' not in binary or
                     'os' not in binary or
@@ -1812,7 +1814,7 @@ Do you want to skip installing the JRE?
                     'checksum' not in package or
                     'link' not in package):
                     log.error(f'Unexpected response from JRE builds URL '
-                        f'{ADOPTOPENJDK_11_API_URL} in package')
+                        f'{ADOPTIUM_11_API_URL} in package')
                     return False
                 
                 package_name = package['name']
@@ -1827,12 +1829,12 @@ Do you want to skip installing the JRE?
                 })
 
         except httpx.RequestError as exception:
-            log.error(f'Cannot connect to JRE builds URL {ADOPTOPENJDK_11_API_URL}.'
+            log.error(f'Cannot connect to JRE builds URL {ADOPTIUM_11_API_URL}.'
                 f'\nException {exception}')
             return False
 
         if len(windows_builds) <= 0:
-            log.error('No JRE builds found on adoptopenjdk.net. We cannot continue.')
+            log.error('No JRE builds found on adoptium.net. We cannot continue.')
             return False
         
         # Download latest JRE build and its signature
