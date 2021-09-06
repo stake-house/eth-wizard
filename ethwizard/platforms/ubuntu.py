@@ -348,18 +348,16 @@ def installation_steps():
     def show_whats_next_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
-        obtained_keys = CTX_OBTAINED_KEYS
         public_keys = CTX_PUBLIC_KEYS
 
         if not (
             test_context_variable(context, selected_network, log) and
-            test_context_variable(context, obtained_keys, log) and
             test_context_variable(context, public_keys, log)
             ):
             # We are missing context variables, we cannot continue
             quit_install()
 
-        show_whats_next(context[selected_network], context[obtained_keys], context[public_keys])
+        show_whats_next(context[selected_network], context[public_keys])
 
         return context
     
@@ -372,19 +370,16 @@ def installation_steps():
     def show_public_keys_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
-        obtained_keys = CTX_OBTAINED_KEYS
         public_keys = CTX_PUBLIC_KEYS
 
         if not (
             test_context_variable(context, selected_network, log) and
-            test_context_variable(context, obtained_keys, log) and
             test_context_variable(context, public_keys, log)
             ):
             # We are missing context variables, we cannot continue
             quit_install()
         
-        show_public_keys(context[selected_network], context[obtained_keys], context[public_keys],
-            log)
+        show_public_keys(context[selected_network], context[public_keys], log)
 
         return context
     
@@ -2875,7 +2870,6 @@ def initiate_deposit(network, keys):
     # Check for syncing status before prompting for deposit
 
     # Response example from Lighthouse Beacon Node /eth​/v1​/node​/syncing API
-
     # {"data":{"is_syncing":true,"head_slot":"23040","sync_distance":"1159516"}}
     # {"data":{"is_syncing":true,"head_slot":"29760","sync_distance":"1152846"}}
     # {"data":{"is_syncing":true,"head_slot":"38656","sync_distance":"1144017"}}

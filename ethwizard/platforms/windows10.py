@@ -378,18 +378,16 @@ def installation_steps(*args, **kwargs):
     def show_whats_next_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
-        obtained_keys = CTX_OBTAINED_KEYS
         public_keys = CTX_PUBLIC_KEYS
 
         if not (
             test_context_variable(context, selected_network, log) and
-            test_context_variable(context, obtained_keys, log) and
             test_context_variable(context, public_keys, log)
             ):
             # We are missing context variables, we cannot continue
             quit_install()
 
-        show_whats_next(context[selected_network], context[obtained_keys], context[public_keys])
+        show_whats_next(context[selected_network], context[public_keys])
 
         return context
     
@@ -402,19 +400,16 @@ def installation_steps(*args, **kwargs):
     def show_public_keys_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
-        obtained_keys = CTX_OBTAINED_KEYS
         public_keys = CTX_PUBLIC_KEYS
 
         if not (
             test_context_variable(context, selected_network, log) and
-            test_context_variable(context, obtained_keys, log) and
             test_context_variable(context, public_keys, log)
             ):
             # We are missing context variables, we cannot continue
             quit_install()
         
-        show_public_keys(context[selected_network], context[obtained_keys], context[public_keys],
-            log)
+        show_public_keys(context[selected_network], context[public_keys], log)
 
         return context
     
@@ -3149,6 +3144,8 @@ def initiate_deposit(base_directory, network, keys):
     # Initiate and explain the deposit on launchpad
 
     base_directory = Path(base_directory)
+
+    # TODO: Check for syncing status before prompting for deposit
 
     launchpad_url = LAUNCHPAD_URLS[network]
     currency = NETWORK_CURRENCY[network]

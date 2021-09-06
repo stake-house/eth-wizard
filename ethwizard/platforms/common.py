@@ -1231,7 +1231,7 @@ correct network: {network.capitalize()}
 
     return entered_directory
 
-def show_whats_next(network, keys, public_keys):
+def show_whats_next(network, public_keys):
     # Show what's next including wait time
 
     beaconcha_in_url = BEACONCHA_IN_URLS[network]
@@ -1241,7 +1241,7 @@ def show_whats_next(network, keys, public_keys):
         text=(
 f'''
 You just completed all the steps needed to become an active validator on
-the {network.capitalize()} Ethereum network. You created {len(keys['keystore_paths'])} validator(s)
+the {network.capitalize()} Ethereum network. You created {len(public_keys)} validator(s)
 that will soon be activated.
 
 You can monitor your activation period and all the details about your
@@ -1260,7 +1260,7 @@ to get in touch with the ethstaker community on:
         ]
     ).run()
 
-def show_public_keys(network, keys, public_keys, log):
+def show_public_keys(network, public_keys, log):
     beaconcha_in_url = BEACONCHA_IN_URLS[network]
 
     newline = '\n'
@@ -1270,7 +1270,7 @@ f'''
 Ethereum Wizard completed!
 
 Network: {network.capitalize()}
-Number of validator(s): {len(keys['keystore_paths'])}
+Number of validator(s): {len(public_keys)}
 
 Make sure to note or save your public keys somewhere. Your validator public
 key(s) are:
