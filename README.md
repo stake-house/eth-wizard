@@ -53,7 +53,7 @@ If you have any question or if you need additional support, make sure to get in 
 
 ## Credits
 
-Based on [Somer Esat's guide](https://someresat.medium.com/guide-to-staking-on-ethereum-2-0-ubuntu-lighthouse-41de20513b12).
+Based on [Somer Esat's guide](https://github.com/SomerEsat/ethereum-staking-guide).
 
 ## License
 
