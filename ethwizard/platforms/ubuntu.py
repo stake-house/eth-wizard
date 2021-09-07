@@ -445,7 +445,7 @@ def load_state() -> Optional[dict]:
     return loaded_data
 
 def quit_install():
-    log.info(f'Quitting eth2-validator-wizard')
+    log.info(f'Quitting eth-wizard')
     quit()
 
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -474,7 +474,7 @@ def init_logging():
 
     log.addHandler(slh)
 
-    log.info(f'Starting eth2-validator-wizard version {__version__}')
+    log.info(f'Starting eth-wizard version {__version__}')
 
 def show_test_overview():
     # Show the overall tests to perform
