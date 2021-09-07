@@ -38,6 +38,12 @@ Download and run [the wizard binary](https://github.com/stake-house/eth-wizard/r
 
 As an alternative, you can download and install [a recent version of Python](https://www.python.org/downloads/) (make sure to select the option for file associations which is included in the default *Install Now* option), download [the latest pyz bundle](https://github.com/stake-house/eth-wizard/releases/download/v0.7.2/ethwizard-0.7.2.pyz) and double-click on it. This alternative is less likely to trigger your antivirus software.
 
+## Demonstration
+
+Here is a demonstration of eth-wizard on Ubuntu 20.04:
+
+[![eth-wizard demo (v0.7.2) for Ubuntu 20.04](https://img.youtube.com/vi/2bnCO5Cujn0/0.jpg)](https://youtu.be/2bnCO5Cujn0)
+
 ## Support
 
 If you have any question or if you need additional support, make sure to get in touch with the ETHStaker community on:
