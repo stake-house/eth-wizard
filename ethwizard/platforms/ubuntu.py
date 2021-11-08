@@ -24,6 +24,7 @@ from ethwizard.platforms.common import (
     select_network,
     select_custom_ports,
     select_eth1_fallbacks,
+    select_consensus_checkpoint_provider,
     progress_log_dialog,
     search_for_generated_keys,
     select_keys_directory,
@@ -209,22 +210,57 @@ def installation_steps():
         exc_function=select_eth1_fallbacks_function
     )
 
+    def select_consensus_checkpoint_url_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        selected_consensus_checkpoint_url = CTX_SELECTED_CONSENSUS_CHECKPOINT_URL
+
+        if not (
+            test_context_variable(context, selected_network, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+
+        if selected_consensus_checkpoint_url not in context:
+            context[selected_consensus_checkpoint_url] = select_consensus_checkpoint_provider(
+                context[selected_network], log)
+            step_sequence.save_state(step.step_id, context)
+
+        if (
+            type(context[selected_consensus_checkpoint_url]) is not str and
+            not context[selected_consensus_checkpoint_url]):
+            # User asked to quit
+            del context[selected_consensus_checkpoint_url]
+            step_sequence.save_state(step.step_id, context)
+
+            quit_install()
+
+        return context
+
+    select_consensus_checkpoint_url_step = Step(
+        step_id=SELECT_CONSENSUS_CHECKPOINT_URL_STEP_ID,
+        display_name='Adding consensus checkpoint state',
+        exc_function=select_consensus_checkpoint_url_function
+    )
+
     def install_lighthouse_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
         selected_ports = CTX_SELECTED_PORTS
         selected_eth1_fallbacks = CTX_SELECTED_ETH1_FALLBACKS
+        selected_consensus_checkpoint_url = CTX_SELECTED_CONSENSUS_CHECKPOINT_URL
 
         if not (
             test_context_variable(context, selected_network, log) and
             test_context_variable(context, selected_ports, log) and
-            test_context_variable(context, selected_eth1_fallbacks, log)
+            test_context_variable(context, selected_eth1_fallbacks, log) and
+            test_context_variable(context, selected_consensus_checkpoint_url, log)
             ):
             # We are missing context variables, we cannot continue
             quit_install()
         
         if not install_lighthouse(context[selected_network], context[selected_eth1_fallbacks],
-            context[selected_ports]):
+            context[selected_consensus_checkpoint_url], context[selected_ports]):
             # User asked to quit or error
             quit_install()
 
@@ -395,6 +431,7 @@ def installation_steps():
         select_custom_ports_step,
         install_geth_step,
         select_eth1_fallbacks_step,
+        select_consensus_checkpoint_url_step,
         install_lighthouse_step,
         test_open_ports_step,
         obtain_keys_step,
@@ -1498,7 +1535,7 @@ def get_systemd_service_details(service):
 
     return service_details
 
-def install_lighthouse(network, eth1_fallbacks, ports):
+def install_lighthouse(network, eth1_fallbacks, consensus_checkpoint_url, ports):
     # Install Lighthouse for the selected network
 
     # Check for existing systemd service
@@ -1822,7 +1859,10 @@ Do you want to remove this directory first and start from nothing?
 
     addparams = ''
     if ports['eth2_bn'] != DEFAULT_LIGHTHOUSE_BN_PORT:
-        addparams = f' --port {ports["eth2_bn"]}'
+        addparams += f' --port {ports["eth2_bn"]}'
+    
+    if consensus_checkpoint_url != '':
+        addparams += f' --checkpoint-sync-url "{consensus_checkpoint_url}"'
 
     service_definition = service_definition.format(
         eth1endpoints=','.join(eth1_endpoints),

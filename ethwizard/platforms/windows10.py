@@ -24,6 +24,8 @@ from dateutil.parser import parse as dateparse
 
 from bs4 import BeautifulSoup
 
+from rfc3986 import builder as urlbuilder
+
 from zipfile import ZipFile
 
 from collections.abc import Collection
@@ -37,7 +39,7 @@ from ethwizard.constants import *
 from ethwizard.platforms.common import (
     select_network,
     select_custom_ports,
-    select_initial_state,
+    select_consensus_checkpoint_provider,
     select_eth1_fallbacks,
     input_dialog_default,
     progress_log_dialog,
@@ -2206,7 +2208,7 @@ Do you want to remove this directory first and start from nothing?
             shutil.rmtree(teku_datadir)
 
     # Get initial state provider
-    initial_state_url = select_initial_state(network, log)
+    initial_state_url = select_consensus_checkpoint_provider(network, log)
     if type(initial_state_url) is not str and not initial_state_url:
         return False
 
@@ -2241,6 +2243,9 @@ Do you want to remove this directory first and start from nothing?
     teku_arguments.append('--validator-keys=' + str(keys['validator_keys_path']) +
         ';' + str(keys['validator_keys_path']))
     if initial_state_url != '':
+        base_url = urlbuilder.URIBuilder.from_uri(initial_state_url)
+        initial_state_url = base_url.add_path(BN_FINALIZED_STATE_URL).finalize().unsplit()
+
         teku_arguments.append('--initial-state=' + initial_state_url)
     if ports['eth2_bn'] != DEFAULT_TEKU_BN_PORT:
         teku_arguments.append('--p2p-port=' + str(ports['eth2_bn']))

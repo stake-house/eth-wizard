@@ -351,8 +351,8 @@ should also be different from the one you choose for Ethereum 1 node.
     
     return ports
 
-def select_initial_state(network, log):
-    # Prompt the user for initial state provider (weak subjectivity checkpoint)
+def select_consensus_checkpoint_provider(network, log):
+    # Prompt the user for consensus checkpoint provider (weak subjectivity checkpoint)
 
     infura_bn_domain = INFURA_BEACON_NODE_DOMAINS[network]
 
@@ -361,12 +361,12 @@ def select_initial_state(network, log):
     while initial_state_url is None:
 
         result = button_dialog(
-                title='Adding initial state provider',
+                title='Adding consensus checkpoint provider',
                 text=(HTML(
 f'''
-Having an initial state provider is highly recommended for your beacon
-node. It makes it possible to get a fully synced beacon in just a few
-minutes compared to having to wait hours or days.
+Having a consensus checkpoint provider is highly recommended for your
+beacon node. It makes it possible to get a fully synced beacon in just a
+few minutes compared to having to wait hours or days.
 
 An easy way to get a provider is to create a free account on Infura. Your
 Infura account can also be used later on in the wizard to provide an eth1
@@ -378,7 +378,7 @@ If you have access to a custom beacon node, you can enter your own URL to
 that beacon node with the custom option. That beacon node should be on the
 <b>{network.capitalize()}</b> Ethereum network.
 
-Do you want add an initial state provider?
+Do you want add a consensus checkpoint provider?
 '''             )),
                 buttons=[
                     ('Infura', 1),
@@ -410,7 +410,7 @@ valid credentials from Infura.</style>'''
                     )
 
                 infura_credentials = input_dialog(
-                    title='Initial state provider using Infura',
+                    title='Consensus checkpoint provider using Infura',
                     text=(HTML(
 f'''
 Please enter your Infura ETH 2 project's credentials from:
@@ -469,7 +469,7 @@ a valid beacon node.</style>'''
                     )
 
                 entered_url = input_dialog(
-                    title='Initial state provider using custom URL',
+                    title='Consensus checkpoint provider using custom URL',
                     text=(HTML(
 f'''
 Please enter your beacon node URL:
@@ -495,10 +495,6 @@ Ethereum Beacon Node API. It should implement these endpoints:
             if input_canceled:
                 # User clicked the cancel button
                 continue
-    
-    if initial_state_url is not None:
-        base_url = urlbuilder.URIBuilder.from_uri(initial_state_url)
-        initial_state_url = base_url.add_path(BN_FINALIZED_STATE_URL).finalize().unsplit()
 
     return initial_state_url
 
