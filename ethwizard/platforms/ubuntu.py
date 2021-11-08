@@ -743,7 +743,7 @@ def test_internet_speed():
 
     try:
         with open(script_path, 'wb') as binary_file:
-            with httpx.stream('GET', SPEEDTEST_SCRIPT_URL) as http_stream:
+            with httpx.stream('GET', SPEEDTEST_SCRIPT_URL, follow_redirects=True) as http_stream:
                 if http_stream.status_code != 200:
                     log.error('HTTP error while downloading speedtest-cli script. '
                         f'Status code {http_stream.status_code}')
@@ -1666,7 +1666,8 @@ Do you want to skip installing the lighthouse binary?
         lighthouse_gh_release_url = GITHUB_REST_API_URL + LIGHTHOUSE_LATEST_RELEASE
         headers = {'Accept': GITHUB_API_VERSION}
         try:
-            response = httpx.get(lighthouse_gh_release_url, headers=headers)
+            response = httpx.get(lighthouse_gh_release_url, headers=headers,
+                follow_redirects=True)
         except httpx.RequestError as exception:
             log.error(f'Exception while downloading lighthouse binary. {exception}')
             return False
@@ -1717,7 +1718,8 @@ Do you want to skip installing the lighthouse binary?
 
         try:
             with open(binary_path, 'wb') as binary_file:
-                with httpx.stream('GET', binary_asset['file_url']) as http_stream:
+                with httpx.stream('GET', binary_asset['file_url'],
+                    follow_redirects=True) as http_stream:
                     if http_stream.status_code != 200:
                         log.error(f'HTTP error while downloading Lighthouse binary from Github. '
                             f'Status code {http_stream.status_code}')
@@ -1732,7 +1734,8 @@ Do you want to skip installing the lighthouse binary?
 
         try:
             with open(signature_path, 'wb') as signature_file:
-                with httpx.stream('GET', signature_asset['file_url']) as http_stream:
+                with httpx.stream('GET', signature_asset['file_url'],
+                    follow_redirects=True) as http_stream:
                     if http_stream.status_code != 200:
                         log.error(f'HTTP error while downloading Lighthouse signature from Github. '
                             f'Status code {http_stream.status_code}')
@@ -2509,7 +2512,8 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
             eth2_cli_gh_release_url = GITHUB_REST_API_URL + ETH2_DEPOSIT_CLI_LATEST_RELEASE
             headers = {'Accept': GITHUB_API_VERSION}
             try:
-                response = httpx.get(eth2_cli_gh_release_url, headers=headers)
+                response = httpx.get(eth2_cli_gh_release_url, headers=headers,
+                    follow_redirects=True)
             except httpx.RequestError as exception:
                 log.error(f'Cannot get latest eth2.0-deposit-cli release from Github. '
                     f'Exception {exception}')
@@ -2567,7 +2571,8 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
 
             try:
                 with open(binary_path, 'wb') as binary_file:
-                    with httpx.stream('GET', binary_asset['file_url']) as http_stream:
+                    with httpx.stream('GET', binary_asset['file_url'],
+                        follow_redirects=True) as http_stream:
                         if http_stream.status_code != 200:
                             log.error(f'HTTP error while downloading eth2.0-deposit-cli binary '
                                 f'from Github. Status code {http_stream.status_code}')
@@ -2588,7 +2593,8 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
 
                 try:
                     with open(checksum_path, 'wb') as signature_file:
-                        with httpx.stream('GET', checksum_asset['file_url']) as http_stream:
+                        with httpx.stream('GET', checksum_asset['file_url'],
+                            follow_redirects=True) as http_stream:
                             if http_stream.status_code != 200:
                                 log.error(f'HTTP error while downloading eth2.0-deposit-cli '
                                     f'checksum from Github. Status code {http_stream.status_code}')
@@ -3231,7 +3237,8 @@ Connected Peers: {bn_connected_peers}
         beaconcha_in_queue_query_url = (
             BEACONCHA_IN_URLS[network] + BEACONCHA_VALIDATOR_QUEUE_API_URL)
         try:
-            response = httpx.get(beaconcha_in_queue_query_url, headers=headers)
+            response = httpx.get(beaconcha_in_queue_query_url, headers=headers,
+                follow_redirects=True)
 
             if response.status_code != 200:
                 log.error(f'Status code: {response.status_code} while querying beaconcha.in.')

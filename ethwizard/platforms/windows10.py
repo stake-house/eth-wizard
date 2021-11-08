@@ -946,7 +946,7 @@ Do you want to skip installing the geth binary?
                 if next_marker is not None:
                     params['marker'] = next_marker
 
-                response = httpx.get(GETH_STORE_BUILDS_URL, params=params)
+                response = httpx.get(GETH_STORE_BUILDS_URL, params=params, follow_redirects=True)
 
                 if response.status_code != 200:
                     log.error(f'Cannot connect to geth builds URL {GETH_STORE_BUILDS_URL}.\n'
@@ -1001,7 +1001,7 @@ Do you want to skip installing the geth binary?
         try:
             with open(geth_archive_path, 'wb') as binary_file:
                 log.info(f'Downloading geth archive {latest_build["name"]}...')
-                with httpx.stream('GET', latest_build_url) as http_stream:
+                with httpx.stream('GET', latest_build_url, follow_redirects=True) as http_stream:
                     if http_stream.status_code != 200:
                         log.error(f'Cannot download geth archive {latest_build_url}.\n'
                             f'Unexpected status code {http_stream.status_code}')
@@ -1021,7 +1021,8 @@ Do you want to skip installing the geth binary?
         try:
             with open(geth_archive_sig_path, 'wb') as binary_file:
                 log.info(f'Downloading geth archive signature {latest_build["name"]}.asc...')
-                with httpx.stream('GET', latest_build_sig_url) as http_stream:
+                with httpx.stream('GET', latest_build_sig_url,
+                    follow_redirects=True) as http_stream:
                     if http_stream.status_code != 200:
                         log.error(f'Cannot download geth archive signature {latest_build_sig_url}.\n'
                             f'Unexpected status code {http_stream.status_code}')
@@ -1638,7 +1639,7 @@ def install_gpg(base_directory):
     # Get the gnupg install URL
     gpg_installer_url = None
     try:
-        response = httpx.get(GNUPG_DOWNLOAD_URL)
+        response = httpx.get(GNUPG_DOWNLOAD_URL, follow_redirects=True)
         
         if response.status_code != 200:
             log.error(f'Cannot connect to GNUPG download URL {GNUPG_DOWNLOAD_URL}.\n'
@@ -1673,7 +1674,7 @@ def install_gpg(base_directory):
     try:
         with open(download_installer_path, 'wb') as binary_file:
             log.info('Downloading GNUPG installer...')
-            with httpx.stream('GET', gpg_installer_url) as http_stream:
+            with httpx.stream('GET', gpg_installer_url, follow_redirects=True) as http_stream:
                 if http_stream.status_code != 200:
                     log.error(f'Cannot download GNUPG installer {gpg_installer_url}.\n'
                         f'Unexpected status code {http_stream.status_code}')
@@ -1770,7 +1771,8 @@ Do you want to skip installing the JRE?
         try:
             log.info('Getting JRE builds...')
 
-            response = httpx.get(ADOPTIUM_11_API_URL, params=ADOPTIUM_11_API_PARAMS)
+            response = httpx.get(ADOPTIUM_11_API_URL, params=ADOPTIUM_11_API_PARAMS,
+                follow_redirects=True)
 
             if response.status_code != 200:
                 log.error(f'Cannot connect to JRE builds URL {ADOPTIUM_11_API_URL}.\n'
@@ -1853,7 +1855,8 @@ Do you want to skip installing the JRE?
         try:
             with open(jre_archive_path, 'wb') as binary_file:
                 log.info(f'Downloading JRE archive {latest_build["name"]}...')
-                with httpx.stream('GET', latest_build['link']) as http_stream:
+                with httpx.stream('GET', latest_build['link'],
+                    follow_redirects=True) as http_stream:
                     if http_stream.status_code != 200:
                         log.error(f'Cannot download JRE archive {latest_build["link"]}.\n'
                             f'Unexpected status code {http_stream.status_code}')
@@ -2054,7 +2057,7 @@ Do you want to skip installing the teku binary distribution?
         teku_gh_release_url = GITHUB_REST_API_URL + TEKU_LATEST_RELEASE
         headers = {'Accept': GITHUB_API_VERSION}
         try:
-            response = httpx.get(teku_gh_release_url, headers=headers)
+            response = httpx.get(teku_gh_release_url, headers=headers, follow_redirects=True)
         except httpx.RequestError as exception:
             log.error(f'Cannot connect to Github. Exception {exception}')
             return False
@@ -2105,7 +2108,7 @@ Do you want to skip installing the teku binary distribution?
         try:
             with open(teku_archive_path, 'wb') as binary_file:
                 log.info(f'Downloading teku archive {url_file_name}...')
-                with httpx.stream('GET', zip_url) as http_stream:
+                with httpx.stream('GET', zip_url, follow_redirects=True) as http_stream:
                     if http_stream.status_code != 200:
                         log.error(f'Cannot download teku archive {zip_url}.\n'
                             f'Unexpected status code {http_stream.status_code}')
@@ -2907,7 +2910,7 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
             eth2_cli_gh_release_url = GITHUB_REST_API_URL + ETH2_DEPOSIT_CLI_LATEST_RELEASE
             headers = {'Accept': GITHUB_API_VERSION}
             try:
-                response = httpx.get(eth2_cli_gh_release_url, headers=headers)
+                response = httpx.get(eth2_cli_gh_release_url, headers=headers, follow_redirects=True)
             except httpx.RequestError as exception:
                 log.error(f'Cannot get latest eth2.0-deposit-cli release from Github. '
                     f'Exception {exception}')
@@ -2970,7 +2973,8 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
                 with open(binary_path, 'wb') as binary_file:
                     log.info(f'Downloading eth2.0-deposit-cli binary '
                         f'{binary_asset["file_name"]}...')
-                    with httpx.stream('GET', binary_asset['file_url']) as http_stream:
+                    with httpx.stream('GET', binary_asset['file_url'],
+                        follow_redirects=True) as http_stream:
                         if http_stream.status_code != 200:
                             log.error(f'Cannot download eth2.0-deposit-cli binary from Github '
                                 f'{binary_asset["file_url"]}.\nUnexpected status code '
@@ -2997,7 +3001,8 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
                     with open(checksum_path, 'wb') as signature_file:
                         log.info(f'Downloading eth2.0-deposit-cli checksum '
                             f'{checksum_asset["file_name"]}...')
-                        with httpx.stream('GET', checksum_asset['file_url']) as http_stream:
+                        with httpx.stream('GET', checksum_asset['file_url'],
+                            follow_redirects=True) as http_stream:
                             if http_stream.status_code != 200:
                                 log.error(f'Cannot download eth2.0-deposit-cli checksum from '
                                     f'Github {checksum_asset["file_url"]}.\nUnexpected status code '
@@ -3472,7 +3477,8 @@ Connected Peers: {bn_connected_peers}
         beaconcha_in_queue_query_url = (
             BEACONCHA_IN_URLS[network] + BEACONCHA_VALIDATOR_QUEUE_API_URL)
         try:
-            response = httpx.get(beaconcha_in_queue_query_url, headers=headers)
+            response = httpx.get(beaconcha_in_queue_query_url, headers=headers,
+                follow_redirects=True)
 
             if response.status_code != 200:
                 log.error(f'Status code: {response.status_code} while querying beaconcha.in.')
@@ -4005,7 +4011,8 @@ Do you want to skip installing the prometheus binary distribution?
         prometheus_gh_release_url = GITHUB_REST_API_URL + PROMETHEUS_LATEST_RELEASE
         headers = {'Accept': GITHUB_API_VERSION}
         try:
-            response = httpx.get(prometheus_gh_release_url, headers=headers)
+            response = httpx.get(prometheus_gh_release_url, headers=headers,
+                follow_redirects=True)
         except httpx.RequestError as exception:
             log.error(f'Cannot get latest Prometheus release from Github. '
                     f'Exception {exception}')
@@ -4059,7 +4066,7 @@ Do you want to skip installing the prometheus binary distribution?
         try:
             with open(prometheus_archive_path, 'wb') as binary_file:
                 log.info(f'Downloading prometheus archive {url_file_name}...')
-                with httpx.stream('GET', zip_url) as http_stream:
+                with httpx.stream('GET', zip_url, follow_redirects=True) as http_stream:
                     if http_stream.status_code != 200:
                         log.error(f'Cannot download prometheus archive {zip_url}.\n'
                             f'Unexpected status code {http_stream.status_code}')
@@ -4629,7 +4636,7 @@ Do you want to skip installing windows exporter?
         we_gh_release_url = GITHUB_REST_API_URL + WINDOWS_EXPORTER_LATEST_RELEASE
         headers = {'Accept': GITHUB_API_VERSION}
         try:
-            response = httpx.get(we_gh_release_url, headers=headers)
+            response = httpx.get(we_gh_release_url, headers=headers, follow_redirects=True)
         except httpx.RequestError as exception:
             log.error(f'Cannot get latest Windows Exporter release from Github. '
                     f'Exception {exception}')
@@ -4680,7 +4687,7 @@ Do you want to skip installing windows exporter?
         try:
             with open(we_installer_path, 'wb') as binary_file:
                 log.info(f'Downloading windows exporter installer {url_file_name}...')
-                with httpx.stream('GET', installer_url) as http_stream:
+                with httpx.stream('GET', installer_url, follow_redirects=True) as http_stream:
                     if http_stream.status_code != 200:
                         log.error(f'Cannot download windows exporter installer {installer_url}.\n'
                             f'Unexpected status code {http_stream.status_code}')
@@ -5062,7 +5069,7 @@ Do you want to skip installing the grafana binary distribution?
             try:
                 timeout_delay = base_timeout + (timeout_retry_increment * retry_index)
                 response = httpx.get(GRAFANA_DOWNLOAD_URL, params=GRAFANA_WINDOWS_PARAM,
-                    timeout=timeout_delay)
+                    timeout=timeout_delay, follow_redirects=True)
             except httpx.RequestError as exception:
                 log.error(f'Cannot connect to Grafana download page. Exception {exception}.')
                     
@@ -5131,7 +5138,7 @@ Do you want to skip installing the grafana binary distribution?
         try:
             with open(grafana_archive_path, 'wb') as binary_file:
                 log.info(f'Downloading grafana archive {url_file_name}...')
-                with httpx.stream('GET', zip_url) as http_stream:
+                with httpx.stream('GET', zip_url, follow_redirects=True) as http_stream:
                     if http_stream.status_code != 200:
                         log.error(f'Cannot download grafana archive {zip_url}.\n'
                             f'Unexpected status code {http_stream.status_code}')

@@ -149,7 +149,8 @@ def select_network(log):
             beaconcha_in_queue_query_url = (
                 BEACONCHA_IN_URLS[network] + BEACONCHA_VALIDATOR_QUEUE_API_URL)
             try:
-                response = await client.get(beaconcha_in_queue_query_url, headers=headers)
+                response = await client.get(beaconcha_in_queue_query_url, headers=headers,
+                    follow_redirects=True)
             except httpx.RequestError as exception:
                 log.error(f'Exception: {exception} while querying beaconcha.in.')
                 return None
@@ -512,7 +513,7 @@ def beacon_node_url_validator(network, url, log):
     }
 
     try:
-        response = httpx.get(deposit_contract_url, headers=headers)
+        response = httpx.get(deposit_contract_url, headers=headers, follow_redirects=True)
 
         if response.status_code != 200:
             log.error(f'Beacon node returned an unexpected status code: {response.status_code}')
@@ -645,7 +646,8 @@ you should keep secret if you used a service that requires an account.
         }
 
         try:
-            response = httpx.post(eth1_fallback, json=request_json, headers=headers)
+            response = httpx.post(eth1_fallback, json=request_json, headers=headers,
+                follow_redirects=True)
         except httpx.RequestError as exception:
             result = button_dialog(
                 title='Cannot connect to Ethereum execution fallback endpoint',
@@ -951,7 +953,7 @@ def get_bc_validator_deposits(network, public_keys, log):
 
     while keep_retrying and retry_index < retry_count:
         try:
-            response = httpx.get(bc_api_query_url, headers=headers)
+            response = httpx.get(bc_api_query_url, headers=headers, follow_redirects=True)
         except httpx.RequestError as exception:
             log.error(f'Exception {exception} when trying to get {bc_api_query_url}')
 
@@ -1015,7 +1017,8 @@ def test_open_ports(ports, log):
     while not all_ports_opened:
         try:
             log.info('Connecting to StakeHouse Port Checker...')
-            response = httpx.get(STAKEHOUSE_PORT_CHECKER_URL, params=params)
+            response = httpx.get(STAKEHOUSE_PORT_CHECKER_URL, params=params,
+                follow_redirects=True)
 
             if response.status_code != 200:
                 result = button_dialog(
