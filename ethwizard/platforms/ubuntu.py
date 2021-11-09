@@ -1880,7 +1880,7 @@ Do you want to remove this directory first and start from nothing?
     subprocess.run([
         'systemctl', 'enable', lighthouse_bn_service_name])
     
-    delay = 30
+    delay = 45
     log.info(
 f'''
 We are giving the lighthouse beacon node {delay} seconds to start before
@@ -1940,6 +1940,15 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
         return False
 
     # Verify proper Lighthouse beacon node installation and syncing
+    keep_retrying = True
+
+    retry_index = 0
+    retry_count = 5
+    retry_delay = 30
+    retry_delay_increase = 15
+    last_exception = None
+    last_status_code = None
+
     local_lighthouse_bn_http_base = 'http://127.0.0.1:5052'
     
     lighthouse_bn_version_query = BN_VERSION_EP
@@ -1947,78 +1956,106 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
     headers = {
         'accept': 'application/json'
     }
-    try:
-        response = httpx.get(lighthouse_bn_query_url, headers=headers)
-    except httpx.RequestError as exception:
-        result = button_dialog(
-            title='Cannot connect to Lighthouse beacon node',
-            text=(
-f'''
-We could not connect to lighthouse beacon node HTTP server. Here are some
-details for this last test we tried to perform:
 
-URL: {lighthouse_bn_query_url}
-Method: GET
-Headers: {headers}
-Exception: {exception}
+    while keep_retrying and retry_index < retry_count:
+        try:
+            response = httpx.get(lighthouse_bn_query_url, headers=headers)
+        except httpx.RequestError as exception:
+            last_exception = exception
 
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
+            log.error(f'Exception {exception} when trying to connect to the beacon node on '
+                f'{lighthouse_bn_query_url}')
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-'''         ),
-            buttons=[
-                ('Quit', False)
-            ]
-        ).run()
+            retry_index = retry_index + 1
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            retry_delay = retry_delay + retry_delay_increase
+            continue
 
-        log.info(
-f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
+        if response.status_code != 200:
+            last_status_code = response.status_code
 
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-'''
-        )
+            log.error(f'Error code {response.status_code} when trying to connect to the beacon '
+                f'node on {lighthouse_bn_query_url}')
+            
+            retry_index = retry_index + 1
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            retry_delay = retry_delay + retry_delay_increase
+            continue
 
-        return False
-
-    if response.status_code != 200:
-        result = button_dialog(
-            title='Cannot connect to Lighthouse beacon node',
-            text=(
-f'''
-We could not connect to lighthouse beacon node HTTP server. Here are some
-details for this last test we tried to perform:
-
-URL: {lighthouse_bn_query_url}
-Method: GET
-Headers: {headers}
-Status code: {response.status_code}
-
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
-
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-'''         ),
-            buttons=[
-                ('Quit', False)
-            ]
-        ).run()
-
-        log.info(
-f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
-
-$ sudo journalctl -ru {lighthouse_bn_service_name}
-'''
-        )
-
-        return False
+        keep_retrying = False
+        last_exception = None
+        last_status_code = None
     
+    if keep_retrying:
+        if last_exception is not None:
+            result = button_dialog(
+                title='Cannot connect to Lighthouse beacon node',
+                text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Exception: {last_exception}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            log.info(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+            )
+        elif last_status_code is not None:
+            result = button_dialog(
+                title='Cannot connect to Lighthouse beacon node',
+                text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Status code: {last_status_code}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            log.info(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {lighthouse_bn_service_name}
+'''
+            )
+        
+        return False
+
     # Verify proper Lighthouse beacon node syncing
     def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
         bn_is_working = False
