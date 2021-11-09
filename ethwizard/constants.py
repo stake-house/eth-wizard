@@ -37,9 +37,11 @@ EXE_MIN_FEW_PEERS = 10.0
 PGP_KEY_SERVERS = [
     'hkps://pgp.mit.edu',
     'hkps://keyserver.ubuntu.com',
+    'hkps://hkps.pool.sks-keyservers.net',
+    'hkps://keys.openpgp.org',
+    'hkps://pgp.key-server.io',
     'hkp://pool.sks-keyservers.net',
-    'hkp://keys.gnupg.net',
-    'hkps://pgp.key-server.io'
+    'hkp://keys.gnupg.net'
 ]
 
 LINUX_SAVE_DIRECTORY = '/var/lib/ethwizard'
