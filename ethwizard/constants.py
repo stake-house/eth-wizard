@@ -47,6 +47,8 @@ LINUX_SAVE_DIRECTORY = '/var/lib/ethwizard'
 STATE_FILE = 'wizardstate.json'
 
 CTX_SELECTED_DIRECTORY = 'selected_directory'
+CTX_SELECTED_EXECUTION_CLIENT = 'selected_execution_client'
+CTX_SELECTED_CONSENSUS_CLIENT = 'selected_consensus_client'
 CTX_WANT_TO_TEST = 'want_to_test'
 CTX_DISK_SIZE_TESTED = 'disk_size_tested'
 CTX_DISK_SPEED_TESTED = 'disk_speed_tested'
@@ -58,6 +60,11 @@ CTX_SELECTED_ETH1_FALLBACKS = 'selected_eth1_fallbacks'
 CTX_SELECTED_CONSENSUS_CHECKPOINT_URL = 'selected_consensus_checkpoint_url'
 CTX_OBTAINED_KEYS = 'obtained_keys'
 CTX_PUBLIC_KEYS = 'public_keys'
+
+EXECUTION_CLIENT_GETH = 'Geth'
+
+CONSENSUS_CLIENT_LIGHTHOUSE = 'Lighthouse'
+CONSENSUS_CLIENT_TEKU = 'Teku'
 
 SELECT_DIRECTORY_STEP_ID = 'select_directory_step'
 TEST_SYSTEM_STEP_ID = 'test_system_step'

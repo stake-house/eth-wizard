@@ -151,6 +151,7 @@ def installation_steps():
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
         selected_ports = CTX_SELECTED_PORTS
+        selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
 
         if not (
             test_context_variable(context, selected_network, log) and
@@ -162,7 +163,9 @@ def installation_steps():
         if not install_geth(context[selected_network], context[selected_ports]):
             # User asked to quit or error
             quit_app()
-
+        
+        context[selected_execution_client] = EXECUTION_CLIENT_GETH
+        
         return context
     
     install_geth_step = Step(
@@ -242,6 +245,7 @@ def installation_steps():
         selected_ports = CTX_SELECTED_PORTS
         selected_eth1_fallbacks = CTX_SELECTED_ETH1_FALLBACKS
         selected_consensus_checkpoint_url = CTX_SELECTED_CONSENSUS_CHECKPOINT_URL
+        selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
 
         if not (
             test_context_variable(context, selected_network, log) and
@@ -256,6 +260,8 @@ def installation_steps():
             context[selected_consensus_checkpoint_url], context[selected_ports]):
             # User asked to quit or error
             quit_app()
+        
+        context[selected_consensus_client] = CONSENSUS_CLIENT_LIGHTHOUSE
 
         return context
     
