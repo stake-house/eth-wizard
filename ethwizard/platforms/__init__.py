@@ -127,7 +127,7 @@ def quit_app(platform):
         from ethwizard.platforms.windows.common import quit_app
         return quit_app()
     
-    return False
+    return quit()
 
 def get_install_steps(platform):
     if platform == PLATFORM_UBUNTU:
