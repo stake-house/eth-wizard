@@ -10,6 +10,11 @@ from typing import Optional
 
 from ethwizard import __version__
 
+from ethwizard.constants import (
+    LINUX_SAVE_DIRECTORY,
+    STATE_FILE
+)
+
 log = logging.getLogger(__name__)
 
 def save_state(step_id: str, context: dict) -> bool:
