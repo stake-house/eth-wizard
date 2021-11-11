@@ -5,18 +5,13 @@ import hashlib
 import shutil
 import time
 import humanize
-import sys
 import stat
 import json
 import re
-import logging
-import logging.handlers
 
 from datetime import timedelta
 
 from pathlib import Path
-
-from ethwizard import __version__
 
 from ethwizard.constants import *
 
@@ -36,12 +31,10 @@ from ethwizard.platforms.common import (
     test_context_variable
 )
 
-from typing import Optional
+from ethwizard.platforms.ubuntu.common import log, quit_app
 
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog, radiolist_dialog, input_dialog
-
-log = logging.getLogger(__name__)
 
 def installation_steps():
 
@@ -62,13 +55,13 @@ def installation_steps():
             del context[want_to_test]
             step_sequence.save_state(step.step_id, context)
 
-            quit_install()
+            quit_app()
 
         if context[want_to_test] == 1:
             if not context.get(disk_size_tested, False):
                 if not test_disk_size():
                     # User asked to quit
-                    quit_install()
+                    quit_app()
                 
                 context[disk_size_tested] = True
                 step_sequence.save_state(step.step_id, context)
@@ -76,7 +69,7 @@ def installation_steps():
             if not context.get(disk_speed_tested, False):
                 if not test_disk_speed():
                     # User asked to quit
-                    quit_install()
+                    quit_app()
                 
                 context[disk_speed_tested] = True
                 step_sequence.save_state(step.step_id, context)
@@ -84,7 +77,7 @@ def installation_steps():
             if not context.get(available_ram_tested, False):
                 if not test_available_ram():
                     # User asked to quit
-                    quit_install()
+                    quit_app()
                 
                 context[available_ram_tested] = True
                 step_sequence.save_state(step.step_id, context)
@@ -92,7 +85,7 @@ def installation_steps():
             if not context.get(internet_speed_tested, False):
                 if not test_internet_speed():
                     # User asked to quit
-                    quit_install()
+                    quit_app()
                 
                 context[internet_speed_tested] = True
                 step_sequence.save_state(step.step_id, context)
@@ -118,7 +111,7 @@ def installation_steps():
             del context[selected_network]
             step_sequence.save_state(step.step_id, context)
 
-            quit_install()
+            quit_app()
         
         return context
     
@@ -144,7 +137,7 @@ def installation_steps():
             del context[selected_ports]
             step_sequence.save_state(step.step_id, context)
 
-            quit_install()
+            quit_app()
         
         return context
 
@@ -164,11 +157,11 @@ def installation_steps():
             test_context_variable(context, selected_ports, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
 
         if not install_geth(context[selected_network], context[selected_ports]):
             # User asked to quit or error
-            quit_install()
+            quit_app()
 
         return context
     
@@ -187,7 +180,7 @@ def installation_steps():
             test_context_variable(context, selected_network, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
 
         if selected_eth1_fallbacks not in context:
             context[selected_eth1_fallbacks] = select_eth1_fallbacks(context[selected_network])
@@ -200,7 +193,7 @@ def installation_steps():
             del context[selected_eth1_fallbacks]
             step_sequence.save_state(step.step_id, context)
 
-            quit_install()
+            quit_app()
 
         return context
 
@@ -219,7 +212,7 @@ def installation_steps():
             test_context_variable(context, selected_network, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
 
         if selected_consensus_checkpoint_url not in context:
             context[selected_consensus_checkpoint_url] = select_consensus_checkpoint_provider(
@@ -233,7 +226,7 @@ def installation_steps():
             del context[selected_consensus_checkpoint_url]
             step_sequence.save_state(step.step_id, context)
 
-            quit_install()
+            quit_app()
 
         return context
 
@@ -257,12 +250,12 @@ def installation_steps():
             test_context_variable(context, selected_consensus_checkpoint_url, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
         
         if not install_lighthouse(context[selected_network], context[selected_eth1_fallbacks],
             context[selected_consensus_checkpoint_url], context[selected_ports]):
             # User asked to quit or error
-            quit_install()
+            quit_app()
 
         return context
     
@@ -280,11 +273,11 @@ def installation_steps():
             test_context_variable(context, selected_ports, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
         
         if not test_open_ports(context[selected_ports], log):
             # User asked to quit or error
-            quit_install()
+            quit_app()
 
         return context
 
@@ -303,7 +296,7 @@ def installation_steps():
             test_context_variable(context, selected_network, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
         
         if obtained_keys not in context:
             context[obtained_keys] = obtain_keys(context[selected_network])
@@ -314,7 +307,7 @@ def installation_steps():
             del context[obtained_keys]
             step_sequence.save_state(step.step_id, context)
 
-            quit_install()
+            quit_app()
 
         return context
 
@@ -334,11 +327,11 @@ def installation_steps():
             test_context_variable(context, obtained_keys, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
         
         if not install_lighthouse_validator(context[selected_network], context[obtained_keys]):
             # User asked to quit or error
-            quit_install()
+            quit_app()
 
         return context
     
@@ -359,7 +352,7 @@ def installation_steps():
             test_context_variable(context, obtained_keys, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
         
         if public_keys not in context:
             context[public_keys] = initiate_deposit(context[selected_network],
@@ -371,7 +364,7 @@ def installation_steps():
             del context[public_keys]
             step_sequence.save_state(step.step_id, context)
 
-            quit_install()
+            quit_app()
 
         return context
 
@@ -391,7 +384,7 @@ def installation_steps():
             test_context_variable(context, public_keys, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
 
         show_whats_next(context[selected_network], context[public_keys])
 
@@ -413,7 +406,7 @@ def installation_steps():
             test_context_variable(context, public_keys, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
         
         show_public_keys(context[selected_network], context[public_keys], log)
 
@@ -442,76 +435,6 @@ def installation_steps():
         show_whats_next_step,
         show_public_keys_step
     ]
-
-def save_state(step_id: str, context: dict) -> bool:
-    # Save wizard state
-
-    data_to_save = {
-        'step': step_id,
-        'context': context
-    }
-
-    save_directory = Path(LINUX_SAVE_DIRECTORY)
-    if not save_directory.is_dir():
-        save_directory.mkdir(parents=True, exist_ok=True)
-    save_file = save_directory.joinpath(STATE_FILE)
-
-    with open(str(save_file), 'w', encoding='utf8') as output_file:
-        json.dump(data_to_save, output_file)
-
-    return True
-
-def load_state() -> Optional[dict]:
-    # Load wizard state
-
-    save_directory = Path(LINUX_SAVE_DIRECTORY)
-    if not save_directory.is_dir():
-        return None
-    save_file = save_directory.joinpath(STATE_FILE)
-    if not save_file.is_file():
-        return None
-    
-    loaded_data = None
-
-    try:
-        with open(str(save_file), 'r', encoding='utf8') as input_file:
-            loaded_data = json.load(input_file)
-    except ValueError:
-        return None
-    
-    return loaded_data
-
-def quit_install():
-    log.info(f'Quitting eth-wizard')
-    quit()
-
-def handle_exception(exc_type, exc_value, exc_traceback):
-    if issubclass(exc_type, KeyboardInterrupt):
-        sys.__excepthook__(exc_type, exc_value, exc_traceback)
-        return
-    
-    log.critical('Uncaught exception', exc_info=(exc_type, exc_value, exc_traceback))
-
-def init_logging():
-    # Initialize logging
-    log.setLevel(logging.INFO)
-
-    # Handle uncaught exception and log them
-    sys.excepthook = handle_exception
-
-    # Console handler to log into the console
-    ch = logging.StreamHandler()
-    log.addHandler(ch)
-
-    # SysLog handler to log into syslog
-    slh = logging.handlers.SysLogHandler(address='/dev/log')
-
-    formatter = logging.Formatter('%(name)s[%(process)d]: %(levelname)s - %(message)s')
-    slh.setFormatter(formatter)
-
-    log.addHandler(slh)
-
-    log.info(f'Starting eth-wizard version {__version__}')
 
 def show_test_overview():
     # Show the overall tests to perform

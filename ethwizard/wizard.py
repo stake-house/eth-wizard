@@ -10,7 +10,7 @@ from ethwizard.platforms import (
     supported_platform,
     has_su_perm,
     init_logging,
-    quit_install,
+    quit_app,
     get_save_state,
     get_load_state
 )
@@ -25,18 +25,18 @@ def run():
     if not platform:
         # This is not a supported platform
         show_unsupported_platform()
-        quit_install(platform)
+        quit_app(platform)
     
     init_logging(platform)
 
     if not has_su_perm(platform):
         # User is not a super user
         show_not_su()
-        quit_install(platform)
+        quit_app(platform)
     
     if not show_welcome():
         # User asked to quit
-        quit_install(platform)
+        quit_app(platform)
 
     self_update()
 
@@ -44,13 +44,13 @@ def run():
     if not steps:
         # Steps were not found for the current platform
         print('No steps found for current platform')
-        quit_install(platform)
+        quit_app(platform)
     
     save_state = get_save_state(platform)
     if not save_state:
         # save_state was not found for the current platform
         print('No save state found for current platform')
-        quit_install(platform)
+        quit_app(platform)
     
     sequence = StepSequence(steps=steps(), save_state=save_state)
 
@@ -65,7 +65,7 @@ def run():
         if is_completed_state(saved_state):
             # TODO: Add features for when we already completed the wizard
             print('Wizard was already completed.')
-            quit_install(platform)
+            quit_app(platform)
         
         saved_step = sequence.get_step(saved_state['step'])
         if saved_step is not None:
@@ -73,20 +73,20 @@ def run():
             resume_result = prompt_resume(saved_step)
             if not resume_result:
                 # User asked to quit
-                quit_install(platform)
+                quit_app(platform)
             elif resume_result == 1:
                 # Execute the platform dependent steps from the saved step
                 sequence.run_from_step(saved_step.step_id, saved_state['context'])
-                quit_install(platform)
+                quit_app(platform)
 
     # Start a brand new installation
     if not explain_overview():
         # User asked to quit
-        quit_install(platform)
+        quit_app(platform)
 
     # Execute the platform dependent steps from the start
     sequence.run_from_start()
-    quit_install(platform)
+    quit_app(platform)
 
 def show_welcome():
     # Show a welcome message about this wizard

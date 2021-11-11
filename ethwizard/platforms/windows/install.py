@@ -1,6 +1,5 @@
 import subprocess
 import time
-import sys
 import httpx
 import humanize
 import re
@@ -10,7 +9,6 @@ import json
 import hashlib
 import winreg
 import io
-import logging
 
 from pathlib import Path
 
@@ -32,8 +30,6 @@ from collections.abc import Collection
 
 from functools import partial
 
-from ethwizard import __version__
-
 from ethwizard.constants import *
 
 from ethwizard.platforms.common import (
@@ -53,12 +49,10 @@ from ethwizard.platforms.common import (
     test_context_variable
 )
 
-from typing import Optional
+from ethwizard.platforms.windows.common import log, quit_app
 
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog, input_dialog
-
-log = logging.getLogger(__name__)
 
 def installation_steps(*args, **kwargs):
 
@@ -75,7 +69,7 @@ def installation_steps(*args, **kwargs):
             del context[selected_directory]
             step_sequence.save_state(step.step_id, context)
 
-            quit_install()
+            quit_app()
         
         return context
 
@@ -98,7 +92,7 @@ def installation_steps(*args, **kwargs):
             del context[selected_network]
             step_sequence.save_state(step.step_id, context)
 
-            quit_install()
+            quit_app()
         
         return context
     
@@ -124,7 +118,7 @@ def installation_steps(*args, **kwargs):
             del context[selected_ports]
             step_sequence.save_state(step.step_id, context)
 
-            quit_install()
+            quit_app()
         
         return context
 
@@ -142,11 +136,11 @@ def installation_steps(*args, **kwargs):
             test_context_variable(context, selected_ports, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
         
         if not create_firewall_rule(context[selected_ports]):
             # User asked to quit or error
-            quit_install()
+            quit_app()
         
         return context
 
@@ -160,7 +154,7 @@ def installation_steps(*args, **kwargs):
 
         if not install_chocolatey():
             # We could not install chocolatey
-            quit_install()
+            quit_app()
 
         return context
 
@@ -174,7 +168,7 @@ def installation_steps(*args, **kwargs):
 
         if not install_nssm():
             # We could not install nssm
-            quit_install()
+            quit_app()
 
         return context
     
@@ -196,12 +190,12 @@ def installation_steps(*args, **kwargs):
             test_context_variable(context, selected_ports, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
 
         if not install_geth(context[selected_directory], context[selected_network],
             context[selected_ports]):
             # User asked to quit or error
-            quit_install()
+            quit_app()
 
         return context
     
@@ -222,7 +216,7 @@ def installation_steps(*args, **kwargs):
             test_context_variable(context, selected_network, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
         
         if obtained_keys not in context:
             context[obtained_keys] = obtain_keys(context[selected_directory],
@@ -234,7 +228,7 @@ def installation_steps(*args, **kwargs):
             del context[obtained_keys]
             step_sequence.save_state(step.step_id, context)
 
-            quit_install()
+            quit_app()
 
         return context
 
@@ -253,7 +247,7 @@ def installation_steps(*args, **kwargs):
             test_context_variable(context, selected_network, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
 
         if selected_eth1_fallbacks not in context:
             context[selected_eth1_fallbacks] = select_eth1_fallbacks(context[selected_network])
@@ -266,7 +260,7 @@ def installation_steps(*args, **kwargs):
             del context[selected_eth1_fallbacks]
             step_sequence.save_state(step.step_id, context)
 
-            quit_install()
+            quit_app()
 
         return context
 
@@ -285,7 +279,7 @@ def installation_steps(*args, **kwargs):
             test_context_variable(context, selected_network, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
 
         if selected_consensus_checkpoint_url not in context:
             context[selected_consensus_checkpoint_url] = select_consensus_checkpoint_provider(
@@ -299,7 +293,7 @@ def installation_steps(*args, **kwargs):
             del context[selected_consensus_checkpoint_url]
             step_sequence.save_state(step.step_id, context)
 
-            quit_install()
+            quit_app()
 
         return context
 
@@ -327,13 +321,13 @@ def installation_steps(*args, **kwargs):
             test_context_variable(context, selected_consensus_checkpoint_url, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
         
         if not install_teku(context[selected_directory], context[selected_network],
             context[obtained_keys], context[selected_eth1_fallbacks],
             context[selected_consensus_checkpoint_url], context[selected_ports]):
             # User asked to quit or error
-            quit_install()
+            quit_app()
 
         return context
     
@@ -351,11 +345,11 @@ def installation_steps(*args, **kwargs):
             test_context_variable(context, selected_ports, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
         
         if not test_open_ports(context[selected_ports], log):
             # User asked to quit or error
-            quit_install()
+            quit_app()
 
         return context
 
@@ -373,11 +367,11 @@ def installation_steps(*args, **kwargs):
             test_context_variable(context, selected_directory, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
         
         if not install_monitoring(context[selected_directory]):
             # User asked to quit or error
-            quit_install()
+            quit_app()
 
         return context
     
@@ -390,7 +384,7 @@ def installation_steps(*args, **kwargs):
     def improve_time_sync_function(step, context, step_sequence):
         if not improve_time_sync():
             # User asked to quit or error
-            quit_install()
+            quit_app()
 
         return context
 
@@ -403,7 +397,7 @@ def installation_steps(*args, **kwargs):
     def disable_windows_updates_function(step, context, step_sequence):
         if not disable_windows_updates():
             # User asked to quit or error
-            quit_install()
+            quit_app()
 
         return context
 
@@ -426,7 +420,7 @@ def installation_steps(*args, **kwargs):
             test_context_variable(context, obtained_keys, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
         
         if public_keys not in context:
             context[public_keys] = initiate_deposit(context[selected_directory],
@@ -438,7 +432,7 @@ def installation_steps(*args, **kwargs):
             del context[public_keys]
             step_sequence.save_state(step.step_id, context)
 
-            quit_install()
+            quit_app()
 
         return context
 
@@ -458,7 +452,7 @@ def installation_steps(*args, **kwargs):
             test_context_variable(context, public_keys, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
 
         show_whats_next(context[selected_network], context[public_keys])
 
@@ -480,7 +474,7 @@ def installation_steps(*args, **kwargs):
             test_context_variable(context, public_keys, log)
             ):
             # We are missing context variables, we cannot continue
-            quit_install()
+            quit_app()
         
         show_public_keys(context[selected_network], context[public_keys], log)
 
@@ -512,92 +506,6 @@ def installation_steps(*args, **kwargs):
         show_whats_next_step,
         show_public_keys_step
     ]
-
-def save_state(step_id: str, context: dict) -> bool:
-    # Save wizard state
-
-    data_to_save = {
-        'step': step_id,
-        'context': context
-    }
-
-    app_data = Path(os.getenv('LOCALAPPDATA', os.getenv('APPDATA', '')))
-    if not app_data.is_dir():
-        return False
-    
-    app_dir = app_data.joinpath('eth-wizard')
-    app_dir.mkdir(parents=True, exist_ok=True)
-    save_file = app_dir.joinpath(STATE_FILE)
-
-    with open(str(save_file), 'w', encoding='utf8') as output_file:
-        json.dump(data_to_save, output_file)
-
-    return True
-
-def load_state() -> Optional[dict]:
-    # Load wizard state
-
-    app_data = Path(os.getenv('LOCALAPPDATA', os.getenv('APPDATA', '')))
-    if not app_data.is_dir():
-        return None
-    
-    app_dir = app_data.joinpath('eth-wizard')
-    if not app_dir.is_dir():
-        return None
-    
-    save_file = app_dir.joinpath(STATE_FILE)
-    if not save_file.is_file():
-        return None
-    
-    loaded_data = None
-
-    try:
-        with open(str(save_file), 'r', encoding='utf8') as input_file:
-            loaded_data = json.load(input_file)
-    except ValueError:
-        return None
-    
-    return loaded_data
-
-def quit_install():
-    print('Press enter to quit')
-    input()
-    
-    log.info(f'Quitting eth-wizard')
-    sys.exit()
-
-def handle_exception(exc_type, exc_value, exc_traceback):
-    if issubclass(exc_type, KeyboardInterrupt):
-        sys.__excepthook__(exc_type, exc_value, exc_traceback)
-        return
-    
-    log.critical('Uncaught exception', exc_info=(exc_type, exc_value, exc_traceback))
-
-def init_logging():
-    # Initialize logging
-    log.setLevel(logging.INFO)
-
-    # Handle uncaught exception and log them
-    sys.excepthook = handle_exception
-
-    # Console handler to log into the console
-    ch = logging.StreamHandler()
-    log.addHandler(ch)
-
-    # File handler to log into a file
-    app_data = Path(os.getenv('LOCALAPPDATA', os.getenv('APPDATA', '')))
-    if app_data.is_dir():
-        app_dir = app_data.joinpath('eth-wizard')
-        app_dir.mkdir(parents=True, exist_ok=True)
-        log_file = app_dir.joinpath('app.log')
-        fh = logging.FileHandler(log_file, encoding='utf8')
-
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        fh.setFormatter(formatter)
-
-        log.addHandler(fh)
-
-    log.info(f'Starting eth-wizard version {__version__}')
 
 def create_firewall_rule(ports):
     # Add rules to Windows Firewall to make sure we can accept connections on clients ports

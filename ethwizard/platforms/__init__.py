@@ -68,7 +68,7 @@ def has_su_perm(platform):
     if platform == PLATFORM_UBUNTU:
         has_su = os.geteuid() == 0
         if not has_su:
-            from ethwizard.platforms.ubuntu import log
+            from ethwizard.platforms.ubuntu.common import log
             log.warning('Running without super user (root or sudo) permissions')
         return has_su
 
@@ -83,7 +83,7 @@ def has_su_perm(platform):
             perform_elevation = True
         
         if perform_elevation:
-            from ethwizard.platforms.windows10 import log
+            from ethwizard.platforms.windows.common import log
             log.info('Performing privilege elevation')
 
             pythonpath_env = rf'$env:PYTHONPATH = "{";".join(sys.path)}";'
@@ -109,55 +109,55 @@ def has_su_perm(platform):
 
 def init_logging(platform):
     if platform == PLATFORM_UBUNTU:
-        from ethwizard.platforms.ubuntu import init_logging
+        from ethwizard.platforms.ubuntu.common import init_logging
         return init_logging()
 
     elif platform == PLATFORM_WINDOWS10:
-        from ethwizard.platforms.windows10 import init_logging
+        from ethwizard.platforms.windows.common import init_logging
         return init_logging()
     
     return False
 
-def quit_install(platform):
+def quit_app(platform):
     if platform == PLATFORM_UBUNTU:
-        from ethwizard.platforms.ubuntu import quit_install
-        return quit_install()
+        from ethwizard.platforms.ubuntu.common import quit_app
+        return quit_app()
 
     elif platform == PLATFORM_WINDOWS10:
-        from ethwizard.platforms.windows10 import quit_install
-        return quit_install()
+        from ethwizard.platforms.windows.common import quit_app
+        return quit_app()
     
     return False
 
 def get_install_steps(platform):
     if platform == PLATFORM_UBUNTU:
-        from ethwizard.platforms.ubuntu import installation_steps as ubuntu_steps
+        from ethwizard.platforms.ubuntu.install import installation_steps as ubuntu_steps
         return ubuntu_steps
 
     elif platform == PLATFORM_WINDOWS10:
-        from ethwizard.platforms.windows10 import installation_steps as windows10_steps
+        from ethwizard.platforms.windows.install import installation_steps as windows10_steps
         return windows10_steps
     
     return False
 
 def get_save_state(platform):
     if platform == PLATFORM_UBUNTU:
-        from ethwizard.platforms.ubuntu import save_state as ubuntu_save_state
+        from ethwizard.platforms.ubuntu.common import save_state as ubuntu_save_state
         return ubuntu_save_state
 
     elif platform == PLATFORM_WINDOWS10:
-        from ethwizard.platforms.windows10 import save_state as windows10_save_state
+        from ethwizard.platforms.windows.common import save_state as windows10_save_state
         return windows10_save_state
     
     return False
 
 def get_load_state(platform):
     if platform == PLATFORM_UBUNTU:
-        from ethwizard.platforms.ubuntu import load_state as ubuntu_load_state
+        from ethwizard.platforms.ubuntu.common import load_state as ubuntu_load_state
         return ubuntu_load_state
 
     elif platform == PLATFORM_WINDOWS10:
-        from ethwizard.platforms.windows10 import load_state as windows10_load_state
+        from ethwizard.platforms.windows.common import load_state as windows10_load_state
         return windows10_load_state
     
     return False
