@@ -244,24 +244,94 @@ def installation_steps(*args, **kwargs):
         exc_function=obtain_keys_function
     )
 
+    def select_eth1_fallbacks_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        selected_eth1_fallbacks = CTX_SELECTED_ETH1_FALLBACKS
+
+        if not (
+            test_context_variable(context, selected_network, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+
+        if selected_eth1_fallbacks not in context:
+            context[selected_eth1_fallbacks] = select_eth1_fallbacks(context[selected_network])
+            step_sequence.save_state(step.step_id, context)
+
+        if (
+            type(context[selected_eth1_fallbacks]) is not list and
+            not context[selected_eth1_fallbacks]):
+            # User asked to quit
+            del context[selected_eth1_fallbacks]
+            step_sequence.save_state(step.step_id, context)
+
+            quit_install()
+
+        return context
+
+    select_eth1_fallbacks_step = Step(
+        step_id=SELECT_ETH1_FALLBACKS_STEP_ID,
+        display_name='Adding execution fallback nodes',
+        exc_function=select_eth1_fallbacks_function
+    )
+
+    def select_consensus_checkpoint_url_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        selected_consensus_checkpoint_url = CTX_SELECTED_CONSENSUS_CHECKPOINT_URL
+
+        if not (
+            test_context_variable(context, selected_network, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_install()
+
+        if selected_consensus_checkpoint_url not in context:
+            context[selected_consensus_checkpoint_url] = select_consensus_checkpoint_provider(
+                context[selected_network], log)
+            step_sequence.save_state(step.step_id, context)
+
+        if (
+            type(context[selected_consensus_checkpoint_url]) is not str and
+            not context[selected_consensus_checkpoint_url]):
+            # User asked to quit
+            del context[selected_consensus_checkpoint_url]
+            step_sequence.save_state(step.step_id, context)
+
+            quit_install()
+
+        return context
+
+    select_consensus_checkpoint_url_step = Step(
+        step_id=SELECT_CONSENSUS_CHECKPOINT_URL_STEP_ID,
+        display_name='Adding consensus checkpoint state',
+        exc_function=select_consensus_checkpoint_url_function
+    )
+
     def install_teku_function(step, context, step_sequence):
         # Context variables
         selected_directory = CTX_SELECTED_DIRECTORY
         selected_network = CTX_SELECTED_NETWORK
         obtained_keys = CTX_OBTAINED_KEYS
         selected_ports = CTX_SELECTED_PORTS
+        selected_eth1_fallbacks = CTX_SELECTED_ETH1_FALLBACKS
+        selected_consensus_checkpoint_url = CTX_SELECTED_CONSENSUS_CHECKPOINT_URL
 
         if not (
             test_context_variable(context, selected_directory, log) and
             test_context_variable(context, selected_network, log) and
             test_context_variable(context, obtained_keys, log) and
-            test_context_variable(context, selected_ports, log)
+            test_context_variable(context, selected_ports, log) and
+            test_context_variable(context, selected_eth1_fallbacks, log) and
+            test_context_variable(context, selected_consensus_checkpoint_url, log)
             ):
             # We are missing context variables, we cannot continue
             quit_install()
         
         if not install_teku(context[selected_directory], context[selected_network],
-            context[obtained_keys], context[selected_ports]):
+            context[obtained_keys], context[selected_eth1_fallbacks],
+            context[selected_consensus_checkpoint_url], context[selected_ports]):
             # User asked to quit or error
             quit_install()
 
@@ -431,6 +501,8 @@ def installation_steps(*args, **kwargs):
         install_nssm_step,
         install_geth_step,
         obtain_keys_step,
+        select_eth1_fallbacks_step,
+        select_consensus_checkpoint_url_step,
         install_teku_step,
         test_open_ports_step,
         install_monitoring_step,
@@ -1916,7 +1988,7 @@ Do you want to skip installing the JRE?
     
     return True
 
-def install_teku(base_directory, network, keys, ports):
+def install_teku(base_directory, network, keys, eth1_fallbacks, consensus_checkpoint_url, ports):
     # Install Teku for the selected network
 
     base_directory = Path(base_directory)
@@ -2210,16 +2282,6 @@ Do you want to remove this directory first and start from nothing?
         if result == 1:
             shutil.rmtree(teku_datadir)
 
-    # Get initial state provider
-    initial_state_url = select_consensus_checkpoint_provider(network, log)
-    if type(initial_state_url) is not str and not initial_state_url:
-        return False
-
-    # Get execution fallbacks from user
-    eth1_fallbacks = select_eth1_fallbacks(network)
-    if type(eth1_fallbacks) is not list and not eth1_fallbacks:
-        return False
-
     # Setup teku directory
     teku_datadir.mkdir(parents=True, exist_ok=True)
 
@@ -2245,8 +2307,8 @@ Do you want to remove this directory first and start from nothing?
     teku_arguments.append('--data-path=' + str(teku_datadir))
     teku_arguments.append('--validator-keys=' + str(keys['validator_keys_path']) +
         ';' + str(keys['validator_keys_path']))
-    if initial_state_url != '':
-        base_url = urlbuilder.URIBuilder.from_uri(initial_state_url)
+    if consensus_checkpoint_url != '':
+        base_url = urlbuilder.URIBuilder.from_uri(consensus_checkpoint_url)
         initial_state_url = base_url.add_path(BN_FINALIZED_STATE_URL).finalize().unsplit()
 
         teku_arguments.append('--initial-state=' + initial_state_url)
