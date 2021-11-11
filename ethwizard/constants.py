@@ -10,7 +10,6 @@ WINDOWS_EXPORTER_LATEST_RELEASE = '/repos/prometheus-community/windows_exporter/
 ETH2_DEPOSIT_CLI_LATEST_RELEASE = '/repos/ethereum/eth2.0-deposit-cli/releases/latest'
 
 NETWORK_MAINNET = 'mainnet'
-NETWORK_PYRMONT = 'pyrmont'
 NETWORK_PRATER = 'prater'
 
 DEFAULT_GETH_PORT = 30303
@@ -90,19 +89,16 @@ CHOCOLATEY_DEFAULT_BIN_PATH = r'C:\ProgramData\chocolatey\bin'
 
 LAUNCHPAD_URLS = {
     NETWORK_MAINNET: 'https://launchpad.ethereum.org',
-    NETWORK_PYRMONT: 'https://pyrmont.launchpad.ethereum.org',
     NETWORK_PRATER: 'https://prater.launchpad.ethereum.org'
 }
 
 BEACONCHA_IN_URLS = {
     NETWORK_MAINNET: 'https://beaconcha.in',
-    NETWORK_PYRMONT: 'https://pyrmont.beaconcha.in',
     NETWORK_PRATER: 'https://prater.beaconcha.in'
 }
 
 INFURA_BEACON_NODE_DOMAINS = {
     NETWORK_MAINNET: 'eth2-beacon-mainnet.infura.io',
-    NETWORK_PYRMONT: 'eth2-beacon-pyrmont.infura.io',
     NETWORK_PRATER: 'eth2-beacon-prater.infura.io'
 }
 
@@ -115,31 +111,26 @@ BN_SYNCING_EP = '/eth/v1/node/syncing'
 
 BN_CHAIN_IDS = {
     NETWORK_MAINNET: 1,
-    NETWORK_PYRMONT: 5,
     NETWORK_PRATER: 5
 }
 
 BN_DEPOSIT_CONTRACTS = {
     NETWORK_MAINNET: '0x00000000219ab540356cbb839cbe05303d7705fa',
-    NETWORK_PYRMONT: '0x8c5fecdc472e27bc447696f431e425d02dd46a8c',
     NETWORK_PRATER: '0xff50ed3d0ec03ac01d4c79aad74928bff48a7b2b'
 }
 
 NETWORK_CURRENCY = {
     NETWORK_MAINNET: 'ETH',
-    NETWORK_PYRMONT: 'GöETH',
     NETWORK_PRATER: 'GöETH',
 }
 
 ETH1_NETWORK_NAME = {
     NETWORK_MAINNET: 'Mainnet',
-    NETWORK_PYRMONT: 'Görli',
     NETWORK_PRATER: 'Görli'
 }
 
 ETH1_NETWORK_CHAINID = {
     NETWORK_MAINNET: 1,
-    NETWORK_PYRMONT: 5,
     NETWORK_PRATER: 5
 }
 
@@ -150,7 +141,6 @@ ETHEREUM_APT_SOURCE_URL = 'http://ppa.launchpad.net/ethereum/ethereum/ubuntu'
 
 GETH_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Go Ethereum Client - Geth (Mainnet)',
-    NETWORK_PYRMONT: 'Go Ethereum Client - Geth (Görli)',
     NETWORK_PRATER: 'Go Ethereum Client - Geth (Görli)'
 }
 
@@ -168,7 +158,6 @@ GETH_BUILDS_BASE_URL = 'https://gethstore.blob.core.windows.net/builds/'
 GETH_WINDOWS_PGP_KEY_ID = '9417309ED2A67EAC'
 GETH_ARGUMENTS = {
     NETWORK_MAINNET: ['--cache', '2048', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof'],
-    NETWORK_PYRMONT: ['--goerli', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof'],
     NETWORK_PRATER: ['--goerli', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof']
 }
 
@@ -184,13 +173,11 @@ ADOPTIUM_11_API_PARAMS = {
 
 TEKU_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Teku Ethereum Client (Mainnet)',
-    NETWORK_PYRMONT: 'Teku Ethereum Client (Pyrmont)',
     NETWORK_PRATER: 'Teku Ethereum Client (Prater)'
 }
 
 TEKU_ARGUMENTS = {
     NETWORK_MAINNET: ['--network=mainnet', '--metrics-enabled', '--rest-api-enabled'],
-    NETWORK_PYRMONT: ['--network=pyrmont', '--metrics-enabled', '--rest-api-enabled'],
     NETWORK_PRATER: ['--network=prater', '--metrics-enabled', '--rest-api-enabled']
 }
 
@@ -41583,24 +41570,6 @@ ExecStart=geth --cache 2048 --syncmode=snap --http --datadir /var/lib/goethereum
 [Install]
 WantedBy=default.target
 '''),
-    NETWORK_PYRMONT: (
-'''
-[Unit]
-Description=Go Ethereum Client - Geth (Görli)
-After=network.target
-Wants=network.target
-
-[Service]
-User=goeth
-Group=goeth
-Type=simple
-Restart=always
-RestartSec=5
-ExecStart=geth --goerli --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof{addparams}
-
-[Install]
-WantedBy=default.target
-'''),
     NETWORK_PRATER: (
 '''
 [Unit]
@@ -41640,24 +41609,6 @@ ExecStart=/usr/local/bin/lighthouse bn --network mainnet --datadir /var/lib/ligh
 [Install]
 WantedBy=multi-user.target
 '''),
-    NETWORK_PYRMONT: (
-'''
-[Unit]
-Description=Lighthouse Ethereum Client Beacon Node (Pyrmont)
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-Type=simple
-User=lighthousebeacon
-Group=lighthousebeacon
-Restart=always
-RestartSec=5
-ExecStart=/usr/local/bin/lighthouse bn --network pyrmont --datadir /var/lib/lighthouse --staking --eth1-endpoints {eth1endpoints} --validator-monitor-auto --metrics{addparams}
-
-[Install]
-WantedBy=multi-user.target
-'''),
     NETWORK_PRATER: (
 '''
 [Unit]
@@ -41693,24 +41644,6 @@ Type=simple
 Restart=always
 RestartSec=5
 ExecStart=/usr/local/bin/lighthouse vc --network mainnet --datadir /var/lib/lighthouse --metrics
-
-[Install]
-WantedBy=multi-user.target
-'''),
-    NETWORK_PYRMONT: (
-'''
-[Unit]
-Description=Lighthouse Ethereum Client Validator Client (Pyrmont)
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-User=lighthousevalidator
-Group=lighthousevalidator
-Type=simple
-Restart=always
-RestartSec=5
-ExecStart=/usr/local/bin/lighthouse vc --network pyrmont --datadir /var/lib/lighthouse --metrics
 
 [Install]
 WantedBy=multi-user.target

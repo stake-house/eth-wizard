@@ -136,8 +136,7 @@ def select_network(log):
 
     network_queue_info = {
         NETWORK_MAINNET: unknown_joining_queue,
-        NETWORK_PRATER: unknown_joining_queue,
-        NETWORK_PYRMONT: unknown_joining_queue
+        NETWORK_PRATER: unknown_joining_queue
     }
 
     headers = {
@@ -209,8 +208,7 @@ For which network would you like to perform this installation?
         ),
         values=[
             (NETWORK_MAINNET, f'Mainnet {network_queue_info[NETWORK_MAINNET]}'),
-            (NETWORK_PRATER, f'Prater {network_queue_info[NETWORK_PRATER]}'),
-            (NETWORK_PYRMONT, f'Pyrmont [deprecated] {network_queue_info[NETWORK_PYRMONT]}')
+            (NETWORK_PRATER, f'Prater {network_queue_info[NETWORK_PRATER]}')
         ],
         ok_text='Use this',
         cancel_text='Quit'
