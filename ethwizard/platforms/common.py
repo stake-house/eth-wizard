@@ -1268,7 +1268,7 @@ def show_public_keys(network, public_keys, log):
 
     log.info(
 f'''
-Ethereum Wizard completed!
+eth-wizard completed!
 
 Network: {network.capitalize()}
 Number of validator(s): {len(public_keys)}

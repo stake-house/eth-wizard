@@ -196,7 +196,7 @@ class BundleWin(Command):
             config_file.write(
 f'''
 ;!@Install@!UTF-8!
-Title="Ethereum Wizard {version}"
+Title="eth-wizard {version}"
 ExecuteFile="python.exe"
 ExecuteParameters="-m ethwizard"
 ;!@InstallEnd@!

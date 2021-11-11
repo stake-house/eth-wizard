@@ -92,14 +92,16 @@ def show_welcome():
     # Show a welcome message about this wizard
 
     result = button_dialog(
-        title='Ethereum Wizard',
+        title='Welcome!',
         text=(
 '''
-Welcome to the Ethereum Wizard!
+Welcome to eth-wizard!
 
 This setup assistant is meant to guide anyone through the different steps
 to become a fully functional validator on the Ethereum network. It will
-install and configure all the software needed to become a validator.
+install and configure all the software needed to become a validator. It
+will test your installation and it will try to make sure you avoid the
+common pitfalls.
 
 If you have any question or if you need additional support, make sure
 to get in touch with the ethstaker community on:
@@ -150,10 +152,9 @@ def show_not_su():
         title='Not a super user',
         text=(
 '''
-The Ethereum Wizard needs to have super user permissions in order to
-proceed.
+eth-wizard needs to have super user permissions in order to proceed.
 
-A simple way to give the wizard these permissions is to start it with sudo.
+A simple way to give eth-wizard these permissions is to start it with sudo.
 '''     ),
         buttons=[
             ('Quit', False)
@@ -194,7 +195,7 @@ def show_unsupported_platform():
         title='Platform not supported',
         text=(HTML(
 '''
-The Ethereum Wizard has no support for your platform. We only support
+eth-wizard has no support for your platform. We only support
 the following platforms:
 
 * <b>Ubuntu 20.04</b> (x86_64)
