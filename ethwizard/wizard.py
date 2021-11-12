@@ -12,7 +12,8 @@ from ethwizard.platforms import (
     init_logging,
     quit_app,
     get_save_state,
-    get_load_state
+    get_load_state,
+    enter_maintenance
 )
 
 from ethwizard.platforms.common import StepSequence, is_completed_state
@@ -61,12 +62,13 @@ def run():
         'step' in saved_state and
         'context' in saved_state
         ):
-        # We might be able to resume from an earlier execution
+        # If the wizard was completed, enter maintenance
         if is_completed_state(saved_state):
-            # TODO: Add features for when we already completed the wizard
-            print('Wizard was already completed.')
+            # Enter maintenance mode
+            enter_maintenance(platform, saved_state['context'])
             quit_app(platform)
         
+        # Check if we might be able to resume from an earlier execution
         saved_step = sequence.get_step(saved_state['step'])
         if saved_step is not None:
             # Prompt the user to see if he wants to resume from saved_step

@@ -161,3 +161,16 @@ def get_load_state(platform):
         return windows10_load_state
     
     return False
+
+def enter_maintenance(platform, context):
+    if platform == PLATFORM_UBUNTU:
+        from ethwizard.platforms.ubuntu.maintain import (
+            enter_maintenance as ubuntu_enter_maintenance )
+        return ubuntu_enter_maintenance(context)
+
+    elif platform == PLATFORM_WINDOWS10:
+        from ethwizard.platforms.windows.maintain import (
+            enter_maintenance as windows10_enter_maintenance )
+        return windows10_enter_maintenance(context)
+    
+    return False
