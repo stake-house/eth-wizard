@@ -1,5 +1,7 @@
 import sys
 import json
+import subprocess
+import re
 
 import logging
 import logging.handlers
@@ -86,3 +88,28 @@ def init_logging():
     log.addHandler(slh)
 
     log.info(f'Starting eth-wizard version {__version__}')
+
+def get_systemd_service_details(service):
+    # Return some systemd service details
+    
+    properties = ('Description', 'LoadState', 'ActiveState', 'ExecMainStartTimestamp',
+        'FragmentPath', 'UnitFilePreset', 'SubState', 'ExecStart')
+
+    process_result = subprocess.run([
+        'systemctl', 'show', service,
+        '--property=' + ','.join(properties)
+        ], capture_output=True, text=True)
+    process_output = process_result.stdout
+
+    service_details = {}
+
+    for sproperty in properties:
+        result = re.search(re.escape(sproperty) + r'=(.*?)\n', process_output)
+        if result:
+            service_details[sproperty] = result.group(1).strip()
+    
+    for sproperty in properties:
+        if sproperty not in service_details:
+            service_details[sproperty] = 'unknown'
+
+    return service_details

@@ -31,7 +31,7 @@ from ethwizard.platforms.common import (
     test_context_variable
 )
 
-from ethwizard.platforms.ubuntu.common import log, quit_app
+from ethwizard.platforms.ubuntu.common import log, quit_app, get_systemd_service_details
 
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog, radiolist_dialog, input_dialog
@@ -1438,31 +1438,6 @@ Connected Peers: {result['exe_connected_peers']}
     time.sleep(5)
 
     return True
-
-def get_systemd_service_details(service):
-    # Return some systemd service details
-    
-    properties = ('Description', 'LoadState', 'ActiveState', 'ExecMainStartTimestamp',
-        'FragmentPath', 'UnitFilePreset', 'SubState', 'ExecStart')
-
-    process_result = subprocess.run([
-        'systemctl', 'show', service,
-        '--property=' + ','.join(properties)
-        ], capture_output=True, text=True)
-    process_output = process_result.stdout
-
-    service_details = {}
-
-    for sproperty in properties:
-        result = re.search(re.escape(sproperty) + r'=(.*?)\n', process_output)
-        if result:
-            service_details[sproperty] = result.group(1).strip()
-    
-    for sproperty in properties:
-        if sproperty not in service_details:
-            service_details[sproperty] = 'unknown'
-
-    return service_details
 
 def install_lighthouse(network, eth1_fallbacks, consensus_checkpoint_url, ports):
     # Install Lighthouse for the selected network
