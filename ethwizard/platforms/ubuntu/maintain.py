@@ -1,3 +1,5 @@
+import httpx
+
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog
 
@@ -74,9 +76,12 @@ Service not found.
         
         details = (
 f'''
-States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
-'''           
-        )
+Service states - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+'''
+        ).strip()
+
+        geth_running_version = get_geth_running_version()
+        print(geth_running_version)
 
         return details
 
@@ -84,7 +89,30 @@ States - Load: {service_details['LoadState']}, Active: {service_details['ActiveS
         log.error(f'Unknown execution client {execution_client}.')
         return False
 
-def get_geth_version():
+def get_geth_running_version():
+    # Get the running version for Geth
+
+    local_geth_jsonrpc_url = 'http://127.0.0.1:8545'
+    request_json = {
+        'jsonrpc': '2.0',
+        'method': 'web3_clientVersion',
+        'id': 67
+    }
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    try:
+        response = httpx.post(local_geth_jsonrpc_url, json=request_json, headers=headers)
+    except httpx.RequestError as exception:
+        return False
+
+    if response.status_code != 200:
+        return False
+    
+    response_json = response.json()
+    return response_json
+
+def get_geth_latest_version():
     pass
 
 def use_default_client(context):
