@@ -1,4 +1,5 @@
 import httpx
+import re
 
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog
@@ -110,9 +111,26 @@ def get_geth_running_version():
         return False
     
     response_json = response.json()
-    return response_json
+
+    if 'result' not in response_json:
+        return False
+    
+    version_agent = response_json['result']
+
+    # Version agent should look like: Geth/v1.10.12-stable-6c4dc6c3/linux-amd64/go1.17.2
+    result = re.search(r'Geth/v(?P<version>[^-/]+)(-(?P<stable>[^-/]+))?(-(?P<commit>[^-/]+))?',
+        version_agent)
+    if not result:
+        return False
+
+    return result.group('version')
 
 def get_geth_latest_version():
+    # Get the latest stable version for Geth
+    pass
+
+def get_geth_latest_available_version():
+    # Get the latest available version for Geth
     pass
 
 def use_default_client(context):
