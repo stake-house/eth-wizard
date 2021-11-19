@@ -1,3 +1,4 @@
+import subprocess
 import httpx
 import re
 
@@ -82,7 +83,9 @@ Service states - Load: {service_details['LoadState']}, Active: {service_details[
         ).strip()
 
         geth_running_version = get_geth_running_version()
-        print(geth_running_version)
+        geth_available_version = get_geth_available_version()
+
+        print(f'Running {geth_running_version}, Available: {geth_available_version}')
 
         return details
 
@@ -105,14 +108,18 @@ def get_geth_running_version():
     try:
         response = httpx.post(local_geth_jsonrpc_url, json=request_json, headers=headers)
     except httpx.RequestError as exception:
+        log.error(f'Cannot connect to Geth. Exception: {exception}')
         return False
 
     if response.status_code != 200:
+        log.error(f'Unexpected status code from {local_geth_jsonrpc_url}. Status code: '
+            f'{response.status_code}')
         return False
     
     response_json = response.json()
 
     if 'result' not in response_json:
+        log.error(f'Unexpected JSON response from {local_geth_jsonrpc_url}. result not found.')
         return False
     
     version_agent = response_json['result']
@@ -121,16 +128,33 @@ def get_geth_running_version():
     result = re.search(r'Geth/v(?P<version>[^-/]+)(-(?P<stable>[^-/]+))?(-(?P<commit>[^-/]+))?',
         version_agent)
     if not result:
+        log.error(f'Cannot parse {version_agent} for Geth version.')
         return False
 
     return result.group('version')
 
-def get_geth_latest_version():
-    # Get the latest stable version for Geth
-    pass
+def get_geth_available_version():
+    # Get the available version for Geth, potentially for update
 
-def get_geth_latest_available_version():
-    # Get the latest available version for Geth
+    subprocess.run(['apt', '-y', 'update'])
+    process_result = subprocess.run(['apt-cache', 'policy', 'geth'], capture_output=True,
+        text=True)
+    
+    if process_result.returncode != 0:
+        log.error(f'Unexpected return code from apt-cache. Return code: '
+            f'{process_result.returncode}')
+        return False
+    
+    process_output = process_result.stdout
+    result = re.search(r'Candidate: (?P<version>[^\+]+)', process_output)
+    if not result:
+        log.error(f'Cannot parse {process_output} for candidate version.')
+        return False
+    
+    return result.group('version')
+
+def get_geth_latest_version():
+    # Get the latest stable version for Geth, potentially not available yet for update
     pass
 
 def use_default_client(context):
