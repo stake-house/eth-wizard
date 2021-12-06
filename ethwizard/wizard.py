@@ -102,8 +102,8 @@ Welcome to eth-wizard!
 This setup assistant is meant to guide anyone through the different steps
 to become a fully functional validator on the Ethereum network. It will
 install and configure all the software needed to become a validator. It
-will test your installation. It will try to make sure you avoid the common
-pitfalls. It will help you maintain and keep your setup updated.
+will test your installation. It will help you avoid the common pitfalls. It
+will help you maintain and keep your setup updated.
 
 If you have any question or if you need additional support, make sure
 to get in touch with the ethstaker community on:
