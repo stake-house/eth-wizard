@@ -1,6 +1,7 @@
 GITHUB_REST_API_URL = 'https://api.github.com'
 GITHUB_API_VERSION = 'application/vnd.github.v3+json'
 
+GETH_LATEST_RELEASE = '/repos/ethereum/go-ethereum/releases/latest'
 LIGHTHOUSE_LATEST_RELEASE = '/repos/sigp/lighthouse/releases/latest'
 LIGHTHOUSE_PRIME_PGP_KEY_ID = '15E66D941F697E28F49381F426416DC3F30674B0'
 TEKU_LATEST_RELEASE = '/repos/ConsenSys/teku/releases/latest'

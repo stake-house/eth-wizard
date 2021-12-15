@@ -17,7 +17,11 @@ from ethwizard.constants import (
     CTX_SELECTED_CONSENSUS_CLIENT,
     EXECUTION_CLIENT_GETH,
     CONSENSUS_CLIENT_LIGHTHOUSE,
-    WIZARD_COMPLETED_STEP_ID
+    WIZARD_COMPLETED_STEP_ID,
+    UNKNOWN_VALUE,
+    GITHUB_REST_API_URL,
+    GETH_LATEST_RELEASE,
+    GITHUB_API_VERSION
 )
 
 def enter_maintenance(context):
@@ -84,8 +88,13 @@ Service states - Load: {service_details['LoadState']}, Active: {service_details[
 
         geth_running_version = get_geth_running_version()
         geth_available_version = get_geth_available_version()
+        geth_latest_version = get_geth_latest_version()
 
-        print(f'Running {geth_running_version}, Available: {geth_available_version}')
+        details = details + '\n' + (
+f'''
+Version - Running: {geth_running_version}, Available: {geth_available_version}, Latest: {geth_latest_version}
+'''
+        ).strip()
 
         return details
 
@@ -109,18 +118,18 @@ def get_geth_running_version():
         response = httpx.post(local_geth_jsonrpc_url, json=request_json, headers=headers)
     except httpx.RequestError as exception:
         log.error(f'Cannot connect to Geth. Exception: {exception}')
-        return False
+        return UNKNOWN_VALUE
 
     if response.status_code != 200:
         log.error(f'Unexpected status code from {local_geth_jsonrpc_url}. Status code: '
             f'{response.status_code}')
-        return False
+        return UNKNOWN_VALUE
     
     response_json = response.json()
 
     if 'result' not in response_json:
         log.error(f'Unexpected JSON response from {local_geth_jsonrpc_url}. result not found.')
-        return False
+        return UNKNOWN_VALUE
     
     version_agent = response_json['result']
 
@@ -129,7 +138,7 @@ def get_geth_running_version():
         version_agent)
     if not result:
         log.error(f'Cannot parse {version_agent} for Geth version.')
-        return False
+        return UNKNOWN_VALUE
 
     return result.group('version')
 
@@ -143,19 +152,40 @@ def get_geth_available_version():
     if process_result.returncode != 0:
         log.error(f'Unexpected return code from apt-cache. Return code: '
             f'{process_result.returncode}')
-        return False
+        return UNKNOWN_VALUE
     
     process_output = process_result.stdout
     result = re.search(r'Candidate: (?P<version>[^\+]+)', process_output)
     if not result:
         log.error(f'Cannot parse {process_output} for candidate version.')
-        return False
+        return UNKNOWN_VALUE
     
     return result.group('version')
 
 def get_geth_latest_version():
     # Get the latest stable version for Geth, potentially not available yet for update
-    pass
+
+    geth_gh_release_url = GITHUB_REST_API_URL + GETH_LATEST_RELEASE
+    headers = {'Accept': GITHUB_API_VERSION}
+    try:
+        response = httpx.get(geth_gh_release_url, headers=headers,
+            follow_redirects=True)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while getting the latest stable version for Geth. {exception}')
+        return UNKNOWN_VALUE
+
+    if response.status_code != 200:
+        log.error(f'HTTP error while getting the latest stable version for Geth. '
+            f'Status code {response.status_code}')
+        return UNKNOWN_VALUE
+    
+    release_json = response.json()
+
+    import pprint
+    pp = pprint.PrettyPrinter(indent=2)
+    pp.pprint(release_json)
+
+    return UNKNOWN_VALUE
 
 def use_default_client(context):
     # Set the default clients in context if they are not provided
