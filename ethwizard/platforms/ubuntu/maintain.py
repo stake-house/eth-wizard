@@ -181,11 +181,18 @@ def get_geth_latest_version():
     
     release_json = response.json()
 
-    import pprint
-    pp = pprint.PrettyPrinter(indent=2)
-    pp.pprint(release_json)
-
-    return UNKNOWN_VALUE
+    if 'tag_name' not in release_json or not isinstance(release_json['tag_name'], str):
+        log.error(f'Unable to find tag name in Github response while getting the latest stable '
+            f'version for Geth.')
+        return UNKNOWN_VALUE
+    
+    tag_name = release_json['tag_name']
+    result = re.search(r'v?(?P<version>.+)', tag_name)
+    if not result:
+        log.error(f'Cannot parse tag name {tag_name} for Geth version.')
+        return UNKNOWN_VALUE
+    
+    return result.group('version')
 
 def use_default_client(context):
     # Set the default clients in context if they are not provided
