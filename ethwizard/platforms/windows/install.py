@@ -1757,11 +1757,11 @@ Do you want to skip installing the JRE?
         try:
             log.info('Getting JRE builds...')
 
-            response = httpx.get(ADOPTIUM_11_API_URL, params=ADOPTIUM_11_API_PARAMS,
+            response = httpx.get(ADOPTIUM_17_API_URL, params=ADOPTIUM_17_API_PARAMS,
                 follow_redirects=True)
 
             if response.status_code != 200:
-                log.error(f'Cannot connect to JRE builds URL {ADOPTIUM_11_API_URL}.\n'
+                log.error(f'Cannot connect to JRE builds URL {ADOPTIUM_17_API_URL}.\n'
                     f'Unexpected status code {response.status_code}')
                 return False
             
@@ -1771,7 +1771,7 @@ Do you want to skip installing the JRE?
                 type(response_json) is not list or
                 len(response_json) == 0 or
                 type(response_json[0]) is not dict):
-                log.error(f'Unexpected response from JRE builds URL {ADOPTIUM_11_API_URL}')
+                log.error(f'Unexpected response from JRE builds URL {ADOPTIUM_17_API_URL}')
                 return False
             
             binaries = response_json
@@ -1804,7 +1804,7 @@ Do you want to skip installing the JRE?
                     'checksum' not in package or
                     'link' not in package):
                     log.error(f'Unexpected response from JRE builds URL '
-                        f'{ADOPTIUM_11_API_URL} in package')
+                        f'{ADOPTIUM_17_API_URL} in package')
                     return False
                 
                 package_name = package['name']
@@ -1819,7 +1819,7 @@ Do you want to skip installing the JRE?
                 })
 
         except httpx.RequestError as exception:
-            log.error(f'Cannot connect to JRE builds URL {ADOPTIUM_11_API_URL}.'
+            log.error(f'Cannot connect to JRE builds URL {ADOPTIUM_17_API_URL}.'
                 f'\nException {exception}')
             return False
 
@@ -2340,7 +2340,7 @@ To examine your teku service logs, inspect the following files:
     keep_retrying = True
 
     retry_index = 0
-    retry_count = 10
+    retry_count = 6
     retry_delay = 30
     retry_delay_increase = 10
     last_exception = None

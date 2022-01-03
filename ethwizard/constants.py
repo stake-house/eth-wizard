@@ -172,8 +172,8 @@ GETH_ARGUMENTS = {
 WINDOWS_SERVICE_RUNNING = 'SERVICE_RUNNING'
 WINDOWS_SERVICE_START_PENDING = 'SERVICE_START_PENDING'
 
-ADOPTIUM_11_API_URL = 'https://api.adoptium.net/v3/assets/latest/11/hotspot'
-ADOPTIUM_11_API_PARAMS = {
+ADOPTIUM_17_API_URL = 'https://api.adoptium.net/v3/assets/latest/17/hotspot'
+ADOPTIUM_17_API_PARAMS = {
     'release': 'latest',
     'jvm_impl': 'hotspot',
     'vendor': 'adoptium'
