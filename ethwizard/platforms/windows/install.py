@@ -2253,7 +2253,7 @@ Do you want to remove this directory first and start from nothing?
         str(nssm_binary), 'start', teku_service_name
     ])
 
-    delay = 30
+    delay = 45
     log.info(f'We are giving {delay} seconds for the teku service to start properly.')
     time.sleep(delay)
 
@@ -2336,22 +2336,38 @@ To examine your teku service logs, inspect the following files:
     headers = {
         'accept': 'application/json'
     }
-    try:
-        response = httpx.get(teku_query_url, headers=headers)
-    except httpx.RequestError as exception:
 
-        # Check for evidence of wrong password file
-        if teku_stderr_log_path.is_file():
-            log_part = ''
-            with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
-                log_file.seek(-1024, 2)
-                log_part = log_file.read(1024)
-            result = re.search(r'Failed to decrypt', log_part)
-            if result:
-                subprocess.run([
-                    str(nssm_binary), 'stop', teku_service_name])
-                
-                log.error(
+    keep_retrying = True
+
+    retry_index = 0
+    retry_count = 10
+    retry_delay = 30
+    retry_delay_increase = 10
+    last_exception = None
+    last_status_code = None
+
+    while keep_retrying and retry_index < retry_count:
+        try:
+            response = httpx.get(teku_query_url, headers=headers)
+        except httpx.RequestError as exception:
+            last_exception = exception
+
+            # Check for evidence of wrong password file
+            if teku_stderr_log_path.is_file():
+                log_part = ''
+                try:
+                    with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
+                        log_file.seek(-1024, 2)
+                        log_part = log_file.read(1024)
+                except OSError as os_exception:
+                    log.warning(f'Unable to read Teku log file in {teku_stderr_log_path}. '
+                        f'{os_exception}')
+                result = re.search(r'Failed to decrypt', log_part)
+                if result:
+                    subprocess.run([
+                        str(nssm_binary), 'stop', teku_service_name])
+                    
+                    log.error(
 f'''
 Your password file contains the wrong password. Teku cannot be started. You
 might need to generate your keys again or fix your password file. We cannot
@@ -2360,80 +2376,106 @@ continue.
 Your password files are the .txt files in:
 
 {keys['validator_keys_path']}
-'''             )
-                return False
+'''                 )
+                    return False
+            
+            log.warning(f'Exception {exception} when trying to connect to teku HTTP server on '
+                f'{teku_query_url}')
 
-        result = button_dialog(
-            title='Cannot connect to Teku',
-            text=(
-f'''
-We could not connect to teku HTTP server. Here are some details for this
-last test we tried to perform:
+            retry_index = retry_index + 1
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            retry_delay = retry_delay + retry_delay_increase
+            continue
 
-URL: {teku_query_url}
-Method: GET
-Headers: {headers}
-Exception: {exception}
+        if response.status_code != 200:
+            last_status_code = response.status_code
 
-We cannot proceed if the teku HTTP server is not responding properly. Make
-sure to check the logs and fix any issue found there. You can see the logs
-in:
-
-{teku_stdout_log_path}
-{teku_stderr_log_path}
-'''         ),
-            buttons=[
-                ('Quit', False)
-            ]
-        ).run()
-
-        log.info(
-f'''
-To examine your teku service logs, inspect the following files:
-
-{teku_stdout_log_path}
-{teku_stderr_log_path}
-'''
-        )
-
-        return False
-
-    if response.status_code != 200:
-        result = button_dialog(
-            title='Cannot connect to Teku',
-            text=(
-f'''
-We could not connect to teku HTTP server. Here are some details for this
-last test we tried to perform:
-
-URL: {teku_query_url}
-Method: GET
-Headers: {headers}
-Status code: {response.status_code}
-
-We cannot proceed if the teku HTTP server is not responding properly. Make
-sure to check the logs and fix any issue found there. You can see the logs
-in:
-
-{teku_stdout_log_path}
-{teku_stderr_log_path}
-'''         ),
-            buttons=[
-                ('Quit', False)
-            ]
-        ).run()
-
-        log.info(
-f'''
-To examine your teku service logs, inspect the following files:
-
-{teku_stdout_log_path}
-{teku_stderr_log_path}
-'''
-        )
-
-        return False
+            log.error(f'Error code {response.status_code} when trying to connect to teku HTTP '
+                f'server on {teku_query_url}')
+            
+            retry_index = retry_index + 1
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            retry_delay = retry_delay + retry_delay_increase
+            continue
+        
+        keep_retrying = False
+        last_exception = None
+        last_status_code = None
     
+    if keep_retrying:
+        if last_exception is not None:
+            result = button_dialog(
+                title='Cannot connect to Teku',
+                text=(
+f'''
+We could not connect to teku HTTP server. Here are some details for this
+last test we tried to perform:
+
+URL: {teku_query_url}
+Method: GET
+Headers: {headers}
+Exception: {last_exception}
+
+We cannot proceed if the teku HTTP server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            log.info(
+f'''
+To examine your teku service logs, inspect the following files:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''
+            )
+
+            return False
+        elif last_status_code is not None:
+            result = button_dialog(
+                title='Cannot connect to Teku',
+                text=(
+f'''
+We could not connect to teku HTTP server. Here are some details for this
+last test we tried to perform:
+
+URL: {teku_query_url}
+Method: GET
+Headers: {headers}
+Status code: {last_status_code}
+
+We cannot proceed if the teku HTTP server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            log.info(
+f'''
+To examine your teku service logs, inspect the following files:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''
+            )
+
+            return False
+
     # Verify proper Teku syncing
     def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
         bn_is_working = False

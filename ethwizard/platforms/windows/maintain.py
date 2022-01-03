@@ -8,21 +8,16 @@ from ethwizard.constants import (
     WIZARD_COMPLETED_STEP_ID
 )
 
-import pprint
-
 def enter_maintenance(context):
     # Maintenance entry point for Windows.
     # Maintenance is started after the wizard has completed.
 
-    log.info(f'Entering maintenance mode.')
+    log.info(f'Entering maintenance mode. To be implemented.')
 
     if context is None:
         log.error('Missing context.')
 
     context = use_default_client(context)
-
-    pp = pprint.PrettyPrinter(indent=2)
-    pp.pprint(context)
 
     if context is None:
         log.error('Missing context.')
