@@ -4721,7 +4721,7 @@ Do you want to skip installing windows exporter?
         log.info(f'Installing windows exporter using {url_file_name} ...')
         process_result = subprocess.run([
             'msiexec', '/i', str(we_installer_path), 'ENABLED_COLLECTORS=[defaults],time,process',
-            'LISTEN_ADDR=127.0.0.1', '/qn'
+            'LISTEN_ADDR=127.0.0.1', 'LISTEN_PORT=9182', '/qn'
         ])
 
         # Remove download leftovers
