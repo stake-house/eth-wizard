@@ -227,8 +227,8 @@ In order to improve your ability to connect with peers, you should have
 exposed ports to the Internet on your machine. Here are the default open
 ports needed for this:
 
-Ethereum 1 node: {ports['eth1']} (TCP/UDP)
-Ethereum 2 beacon node: {ports['eth2_bn']} (TCP/UDP)
+Execution node: {ports['eth1']} (TCP/UDP)
+Consensus beacon node: {ports['eth2_bn']} (TCP/UDP)
 
 If this machine is behind a router or another network device that blocks
 incoming connections on those ports, you will have to configure those
@@ -267,10 +267,10 @@ port.</style>'''
                 )
 
             entered_port = input_dialog(
-                title='Custom port for Ethereum 1 node',
+                title='Custom port for execution node',
                 text=(HTML(
 f'''
-Please enter your custom port for your Ethereum 1 node:
+Please enter your custom port for your execution node:
 
 The default port is {ports['eth1']} (TCP/UDP)
 
@@ -313,15 +313,15 @@ port.</style>'''
                 )
 
             entered_port = input_dialog(
-                title='Custom port for Ethereum 2 beacon node',
+                title='Custom port for consensus beacon node',
                 text=(HTML(
 f'''
-Please enter your custom port for your Ethereum 2 beacon node:
+Please enter your custom port for your consensus beacon node:
 
 The default port is {ports['eth2_bn']} (TCP/UDP)
 
 That port number should be greater than 1024 and lower than 65535. It
-should also be different from the one you choose for Ethereum 1 node.
+should also be different from the one you choose for execution node.
 
 * Press the tab key to switch between the controls below{not_valid_msg}
 '''             ))).run()
