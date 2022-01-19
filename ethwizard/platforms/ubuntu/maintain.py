@@ -61,9 +61,6 @@ def show_dashboard(context):
     if not execution_client_details:
         return False
 
-    print('Geth details:')
-    print(execution_client_details)
-
     # Find out if we need to do maintenance for the execution client
 
     execution_client_details['next_step'] = MAINTENANCE_DO_NOTHING
@@ -89,6 +86,9 @@ def show_dashboard(context):
     if installed_version != UNKNOWN_VALUE and available_version != UNKNOWN_VALUE:
         if installed_version < available_version:
             execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
+
+    print('Geth details:')
+    print(execution_client_details)
 
     return True
 
