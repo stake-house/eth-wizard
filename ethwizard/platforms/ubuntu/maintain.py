@@ -87,13 +87,14 @@ Service states - Load: {service_details['LoadState']}, Active: {service_details[
 '''
         ).strip()
 
+        geth_installed_version = get_geth_installed_version()
         geth_running_version = get_geth_running_version()
         geth_available_version = get_geth_available_version()
         geth_latest_version = get_geth_latest_version()
 
         details = details + '\n' + (
 f'''
-Version - Running: {geth_running_version}, Available: {geth_available_version}, Latest: {geth_latest_version}
+Version - I: {geth_installed_version}, R: {geth_running_version}, A: {geth_available_version}, L: {geth_latest_version}
 '''
         ).strip()
 
@@ -102,6 +103,25 @@ Version - Running: {geth_running_version}, Available: {geth_available_version}, 
     else:
         log.error(f'Unknown execution client {execution_client}.')
         return False
+
+def get_geth_installed_version():
+    # Get the installed version for Geth
+
+    process_result = subprocess.run(['geth', 'version'], capture_output=True,
+        text=True)
+    
+    if process_result.returncode != 0:
+        log.error(f'Unexpected return code from geth. Return code: '
+            f'{process_result.returncode}')
+        return UNKNOWN_VALUE
+    
+    process_output = process_result.stdout
+    result = re.search(r'Version: (?P<version>[^-]+)', process_output)
+    if not result:
+        log.error(f'Cannot parse {process_output} for Geth installed version.')
+        return UNKNOWN_VALUE
+    
+    return result.group('version')
 
 def get_geth_running_version():
     # Get the running version for Geth
@@ -158,7 +178,7 @@ def get_geth_available_version():
     process_output = process_result.stdout
     result = re.search(r'Candidate: (?P<version>[^\+]+)', process_output)
     if not result:
-        log.error(f'Cannot parse {process_output} for candidate version.')
+        log.error(f'Cannot parse {process_output} for Geth candidate version.')
         return UNKNOWN_VALUE
     
     return result.group('version')
