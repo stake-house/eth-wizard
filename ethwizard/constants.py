@@ -94,6 +94,7 @@ WIZARD_COMPLETED_STEP_ID = 'wizard_completed'
 MAINTENANCE_DO_NOTHING = 'do_nothing'
 MAINTENANCE_RESTART_SERVICE = 'restart_service'
 MAINTENANCE_UPGRADE_CLIENT = 'upgrade_client'
+MAINTENANCE_CHECK_AGAIN_SOON = 'check_again_soon'
 
 UNKNOWN_VALUE = 'Unknown'
 

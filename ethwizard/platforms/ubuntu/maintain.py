@@ -27,7 +27,8 @@ from ethwizard.constants import (
     GETH_SYSTEMD_SERVICE_NAME,
     MAINTENANCE_DO_NOTHING,
     MAINTENANCE_RESTART_SERVICE,
-    MAINTENANCE_UPGRADE_CLIENT
+    MAINTENANCE_UPGRADE_CLIENT,
+    MAINTENANCE_CHECK_AGAIN_SOON
 )
 
 def enter_maintenance(context):
@@ -74,6 +75,16 @@ def show_dashboard(context):
     available_version = execution_client_details['versions']['available']
     if available_version != UNKNOWN_VALUE:
         available_version = parse_version(available_version)
+    latest_version = execution_client_details['versions']['latest']
+    if latest_version != UNKNOWN_VALUE:
+        latest_version = parse_version(latest_version)
+
+    # If the available version is older than the latest one, we need to check again soon
+    # It simply means that the updated build is not available yet for installing
+
+    if is_version(latest_version) and is_version(available_version):
+        if available_version < latest_version:
+            execution_client_details['next_step'] = MAINTENANCE_CHECK_AGAIN_SOON
 
     # If the running version is older than the installed one, we need to restart the service
 
