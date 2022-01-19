@@ -2,6 +2,8 @@ import subprocess
 import httpx
 import re
 
+from distutils.version import LooseVersion
+
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog
 
@@ -22,7 +24,10 @@ from ethwizard.constants import (
     GITHUB_REST_API_URL,
     GETH_LATEST_RELEASE,
     GITHUB_API_VERSION,
-    GETH_SYSTEMD_SERVICE_NAME
+    GETH_SYSTEMD_SERVICE_NAME,
+    MAINTENANCE_DO_NOTHING,
+    MAINTENANCE_RESTART_SERVICE,
+    MAINTENANCE_UPGRADE_CLIENT
 )
 
 def enter_maintenance(context):
@@ -58,6 +63,32 @@ def show_dashboard(context):
 
     print('Geth details:')
     print(execution_client_details)
+
+    # Find out if we need to do maintenance for the execution client
+
+    execution_client_details['next_step'] = MAINTENANCE_DO_NOTHING
+
+    installed_version = execution_client_details['versions']['installed']
+    if installed_version != UNKNOWN_VALUE:
+        installed_version = LooseVersion(installed_version)
+    running_version = execution_client_details['versions']['running']
+    if running_version != UNKNOWN_VALUE:
+        running_version = LooseVersion(running_version)
+    available_version = execution_client_details['versions']['available']
+    if available_version != UNKNOWN_VALUE:
+        available_version = LooseVersion(available_version)
+
+    # If the running version is older than the installed one, we need to restart the service
+
+    if installed_version != UNKNOWN_VALUE and running_version != UNKNOWN_VALUE:
+        if running_version < installed_version:
+            execution_client_details['next_step'] = MAINTENANCE_RESTART_SERVICE
+
+    # If the installed version is older than the available one, we need to upgrade the client
+
+    if installed_version != UNKNOWN_VALUE and available_version != UNKNOWN_VALUE:
+        if installed_version < available_version:
+            execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
 
     return True
 
@@ -128,7 +159,11 @@ def get_geth_installed_version():
         log.error(f'Cannot parse {process_output} for Geth installed version.')
         return UNKNOWN_VALUE
     
-    return result.group('version')
+    installed_version = result.group('version')
+
+    log.info(f'Geth installed version is {installed_version}')
+
+    return installed_version
 
 def get_geth_running_version():
     # Get the running version for Geth
@@ -170,7 +205,11 @@ def get_geth_running_version():
         log.error(f'Cannot parse {version_agent} for Geth version.')
         return UNKNOWN_VALUE
 
-    return result.group('version')
+    running_version = result.group('version')
+
+    log.info(f'Geth running version is {running_version}')
+
+    return running_version
 
 def get_geth_available_version():
     # Get the available version for Geth, potentially for update
@@ -192,7 +231,11 @@ def get_geth_available_version():
         log.error(f'Cannot parse {process_output} for Geth candidate version.')
         return UNKNOWN_VALUE
     
-    return result.group('version')
+    available_version = result.group('version')
+
+    log.info(f'Geth available version is {available_version}')
+
+    return available_version
 
 def get_geth_latest_version():
     # Get the latest stable version for Geth, potentially not available yet for update
@@ -226,7 +269,11 @@ def get_geth_latest_version():
         log.error(f'Cannot parse tag name {tag_name} for Geth version.')
         return UNKNOWN_VALUE
     
-    return result.group('version')
+    latest_version = result.group('version')
+
+    log.info(f'Geth latest version is {latest_version}')
+
+    return latest_version
 
 def use_default_client(context):
     # Set the default clients in context if they are not provided

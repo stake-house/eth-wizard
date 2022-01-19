@@ -91,6 +91,10 @@ SHOW_PUBLIC_KEYS_STEP_ID = 'show_public_keys_step'
 
 WIZARD_COMPLETED_STEP_ID = 'wizard_completed'
 
+MAINTENANCE_DO_NOTHING = 'do_nothing'
+MAINTENANCE_RESTART_SERVICE = 'restart_service'
+MAINTENANCE_UPGRADE_CLIENT = 'upgrade_client'
+
 UNKNOWN_VALUE = 'Unknown'
 
 CHOCOLATEY_DEFAULT_BIN_PATH = r'C:\ProgramData\chocolatey\bin'
