@@ -56,12 +56,28 @@ def show_dashboard(context):
     if not execution_client_details:
         return False
 
+    print('Geth details:')
     print(execution_client_details)
 
     return True
 
 def get_execution_client_details(execution_client):
     # Get the details shown on the dashboard for the execution client
+
+    details = {
+        'service': {
+            'found': False,
+            'load': UNKNOWN_VALUE,
+            'active': UNKNOWN_VALUE,
+            'sub': UNKNOWN_VALUE
+        },
+        'versions': {
+            'installed': UNKNOWN_VALUE,
+            'running': UNKNOWN_VALUE,
+            'available': UNKNOWN_VALUE,
+            'latest': UNKNOWN_VALUE
+        }
+    }
 
     if execution_client == EXECUTION_CLIENT_GETH:
         
@@ -75,28 +91,17 @@ def get_execution_client_details(execution_client):
             geth_service_exists = True
         
         if not geth_service_exists:
-            return (
-f'''
-Service not found.
-'''
-            ).strip()
+            return details
         
-        details = (
-f'''
-Service states - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
-'''
-        ).strip()
+        details['service']['found'] = True
+        details['service']['load'] = service_details['LoadState']
+        details['service']['active'] = service_details['ActiveState']
+        details['service']['sub'] = service_details['SubState']
 
-        geth_installed_version = get_geth_installed_version()
-        geth_running_version = get_geth_running_version()
-        geth_available_version = get_geth_available_version()
-        geth_latest_version = get_geth_latest_version()
-
-        details = details + '\n' + (
-f'''
-Version - I: {geth_installed_version}, R: {geth_running_version}, A: {geth_available_version}, L: {geth_latest_version}
-'''
-        ).strip()
+        details['versions']['installed'] = get_geth_installed_version()
+        details['versions']['running'] = get_geth_running_version()
+        details['versions']['available'] = get_geth_available_version()
+        details['versions']['latest'] = get_geth_latest_version()
 
         return details
 
@@ -106,6 +111,8 @@ Version - I: {geth_installed_version}, R: {geth_running_version}, A: {geth_avail
 
 def get_geth_installed_version():
     # Get the installed version for Geth
+
+    log.info('Getting Geth installed version...')
 
     process_result = subprocess.run(['geth', 'version'], capture_output=True,
         text=True)
@@ -125,6 +132,8 @@ def get_geth_installed_version():
 
 def get_geth_running_version():
     # Get the running version for Geth
+
+    log.info('Getting Geth running version...')
 
     local_geth_jsonrpc_url = 'http://127.0.0.1:8545'
     request_json = {
@@ -166,6 +175,8 @@ def get_geth_running_version():
 def get_geth_available_version():
     # Get the available version for Geth, potentially for update
 
+    log.info('Getting Geth available version...')
+
     subprocess.run(['apt', '-y', 'update'])
     process_result = subprocess.run(['apt-cache', 'policy', 'geth'], capture_output=True,
         text=True)
@@ -185,6 +196,8 @@ def get_geth_available_version():
 
 def get_geth_latest_version():
     # Get the latest stable version for Geth, potentially not available yet for update
+
+    log.info('Getting Geth latest version...')
 
     geth_gh_release_url = GITHUB_REST_API_URL + GETH_LATEST_RELEASE
     headers = {'Accept': GITHUB_API_VERSION}
