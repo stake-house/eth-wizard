@@ -169,6 +169,8 @@ GETH_ARGUMENTS = {
     NETWORK_PRATER: ['--goerli', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof']
 }
 
+GETH_SYSTEMD_SERVICE_NAME = 'geth.service'
+
 WINDOWS_SERVICE_RUNNING = 'SERVICE_RUNNING'
 WINDOWS_SERVICE_START_PENDING = 'SERVICE_START_PENDING'
 

@@ -21,7 +21,8 @@ from ethwizard.constants import (
     UNKNOWN_VALUE,
     GITHUB_REST_API_URL,
     GETH_LATEST_RELEASE,
-    GITHUB_API_VERSION
+    GITHUB_API_VERSION,
+    GETH_SYSTEMD_SERVICE_NAME
 )
 
 def enter_maintenance(context):
@@ -66,7 +67,7 @@ def get_execution_client_details(execution_client):
         
         # Check for existing systemd service
         geth_service_exists = False
-        geth_service_name = 'geth.service'
+        geth_service_name = GETH_SYSTEMD_SERVICE_NAME
 
         service_details = get_systemd_service_details(geth_service_name)
 

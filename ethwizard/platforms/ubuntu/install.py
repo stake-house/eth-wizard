@@ -848,7 +848,7 @@ def install_geth(network, ports):
 
     # Check for existing systemd service
     geth_service_exists = False
-    geth_service_name = 'geth.service'
+    geth_service_name = GETH_SYSTEMD_SERVICE_NAME
 
     service_details = get_systemd_service_details(geth_service_name)
 
