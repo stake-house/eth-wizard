@@ -2,7 +2,7 @@ import subprocess
 import httpx
 import re
 
-from distutils.version import LooseVersion
+from packaging.version import parse as parse_version, Version
 
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog
@@ -67,23 +67,23 @@ def show_dashboard(context):
 
     installed_version = execution_client_details['versions']['installed']
     if installed_version != UNKNOWN_VALUE:
-        installed_version = LooseVersion(installed_version)
+        installed_version = parse_version(installed_version)
     running_version = execution_client_details['versions']['running']
     if running_version != UNKNOWN_VALUE:
-        running_version = LooseVersion(running_version)
+        running_version = parse_version(running_version)
     available_version = execution_client_details['versions']['available']
     if available_version != UNKNOWN_VALUE:
-        available_version = LooseVersion(available_version)
+        available_version = parse_version(available_version)
 
     # If the running version is older than the installed one, we need to restart the service
 
-    if installed_version != UNKNOWN_VALUE and running_version != UNKNOWN_VALUE:
+    if is_version(installed_version) and is_version(running_version):
         if running_version < installed_version:
             execution_client_details['next_step'] = MAINTENANCE_RESTART_SERVICE
 
     # If the installed version is older than the available one, we need to upgrade the client
 
-    if installed_version != UNKNOWN_VALUE and available_version != UNKNOWN_VALUE:
+    if is_version(installed_version) and is_version(available_version):
         if installed_version < available_version:
             execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
 
@@ -91,6 +91,10 @@ def show_dashboard(context):
     print(execution_client_details)
 
     return True
+
+def is_version(value):
+    # Return true if this is a packaging version
+    return isinstance(value, Version)
 
 def get_execution_client_details(execution_client):
     # Get the details shown on the dashboard for the execution client
