@@ -115,6 +115,36 @@ def show_dashboard(context):
         log.error('Unable to get consensus client details.')
         return False
     
+    installed_version = consensus_client_details['versions']['installed']
+    if installed_version != UNKNOWN_VALUE:
+        installed_version = parse_version(installed_version)
+    running_version = consensus_client_details['versions']['running']
+    if running_version != UNKNOWN_VALUE:
+        running_version = parse_version(running_version)
+    latest_version = consensus_client_details['versions']['latest']
+    if latest_version != UNKNOWN_VALUE:
+        latest_version = parse_version(latest_version)
+    
+    # If the beacon node service is not install or found, we need to reinstall Lighthouse beacon
+    # node service
+    # TODO: Test for service installed and reinstall if needed
+
+    # If the validator client service is not install or found, we need to reinstall Lighthouse beacon
+    # node service
+    # TODO: Test for service installed and reinstall if needed
+
+    # If the running version is older than the installed one, we need to restart the services
+
+    if is_version(installed_version) and is_version(running_version):
+        if running_version < installed_version:
+            consensus_client_details['next_step'] = MAINTENANCE_RESTART_SERVICE
+
+    # If the installed version is older than the latest one, we need to upgrade the client
+
+    if is_version(installed_version) and is_version(latest_version):
+        if installed_version < latest_version:
+            consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
+
     print('Lighthouse details:')
     print(consensus_client_details)
 
@@ -328,7 +358,6 @@ def get_consensus_client_details(consensus_client):
             'versions': {
                 'installed': UNKNOWN_VALUE,
                 'running': UNKNOWN_VALUE,
-                'available': UNKNOWN_VALUE,
                 'latest': UNKNOWN_VALUE
             }
         }
