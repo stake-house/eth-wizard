@@ -94,11 +94,9 @@ def show_welcome():
     # Show a welcome message about this wizard
 
     result = button_dialog(
-        title='Welcome!',
+        title='Welcome to eth-wizard!',
         text=(
 '''
-Welcome to eth-wizard!
-
 This setup assistant is meant to guide anyone through the different steps
 to become a fully functional validator on the Ethereum network. It will
 install and configure all the software needed to become a validator. It
