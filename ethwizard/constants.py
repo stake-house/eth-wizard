@@ -176,6 +176,11 @@ GETH_ARGUMENTS = {
 
 GETH_SYSTEMD_SERVICE_NAME = 'geth.service'
 
+LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME = 'lighthousebeacon.service'
+LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME = 'lighthousevalidator.service'
+LIGHTHOUSE_INSTALLED_DIRECTORY = '/usr/local/bin'
+LIGHTHOUSE_INSTALLED_PATH = f'{LIGHTHOUSE_INSTALLED_DIRECTORY}/lighthouse'
+
 WINDOWS_SERVICE_RUNNING = 'SERVICE_RUNNING'
 WINDOWS_SERVICE_START_PENDING = 'SERVICE_START_PENDING'
 
@@ -41607,7 +41612,7 @@ WantedBy=default.target
 
 LIGHTHOUSE_BN_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (
-'''
+f'''
 [Unit]
 Description=Lighthouse Ethereum Client Beacon Node (Mainnet)
 Wants=network-online.target
@@ -41619,13 +41624,13 @@ User=lighthousebeacon
 Group=lighthousebeacon
 Restart=always
 RestartSec=5
-ExecStart=/usr/local/bin/lighthouse bn --network mainnet --datadir /var/lib/lighthouse --staking --eth1-endpoints {eth1endpoints} --validator-monitor-auto --metrics{addparams}
+ExecStart={LIGHTHOUSE_INSTALLED_PATH} bn --network mainnet --datadir /var/lib/lighthouse --staking --eth1-endpoints {{eth1endpoints}} --validator-monitor-auto --metrics{{addparams}}
 
 [Install]
 WantedBy=multi-user.target
 '''),
     NETWORK_PRATER: (
-'''
+f'''
 [Unit]
 Description=Lighthouse Ethereum Client Beacon Node (Prater)
 Wants=network-online.target
@@ -41637,7 +41642,7 @@ User=lighthousebeacon
 Group=lighthousebeacon
 Restart=always
 RestartSec=5
-ExecStart=/usr/local/bin/lighthouse bn --network prater --datadir /var/lib/lighthouse --staking --eth1-endpoints {eth1endpoints} --validator-monitor-auto --metrics{addparams}
+ExecStart={LIGHTHOUSE_INSTALLED_PATH} bn --network prater --datadir /var/lib/lighthouse --staking --eth1-endpoints {{eth1endpoints}} --validator-monitor-auto --metrics{{addparams}}
 
 [Install]
 WantedBy=multi-user.target
@@ -41646,7 +41651,7 @@ WantedBy=multi-user.target
 
 LIGHTHOUSE_VC_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (
-'''
+f'''
 [Unit]
 Description=Lighthouse Ethereum Client Validator Client (Mainnet)
 Wants=network-online.target
@@ -41658,13 +41663,13 @@ Group=lighthousevalidator
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart=/usr/local/bin/lighthouse vc --network mainnet --datadir /var/lib/lighthouse --metrics
+ExecStart={LIGHTHOUSE_INSTALLED_PATH} vc --network mainnet --datadir /var/lib/lighthouse --metrics
 
 [Install]
 WantedBy=multi-user.target
 '''),
     NETWORK_PRATER: (
-'''
+f'''
 [Unit]
 Description=Lighthouse Ethereum Client Validator Client (Prater)
 Wants=network-online.target
@@ -41676,7 +41681,7 @@ Group=lighthousevalidator
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart=/usr/local/bin/lighthouse vc --network prater --datadir /var/lib/lighthouse --metrics
+ExecStart={LIGHTHOUSE_INSTALLED_PATH} vc --network prater --datadir /var/lib/lighthouse --metrics
 
 [Install]
 WantedBy=multi-user.target

@@ -28,7 +28,11 @@ from ethwizard.constants import (
     MAINTENANCE_DO_NOTHING,
     MAINTENANCE_RESTART_SERVICE,
     MAINTENANCE_UPGRADE_CLIENT,
-    MAINTENANCE_CHECK_AGAIN_SOON
+    MAINTENANCE_CHECK_AGAIN_SOON,
+    LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME,
+    LIGHTHOUSE_LATEST_RELEASE,
+    LIGHTHOUSE_INSTALLED_PATH,
+    BN_VERSION_EP
 )
 
 def enter_maintenance(context):
@@ -60,6 +64,7 @@ def show_dashboard(context):
 
     execution_client_details = get_execution_client_details(current_execution_client)
     if not execution_client_details:
+        log.error('Unable to get execution client details.')
         return False
 
     # Find out if we need to do maintenance for the execution client
@@ -78,6 +83,9 @@ def show_dashboard(context):
     latest_version = execution_client_details['versions']['latest']
     if latest_version != UNKNOWN_VALUE:
         latest_version = parse_version(latest_version)
+
+    # If the service is not install or found, we need to reinstall Geth
+    # TODO: Test for service installed and reinstall if needed
 
     # If the available version is older than the latest one, we need to check again soon
     # It simply means that the updated build is not available yet for installing
@@ -101,6 +109,14 @@ def show_dashboard(context):
     print('Geth details:')
     print(execution_client_details)
 
+    consensus_client_details = get_consensus_client_details(current_consensus_client)
+    if not consensus_client_details:
+        log.error('Unable to get consensus client details.')
+        return False
+    
+    print('Lighthouse details:')
+    print(consensus_client_details)
+
     return True
 
 def is_version(value):
@@ -108,24 +124,24 @@ def is_version(value):
     return isinstance(value, Version)
 
 def get_execution_client_details(execution_client):
-    # Get the details shown on the dashboard for the execution client
-
-    details = {
-        'service': {
-            'found': False,
-            'load': UNKNOWN_VALUE,
-            'active': UNKNOWN_VALUE,
-            'sub': UNKNOWN_VALUE
-        },
-        'versions': {
-            'installed': UNKNOWN_VALUE,
-            'running': UNKNOWN_VALUE,
-            'available': UNKNOWN_VALUE,
-            'latest': UNKNOWN_VALUE
-        }
-    }
+    # Get the details for the current execution client
 
     if execution_client == EXECUTION_CLIENT_GETH:
+
+        details = {
+            'service': {
+                'found': False,
+                'load': UNKNOWN_VALUE,
+                'active': UNKNOWN_VALUE,
+                'sub': UNKNOWN_VALUE
+            },
+            'versions': {
+                'installed': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE,
+                'available': UNKNOWN_VALUE,
+                'latest': UNKNOWN_VALUE
+            }
+        }
         
         # Check for existing systemd service
         geth_service_exists = False
@@ -287,6 +303,171 @@ def get_geth_latest_version():
     latest_version = result.group('version')
 
     log.info(f'Geth latest version is {latest_version}')
+
+    return latest_version
+
+def get_consensus_client_details(consensus_client):
+    # Get the details for the current consensus client
+
+    if consensus_client == CONSENSUS_CLIENT_LIGHTHOUSE:
+
+        details = {
+            'bn_service': {
+                'found': False,
+                'load': UNKNOWN_VALUE,
+                'active': UNKNOWN_VALUE,
+                'sub': UNKNOWN_VALUE
+            },
+            'vc_service': {
+                'found': False,
+                'load': UNKNOWN_VALUE,
+                'active': UNKNOWN_VALUE,
+                'sub': UNKNOWN_VALUE
+            },
+            'versions': {
+                'installed': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE,
+                'available': UNKNOWN_VALUE,
+                'latest': UNKNOWN_VALUE
+            }
+        }
+        
+        # Check for existing systemd services
+        lighthouse_bn_service_exists = False
+        lighthouse_bn_service_name = LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME
+
+        service_details = get_systemd_service_details(lighthouse_bn_service_name)
+
+        if service_details['LoadState'] == 'loaded':
+            lighthouse_bn_service_exists = True
+
+            details['bn_service']['found'] = True
+            details['bn_service']['load'] = service_details['LoadState']
+            details['bn_service']['active'] = service_details['ActiveState']
+            details['bn_service']['sub'] = service_details['SubState']
+
+        lighthouse_vc_service_exists = False
+        lighthouse_vc_service_name = LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME
+
+        service_details = get_systemd_service_details(lighthouse_vc_service_name)
+
+        if service_details['LoadState'] == 'loaded':
+            lighthouse_vc_service_exists = True
+        
+            details['vc_service']['found'] = True
+            details['vc_service']['load'] = service_details['LoadState']
+            details['vc_service']['active'] = service_details['ActiveState']
+            details['vc_service']['sub'] = service_details['SubState']
+
+        details['versions']['installed'] = get_lighthouse_installed_version()
+        details['versions']['running'] = get_lighthouse_running_version()
+        details['versions']['latest'] = get_lighthouse_latest_version()
+
+        return details
+
+    else:
+        log.error(f'Unknown consensus client {consensus_client}.')
+        return False
+
+def get_lighthouse_installed_version():
+    # Get the installed version for Lighthouse
+
+    log.info('Getting Lighthouse installed version...')
+
+    process_result = subprocess.run([LIGHTHOUSE_INSTALLED_PATH, '--version'], capture_output=True,
+        text=True)
+    
+    if process_result.returncode != 0:
+        log.error(f'Unexpected return code from Lighthouse. Return code: '
+            f'{process_result.returncode}')
+        return UNKNOWN_VALUE
+    
+    process_output = process_result.stdout
+    result = re.search(r'Lighthouse v?(?P<version>[^-]+)', process_output)
+    if not result:
+        log.error(f'Cannot parse {process_output} for Lighthouse installed version.')
+        return UNKNOWN_VALUE
+    
+    installed_version = result.group('version')
+
+    log.info(f'Lighthouse installed version is {installed_version}')
+
+    return installed_version
+
+def get_lighthouse_running_version():
+    # Get the running version for Lighthouse
+
+    log.info('Getting Lighthouse running version...')
+
+    local_lighthouse_bn_version_url = 'http://127.0.0.1:5052' + BN_VERSION_EP
+
+    try:
+        response = httpx.get(local_lighthouse_bn_version_url)
+    except httpx.RequestError as exception:
+        log.error(f'Cannot connect to Lighthouse. Exception: {exception}')
+        return UNKNOWN_VALUE
+
+    if response.status_code != 200:
+        log.error(f'Unexpected status code from {local_lighthouse_bn_version_url}. Status code: '
+            f'{response.status_code}')
+        return UNKNOWN_VALUE
+    
+    response_json = response.json()
+
+    if 'data' not in response_json or 'version' not in response_json['data']:
+        log.error(f'Unexpected JSON response from {local_lighthouse_bn_version_url}. result not found.')
+        return UNKNOWN_VALUE
+    
+    version_agent = response_json['data']['version']
+
+    # Version agent should look like: Lighthouse/v2.0.1-aaa5344/x86_64-linux
+    result = re.search(r'Lighthouse/v(?P<version>[^-/]+)(-(?P<commit>[^-/]+))?',
+        version_agent)
+    if not result:
+        log.error(f'Cannot parse {version_agent} for Lighthouse version.')
+        return UNKNOWN_VALUE
+
+    running_version = result.group('version')
+
+    log.info(f'Lighthouse running version is {running_version}')
+
+    return running_version
+
+def get_lighthouse_latest_version():
+    # Get the latest version for Lighthouse
+
+    log.info('Getting Lighthouse latest version...')
+
+    lighthouse_gh_release_url = GITHUB_REST_API_URL + LIGHTHOUSE_LATEST_RELEASE
+    headers = {'Accept': GITHUB_API_VERSION}
+    try:
+        response = httpx.get(lighthouse_gh_release_url, headers=headers,
+            follow_redirects=True)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while getting the latest stable version for Lighthouse. {exception}')
+        return UNKNOWN_VALUE
+
+    if response.status_code != 200:
+        log.error(f'HTTP error while getting the latest stable version for Lighthouse. '
+            f'Status code {response.status_code}')
+        return UNKNOWN_VALUE
+    
+    release_json = response.json()
+
+    if 'tag_name' not in release_json or not isinstance(release_json['tag_name'], str):
+        log.error(f'Unable to find tag name in Github response while getting the latest stable '
+            f'version for Lighthouse.')
+        return UNKNOWN_VALUE
+    
+    tag_name = release_json['tag_name']
+    result = re.search(r'v?(?P<version>.+)', tag_name)
+    if not result:
+        log.error(f'Cannot parse tag name {tag_name} for Lighthouse version.')
+        return UNKNOWN_VALUE
+    
+    latest_version = result.group('version')
+
+    log.info(f'Lighthouse latest version is {latest_version}')
 
     return latest_version
 

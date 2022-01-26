@@ -1444,7 +1444,7 @@ def install_lighthouse(network, eth1_fallbacks, consensus_checkpoint_url, ports)
 
     # Check for existing systemd service
     lighthouse_bn_service_exists = False
-    lighthouse_bn_service_name = 'lighthousebeacon.service'
+    lighthouse_bn_service_name = LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME
 
     service_details = get_systemd_service_details(lighthouse_bn_service_name)
 
@@ -1701,7 +1701,7 @@ binary after {retry_count} retries.
         
         # Extracting the Lighthouse binary archive
         subprocess.run([
-            'tar', 'xvf', binary_path, '--directory', '/usr/local/bin'])
+            'tar', 'xvf', binary_path, '--directory', LIGHTHOUSE_INSTALLED_DIRECTORY])
         
         # Remove download leftovers
         binary_path.unlink()
@@ -2211,7 +2211,7 @@ def obtain_keys(network):
     lighthouse_datadir = Path('/var/lib/lighthouse')
 
     process_result = subprocess.run([
-        '/usr/local/bin/lighthouse', '--network', network, 'account', 'validator', 'list',
+        LIGHTHOUSE_INSTALLED_PATH, '--network', network, 'account', 'validator', 'list',
         '--datadir', lighthouse_datadir
         ], capture_output=True, text=True)
     if process_result.returncode == 0:
@@ -2598,7 +2598,7 @@ def install_lighthouse_validator(network, keys):
 
     # Check for existing systemd service
     lighthouse_vc_service_exists = False
-    lighthouse_vc_service_name = 'lighthousevalidator.service'
+    lighthouse_vc_service_name = LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME
 
     service_details = get_systemd_service_details(lighthouse_vc_service_name)
 
@@ -2723,7 +2723,7 @@ this directory will also remove any key imported previously.
 
     if len(keys['keystore_paths']) > 0:
         subprocess.run([
-            '/usr/local/bin/lighthouse', '--network', network, 'account', 'validator', 'import',
+            LIGHTHOUSE_INSTALLED_PATH, '--network', network, 'account', 'validator', 'import',
             '--directory', keys['validator_keys_path'], '--datadir', lighthouse_datadir])
     else:
         log.warning('No keystore files found to import. We\'ll guess they were already imported '
@@ -2734,7 +2734,7 @@ this directory will also remove any key imported previously.
     public_keys = []
 
     process_result = subprocess.run([
-        '/usr/local/bin/lighthouse', '--network', network, 'account', 'validator', 'list',
+        LIGHTHOUSE_INSTALLED_PATH, '--network', network, 'account', 'validator', 'list',
         '--datadir', lighthouse_datadir
         ], capture_output=True, text=True)
     if process_result.returncode == 0:
@@ -2859,7 +2859,7 @@ def initiate_deposit(network, keys):
     # Check for syncing status before prompting for deposit
 
     # Check if the Lighthouse beacon node service is still running
-    lighthouse_bn_service_name = 'lighthousebeacon.service'
+    lighthouse_bn_service_name = LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME
 
     service_details = get_systemd_service_details(lighthouse_bn_service_name)
 
