@@ -29,6 +29,8 @@ from ethwizard.constants import (
     MAINTENANCE_RESTART_SERVICE,
     MAINTENANCE_UPGRADE_CLIENT,
     MAINTENANCE_CHECK_AGAIN_SOON,
+    MAINTENANCE_START_SERVICE,
+    MAINTENANCE_REINSTALL_CLIENT,
     LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME,
     LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME,
     LIGHTHOUSE_LATEST_RELEASE,
@@ -85,15 +87,20 @@ def show_dashboard(context):
     if latest_version != UNKNOWN_VALUE:
         latest_version = parse_version(latest_version)
 
-    # If the service is not install or found, we need to reinstall Geth
-    # TODO: Test for service installed and reinstall if needed
-
     # If the available version is older than the latest one, we need to check again soon
     # It simply means that the updated build is not available yet for installing
 
     if is_version(latest_version) and is_version(available_version):
         if available_version < latest_version:
             execution_client_details['next_step'] = MAINTENANCE_CHECK_AGAIN_SOON
+
+    # If the service is not running, we need to start it
+
+    if execution_client_details['service']['found'] and not (
+        execution_client_details['service']['active'] == 'active' and
+        execution_client_details['service']['sub'] == 'running'
+        ):
+        execution_client_details['next_step'] = MAINTENANCE_START_SERVICE
 
     # If the running version is older than the installed one, we need to restart the service
 
@@ -107,8 +114,14 @@ def show_dashboard(context):
         if installed_version < available_version:
             execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
 
+    # If the service is not installed or found, we need to reinstall the client
+
+    if not execution_client_details['service']['found']:
+        execution_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
+
     print('Geth details:')
     print(execution_client_details)
+
 
     consensus_client_details = get_consensus_client_details(current_consensus_client)
     if not consensus_client_details:
@@ -125,13 +138,19 @@ def show_dashboard(context):
     if latest_version != UNKNOWN_VALUE:
         latest_version = parse_version(latest_version)
     
-    # If the beacon node service is not install or found, we need to reinstall Lighthouse beacon
-    # node service
-    # TODO: Test for service installed and reinstall if needed
+    # If the service is not running, we need to start it
 
-    # If the validator client service is not install or found, we need to reinstall Lighthouse beacon
-    # node service
-    # TODO: Test for service installed and reinstall if needed
+    if execution_client_details['bn_service']['found'] and not (
+        execution_client_details['bn_service']['active'] == 'active' and
+        execution_client_details['bn_service']['sub'] == 'running'
+        ):
+        execution_client_details['next_step'] = MAINTENANCE_START_SERVICE
+
+    if execution_client_details['vc_service']['found'] and not (
+        execution_client_details['vc_service']['active'] == 'active' and
+        execution_client_details['vc_service']['sub'] == 'running'
+        ):
+        execution_client_details['next_step'] = MAINTENANCE_START_SERVICE
 
     # If the running version is older than the installed one, we need to restart the services
 
@@ -144,6 +163,12 @@ def show_dashboard(context):
     if is_version(installed_version) and is_version(latest_version):
         if installed_version < latest_version:
             consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
+
+    # If the service is not installed or found, we need to reinstall the client
+
+    if (not execution_client_details['bn_service']['found'] or
+        not execution_client_details['vc_service']['found']):
+        execution_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
 
     print('Lighthouse details:')
     print(consensus_client_details)

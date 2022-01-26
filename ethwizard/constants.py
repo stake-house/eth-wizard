@@ -92,9 +92,11 @@ SHOW_PUBLIC_KEYS_STEP_ID = 'show_public_keys_step'
 WIZARD_COMPLETED_STEP_ID = 'wizard_completed'
 
 MAINTENANCE_DO_NOTHING = 'do_nothing'
+MAINTENANCE_START_SERVICE = 'start_service'
 MAINTENANCE_RESTART_SERVICE = 'restart_service'
 MAINTENANCE_UPGRADE_CLIENT = 'upgrade_client'
 MAINTENANCE_CHECK_AGAIN_SOON = 'check_again_soon'
+MAINTENANCE_REINSTALL_CLIENT = 'reinstall_client'
 
 UNKNOWN_VALUE = 'Unknown'
 
