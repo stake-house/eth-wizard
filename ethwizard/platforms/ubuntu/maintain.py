@@ -140,17 +140,17 @@ def show_dashboard(context):
     
     # If the service is not running, we need to start it
 
-    if execution_client_details['bn_service']['found'] and not (
-        execution_client_details['bn_service']['active'] == 'active' and
-        execution_client_details['bn_service']['sub'] == 'running'
+    if consensus_client_details['bn_service']['found'] and not (
+        consensus_client_details['bn_service']['active'] == 'active' and
+        consensus_client_details['bn_service']['sub'] == 'running'
         ):
-        execution_client_details['next_step'] = MAINTENANCE_START_SERVICE
+        consensus_client_details['next_step'] = MAINTENANCE_START_SERVICE
 
-    if execution_client_details['vc_service']['found'] and not (
-        execution_client_details['vc_service']['active'] == 'active' and
-        execution_client_details['vc_service']['sub'] == 'running'
+    if consensus_client_details['vc_service']['found'] and not (
+        consensus_client_details['vc_service']['active'] == 'active' and
+        consensus_client_details['vc_service']['sub'] == 'running'
         ):
-        execution_client_details['next_step'] = MAINTENANCE_START_SERVICE
+        consensus_client_details['next_step'] = MAINTENANCE_START_SERVICE
 
     # If the running version is older than the installed one, we need to restart the services
 
@@ -166,9 +166,9 @@ def show_dashboard(context):
 
     # If the service is not installed or found, we need to reinstall the client
 
-    if (not execution_client_details['bn_service']['found'] or
-        not execution_client_details['vc_service']['found']):
-        execution_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
+    if (not consensus_client_details['bn_service']['found'] or
+        not consensus_client_details['vc_service']['found']):
+        consensus_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
 
     print('Lighthouse details:')
     print(consensus_client_details)
