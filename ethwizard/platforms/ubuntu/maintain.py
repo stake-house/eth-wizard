@@ -7,6 +7,8 @@ from packaging.version import parse as parse_version, Version
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog
 
+from pathlib import Path
+
 from ethwizard.platforms.ubuntu.common import (
     log,
     save_state,
@@ -35,7 +37,9 @@ from ethwizard.constants import (
     LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME,
     LIGHTHOUSE_LATEST_RELEASE,
     LIGHTHOUSE_INSTALLED_PATH,
-    BN_VERSION_EP
+    LIGHTHOUSE_PRIME_PGP_KEY_ID,
+    BN_VERSION_EP,
+    PGP_KEY_SERVERS,
 )
 
 def enter_maintenance(context):
@@ -242,6 +246,7 @@ Versions legend - I: Installed, R: Running, A: Available, L: Latest
             current_consensus_client, consensus_client_details):
             return show_dashboard(context)
         else:
+            log.error('We could not perform all the maintenance tasks.')
             return False
 
 def is_version(value):
@@ -665,7 +670,160 @@ def upgrade_geth():
 
 def upgrade_lighthouse():
     # Upgrade the Lighthouse client
-    log.warn('TODO: Upgrading client is to be implemented.')
+    log.info('Upgrading Lighthouse client...')
+
+    # Getting latest Lighthouse release files
+    lighthouse_gh_release_url = GITHUB_REST_API_URL + LIGHTHOUSE_LATEST_RELEASE
+    headers = {'Accept': GITHUB_API_VERSION}
+    try:
+        response = httpx.get(lighthouse_gh_release_url, headers=headers,
+            follow_redirects=True)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading lighthouse binary. {exception}')
+        return False
+
+    if response.status_code != 200:
+        log.error(f'HTTP error while downloading lighthouse binary. '
+            f'Status code {response.status_code}')
+        return False
+    
+    release_json = response.json()
+
+    if 'assets' not in release_json:
+        log.error('No assets in Github release for lighthouse.')
+        return False
+    
+    binary_asset = None
+    signature_asset = None
+
+    for asset in release_json['assets']:
+        if 'name' not in asset:
+            continue
+        if 'browser_download_url' not in asset:
+            continue
+    
+        file_name = asset['name']
+        file_url = asset['browser_download_url']
+
+        if file_name.endswith('x86_64-unknown-linux-gnu.tar.gz'):
+            binary_asset = {
+                'file_name': file_name,
+                'file_url': file_url
+            }
+        elif file_name.endswith('x86_64-unknown-linux-gnu.tar.gz.asc'):
+            signature_asset = {
+                'file_name': file_name,
+                'file_url': file_url
+            }
+
+    if binary_asset is None or signature_asset is None:
+        log.error('Could not find binary or signature asset in Github release.')
+        return False
+    
+    # Downloading latest Lighthouse release files
+    download_path = Path(Path.home(), 'ethwizard', 'downloads')
+    download_path.mkdir(parents=True, exist_ok=True)
+
+    binary_path = Path(download_path, binary_asset['file_name'])
+
+    try:
+        with open(binary_path, 'wb') as binary_file:
+            with httpx.stream('GET', binary_asset['file_url'],
+                follow_redirects=True) as http_stream:
+                if http_stream.status_code != 200:
+                    log.error(f'HTTP error while downloading Lighthouse binary from Github. '
+                        f'Status code {http_stream.status_code}')
+                    return False
+                for data in http_stream.iter_bytes():
+                    binary_file.write(data)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading Lighthouse binary from Github. {exception}')
+        return False
+    
+    signature_path = Path(download_path, signature_asset['file_name'])
+
+    try:
+        with open(signature_path, 'wb') as signature_file:
+            with httpx.stream('GET', signature_asset['file_url'],
+                follow_redirects=True) as http_stream:
+                if http_stream.status_code != 200:
+                    log.error(f'HTTP error while downloading Lighthouse signature from Github. '
+                        f'Status code {http_stream.status_code}')
+                    return False
+                for data in http_stream.iter_bytes():
+                    signature_file.write(data)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading Lighthouse signature from Github. {exception}')
+        return False
+
+    # Install gpg using APT
+    subprocess.run([
+        'apt', '-y', 'update'])
+    subprocess.run([
+        'apt', '-y', 'install', 'gpg'])
+
+    # Verify PGP signature
+
+    retry_index = 0
+    retry_count = 15
+
+    key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+    log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
+    command_line = ['gpg', '--keyserver', key_server, '--recv-keys',
+        LIGHTHOUSE_PRIME_PGP_KEY_ID]
+    process_result = subprocess.run(command_line)
+
+    if process_result.returncode != 0:
+        # GPG failed to download Sigma Prime's PGP key, let's wait and retry a few times
+        while process_result.returncode != 0 and retry_index < retry_count:
+            retry_index = retry_index + 1
+            delay = 5
+            log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
+                f'and try again from a different server.')
+            time.sleep(delay)
+
+            key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+            log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
+            command_line = ['gpg', '--keyserver', key_server, '--recv-keys',
+                LIGHTHOUSE_PRIME_PGP_KEY_ID]
+
+            process_result = subprocess.run(command_line)
+    
+    if process_result.returncode != 0:
+        log.error(
+f'''
+We failed to download the Sigma Prime's PGP key to verify the lighthouse
+binary after {retry_count} retries.
+'''
+        )
+        return False
+    
+    process_result = subprocess.run([
+        'gpg', '--verify', signature_path])
+    if process_result.returncode != 0:
+        log.error('The lighthouse binary signature is wrong. '
+            'We will stop here to protect you.')
+        return False
+    
+    # Stopping Lighthouse services before updating the binary
+    log.info('Stopping Lighthouse services...')
+    subprocess.run(['systemctl', 'stop', LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME,
+        LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME])
+
+    # Extracting the Lighthouse binary archive
+    subprocess.run([
+        'tar', 'xvf', binary_path, '--directory', LIGHTHOUSE_INSTALLED_DIRECTORY])
+    
+    # Restarting Lighthouse services after updating the binary
+    log.info('Starting Lighthouse services...')
+    subprocess.run(['systemctl', 'start', LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME,
+        LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME])
+
+    # Remove download leftovers
+    binary_path.unlink()
+    signature_path.unlink()
+
+    return True
 
 def use_default_client(context):
     # Set the default clients in context if they are not provided

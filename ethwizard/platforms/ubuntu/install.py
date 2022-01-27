@@ -1611,7 +1611,7 @@ Do you want to skip installing the lighthouse binary?
                 }
 
         if binary_asset is None or signature_asset is None:
-            log.error('Could not find binary or signature asset in Github release')
+            log.error('Could not find binary or signature asset in Github release.')
             return False
         
         # Downloading latest Lighthouse release files
