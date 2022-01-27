@@ -206,16 +206,16 @@ def show_dashboard(context):
 
         maintenance_message = 'Some maintenance tasks are pending. Click maintain to perform them.'
 
-    ec_section = (f'Geth details (I: {execution_client_details["versions"]["installed"]}, '
+    ec_section = (f'<b>Geth</b> details (I: {execution_client_details["versions"]["installed"]}, '
         f'R: {execution_client_details["versions"]["running"]}, '
         f'A: {execution_client_details["versions"]["available"]}, '
         f'L: {execution_client_details["versions"]["latest"]})\n'
-        f'Maintenance task: {maintenance_tasks_description.get(execution_client_details["next_step"], UNKNOWN_VALUE)}')
+        f'<b>Maintenance task</b>: {maintenance_tasks_description.get(execution_client_details["next_step"], UNKNOWN_VALUE)}')
 
-    cc_section = (f'Lighthouse details (I: {consensus_client_details["versions"]["installed"]}, '
+    cc_section = (f'<b>Lighthouse</b> details (I: {consensus_client_details["versions"]["installed"]}, '
         f'R: {consensus_client_details["versions"]["running"]}, '
         f'L: {consensus_client_details["versions"]["latest"]})\n'
-        f'Maintenance task: {maintenance_tasks_description.get(consensus_client_details["next_step"], UNKNOWN_VALUE)}')
+        f'<b>Maintenance task</b>: {maintenance_tasks_description.get(consensus_client_details["next_step"], UNKNOWN_VALUE)}')
 
     result = button_dialog(
         title='Maintenance dashboard',
