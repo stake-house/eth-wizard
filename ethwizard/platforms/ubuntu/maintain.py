@@ -208,7 +208,7 @@ def show_dashboard(context):
             ('Quit', False),
         ]
 
-        maintenance_message = 'Some maintenance tasks are pending. Click maintain to perform them.'
+        maintenance_message = 'Some maintenance tasks are pending. Select maintain to perform them.'
 
     ec_section = (f'<b>Geth</b> details (I: {execution_client_details["versions"]["installed"]}, '
         f'R: {execution_client_details["versions"]["running"]}, '
