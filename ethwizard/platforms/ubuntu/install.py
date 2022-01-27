@@ -1650,47 +1650,66 @@ Do you want to skip installing the lighthouse binary?
             log.error(f'Exception while downloading Lighthouse signature from Github. {exception}')
             return False
 
-        # Install gpg using APT
-        subprocess.run([
-            'apt', '-y', 'update'])
-        subprocess.run([
-            'apt', '-y', 'install', 'gpg'])
+        # Test if gpg is already installed
+        process_result = subprocess.run(['apt', '-qq', 'list', 'gpg'], capture_output=True, text=True)
+
+        if process_result.returncode != 0:
+            log.error(f'Unexpected return code from apt. Return code: '
+                f'{process_result.returncode}')
+            return False
+        
+        process_output = process_result.stdout
+        result = re.search(r'gpg/.+\[installed\]', process_output)
+        gpg_is_installed = result is not None
+
+        if not gpg_is_installed:
+            # Install gpg using APT
+            subprocess.run([
+                'apt', '-y', 'update'])
+            subprocess.run([
+                'apt', '-y', 'install', 'gpg'])
 
         # Verify PGP signature
 
-        retry_index = 0
-        retry_count = 15
-
-        key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
-        log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
-        command_line = ['gpg', '--keyserver', key_server, '--recv-keys',
-            LIGHTHOUSE_PRIME_PGP_KEY_ID]
+        command_line = ['gpg', '--list-keys', '--with-colons', LIGHTHOUSE_PRIME_PGP_KEY_ID]
         process_result = subprocess.run(command_line)
+        pgp_key_found = process_result.returncode == 0
 
-        if process_result.returncode != 0:
-            # GPG failed to download Sigma Prime's PGP key, let's wait and retry a few times
-            while process_result.returncode != 0 and retry_index < retry_count:
-                retry_index = retry_index + 1
-                delay = 5
-                log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
-                    f'and try again from a different server.')
-                time.sleep(delay)
+        if not pgp_key_found:
 
-                key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
-                log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
-                command_line = ['gpg', '--keyserver', key_server, '--recv-keys',
-                    LIGHTHOUSE_PRIME_PGP_KEY_ID]
+            retry_index = 0
+            retry_count = 15
 
-                process_result = subprocess.run(command_line)
-        
-        if process_result.returncode != 0:
-            log.error(
+            key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+            log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
+            command_line = ['gpg', '--keyserver', key_server, '--recv-keys',
+                LIGHTHOUSE_PRIME_PGP_KEY_ID]
+            process_result = subprocess.run(command_line)
+
+            if process_result.returncode != 0:
+                # GPG failed to download Sigma Prime's PGP key, let's wait and retry a few times
+                while process_result.returncode != 0 and retry_index < retry_count:
+                    retry_index = retry_index + 1
+                    delay = 5
+                    log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
+                        f'and try again from a different server.')
+                    time.sleep(delay)
+
+                    key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+                    log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
+                    command_line = ['gpg', '--keyserver', key_server, '--recv-keys',
+                        LIGHTHOUSE_PRIME_PGP_KEY_ID]
+
+                    process_result = subprocess.run(command_line)
+            
+            if process_result.returncode != 0:
+                log.error(
 f'''
 We failed to download the Sigma Prime's PGP key to verify the lighthouse
 binary after {retry_count} retries.
 '''
-            )
-            return False
+                )
+                return False
         
         process_result = subprocess.run([
             'gpg', '--verify', signature_path])
