@@ -213,7 +213,7 @@ def show_dashboard(context):
     cc_section = (f'<b>Lighthouse</b> details (I: {consensus_client_details["versions"]["installed"]}, '
         f'R: {consensus_client_details["versions"]["running"]}, '
         f'L: {consensus_client_details["versions"]["latest"]})\n'
-        f'Services are running - Beacon node: {execution_client_details["bn_service"]["running"]}, Validator client: {execution_client_details["vc_service"]["running"]})\n'
+        f'Services are running - Beacon node: {consensus_client_details["bn_service"]["running"]}, Validator client: {consensus_client_details["vc_service"]["running"]})\n'
         f'<b>Maintenance task</b>: {maintenance_tasks_description.get(consensus_client_details["next_step"], UNKNOWN_VALUE)}')
 
     result = button_dialog(
