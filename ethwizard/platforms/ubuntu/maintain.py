@@ -104,10 +104,7 @@ def show_dashboard(context):
 
     # If the service is not running, we need to start it
 
-    if execution_client_details['service']['found'] and not (
-        execution_client_details['service']['active'] == 'active' and
-        execution_client_details['service']['sub'] == 'running'
-        ):
+    if not execution_client_details['service']['running']:
         execution_client_details['next_step'] = MAINTENANCE_START_SERVICE
 
     # If the running version is older than the installed one, we need to restart the service
@@ -150,16 +147,10 @@ def show_dashboard(context):
     
     # If the service is not running, we need to start it
 
-    if consensus_client_details['bn_service']['found'] and not (
-        consensus_client_details['bn_service']['active'] == 'active' and
-        consensus_client_details['bn_service']['sub'] == 'running'
-        ):
+    if not consensus_client_details['bn_service']['running']:
         consensus_client_details['next_step'] = MAINTENANCE_START_SERVICE
 
-    if consensus_client_details['vc_service']['found'] and not (
-        consensus_client_details['vc_service']['active'] == 'active' and
-        consensus_client_details['vc_service']['sub'] == 'running'
-        ):
+    if not consensus_client_details['vc_service']['running']:
         consensus_client_details['next_step'] = MAINTENANCE_START_SERVICE
 
     # If the running version is older than the installed one, we need to restart the services
@@ -255,6 +246,14 @@ def is_version(value):
     # Return true if this is a packaging version
     return isinstance(value, Version)
 
+def is_service_running(service_details):
+    # Return true if this systemd service is running
+    return (
+        service_details['LoadState'] == 'loaded' and
+        service_details['ActiveState'] == 'active' and
+        service_details['SubState'] == 'running'
+    )
+
 def get_execution_client_details(execution_client):
     # Get the details for the current execution client
 
@@ -291,6 +290,7 @@ def get_execution_client_details(execution_client):
         details['service']['load'] = service_details['LoadState']
         details['service']['active'] = service_details['ActiveState']
         details['service']['sub'] = service_details['SubState']
+        details['service']['running'] = is_service_running(service_details)
 
         details['versions']['installed'] = get_geth_installed_version()
         details['versions']['running'] = get_geth_running_version()
@@ -476,6 +476,7 @@ def get_consensus_client_details(consensus_client):
             details['bn_service']['load'] = service_details['LoadState']
             details['bn_service']['active'] = service_details['ActiveState']
             details['bn_service']['sub'] = service_details['SubState']
+            details['bn_service']['running'] = is_service_running(service_details)
 
         lighthouse_vc_service_exists = False
         lighthouse_vc_service_name = LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME
@@ -489,6 +490,7 @@ def get_consensus_client_details(consensus_client):
             details['vc_service']['load'] = service_details['LoadState']
             details['vc_service']['active'] = service_details['ActiveState']
             details['vc_service']['sub'] = service_details['SubState']
+            details['vc_service']['running'] = service_details(service_details)
 
         details['versions']['installed'] = get_lighthouse_installed_version()
         details['versions']['running'] = get_lighthouse_running_version()
