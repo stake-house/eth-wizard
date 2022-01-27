@@ -238,7 +238,8 @@ Versions legend - I: Installed, R: Running, A: Available, L: Latest
         return False
     
     if result == 1:
-        return perform_maintenance(execution_client_details, consensus_client_details)
+        return perform_maintenance(current_execution_client, execution_client_details,
+            current_consensus_client, consensus_client_details)
 
 def is_version(value):
     # Return true if this is a packaging version
@@ -591,9 +592,77 @@ def get_lighthouse_latest_version():
 
     return latest_version
 
-def perform_maintenance(execution_client_details, consensus_client_details):
-    # TODO: Perform all the maintenance tasks
-    return False
+def perform_maintenance(execution_client, execution_client_details, consensus_client,
+    consensus_client_details):
+    # Perform all the maintenance tasks
+
+    if execution_client == EXECUTION_CLIENT_GETH:
+        # Geth maintenance tasks
+
+        if execution_client_details['next_step'] == MAINTENANCE_RESTART_SERVICE:
+            log.info('Restarting Geth service...')
+
+            subprocess.run(['systemctl', 'restart', GETH_SYSTEMD_SERVICE_NAME])
+
+        elif execution_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT:
+            if not upgrade_geth():
+                log.error('We could not upgrade the Geth client.')
+                return False
+            
+        elif execution_client_details['next_step'] == MAINTENANCE_START_SERVICE:
+            log.info('Starting Geth service...')
+
+            subprocess.run(['systemctl', 'start', GETH_SYSTEMD_SERVICE_NAME])
+
+        elif execution_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
+            log.warn('TODO: Reinstalling client is to be implemented.')
+    else:
+        log.error(f'Unknown execution client {execution_client}.')
+        return False
+    
+    if consensus_client == CONSENSUS_CLIENT_LIGHTHOUSE:
+        # Lighthouse maintenance tasks
+
+        if consensus_client_details['next_step'] == MAINTENANCE_RESTART_SERVICE:
+            log.info('Restarting Lighthouse services...')
+
+            subprocess.run(['systemctl', 'restart', LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME,
+                LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME])
+
+        elif consensus_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT:
+            if not upgrade_lighthouse():
+                log.error('We could not upgrade the Lighthouse client.')
+                return False
+            
+        elif consensus_client_details['next_step'] == MAINTENANCE_START_SERVICE:
+            log.info('Starting Lighthouse services...')
+
+            subprocess.run(['systemctl', 'start', LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME,
+                LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME])
+
+        elif consensus_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
+            log.warn('TODO: Reinstalling client is to be implemented.')
+    else:
+        log.error(f'Unknown consensus client {consensus_client}.')
+        return False
+
+    return True
+
+def upgrade_geth():
+    # Upgrade the Geth client
+    log.info('Upgrading Geth client...')
+
+    subprocess.run(['apt', '-y', 'update'])
+    subprocess.run(['apt', '-y', 'install', 'geth'])
+
+    log.info('Restarting Geth service...')
+    subprocess.run(['systemctl', 'restart', GETH_SYSTEMD_SERVICE_NAME])
+
+    return True
+
+def upgrade_lighthouse():
+    # Upgrade the Lighthouse client
+    log.warn('TODO: Upgrading client is to be implemented.')
 
 def use_default_client(context):
     # Set the default clients in context if they are not provided
