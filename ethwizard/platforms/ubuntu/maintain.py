@@ -492,7 +492,7 @@ def get_consensus_client_details(consensus_client):
             details['vc_service']['load'] = service_details['LoadState']
             details['vc_service']['active'] = service_details['ActiveState']
             details['vc_service']['sub'] = service_details['SubState']
-            details['vc_service']['running'] = service_details(service_details)
+            details['vc_service']['running'] = is_service_running(service_details)
 
         details['versions']['installed'] = get_lighthouse_installed_version()
         details['versions']['running'] = get_lighthouse_running_version()
