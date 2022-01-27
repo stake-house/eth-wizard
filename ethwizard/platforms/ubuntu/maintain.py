@@ -207,15 +207,17 @@ def show_dashboard(context):
         f'R: {execution_client_details["versions"]["running"]}, '
         f'A: {execution_client_details["versions"]["available"]}, '
         f'L: {execution_client_details["versions"]["latest"]})\n'
+        f'Service is running: {execution_client_details["service"]["running"]}\n'
         f'<b>Maintenance task</b>: {maintenance_tasks_description.get(execution_client_details["next_step"], UNKNOWN_VALUE)}')
 
     cc_section = (f'<b>Lighthouse</b> details (I: {consensus_client_details["versions"]["installed"]}, '
         f'R: {consensus_client_details["versions"]["running"]}, '
         f'L: {consensus_client_details["versions"]["latest"]})\n'
+        f'Services are running - Beacon node: {execution_client_details["bn_service"]["running"]}, Validator client: {execution_client_details["vc_service"]["running"]})\n'
         f'<b>Maintenance task</b>: {maintenance_tasks_description.get(consensus_client_details["next_step"], UNKNOWN_VALUE)}')
 
     result = button_dialog(
-        title='Maintenance dashboard',
+        title='Maintenance Dashboard',
         text=(HTML(
 f'''
 Here are some details about your Ethereum clients.
