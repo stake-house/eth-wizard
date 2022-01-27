@@ -831,6 +831,7 @@ binary after {retry_count} retries.
         LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME])
 
     # Extracting the Lighthouse binary archive
+    log.info('Updating Lighthouse binary...')
     subprocess.run([
         'tar', 'xvf', binary_path, '--directory', LIGHTHOUSE_INSTALLED_DIRECTORY])
     
