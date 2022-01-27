@@ -238,8 +238,11 @@ Versions legend - I: Installed, R: Running, A: Available, L: Latest
         return False
     
     if result == 1:
-        return perform_maintenance(current_execution_client, execution_client_details,
-            current_consensus_client, consensus_client_details)
+        if perform_maintenance(current_execution_client, execution_client_details,
+            current_consensus_client, consensus_client_details):
+            return show_dashboard(context)
+        else:
+            return False
 
 def is_version(value):
     # Return true if this is a packaging version
