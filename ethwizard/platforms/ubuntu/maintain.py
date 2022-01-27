@@ -65,6 +65,8 @@ def show_dashboard(context):
     current_execution_client = context[selected_execution_client]
     current_consensus_client = context[selected_consensus_client]
 
+    # Get execution client details
+
     execution_client_details = get_execution_client_details(current_execution_client)
     if not execution_client_details:
         log.error('Unable to get execution client details.')
@@ -119,15 +121,17 @@ def show_dashboard(context):
     if not execution_client_details['service']['found']:
         execution_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
 
-    print('Geth details:')
-    print(execution_client_details)
-
+    # Get consensus client details
 
     consensus_client_details = get_consensus_client_details(current_consensus_client)
     if not consensus_client_details:
         log.error('Unable to get consensus client details.')
         return False
     
+    # Find out if we need to do maintenance for the consensus client
+
+    consensus_client_details['next_step'] = MAINTENANCE_DO_NOTHING
+
     installed_version = consensus_client_details['versions']['installed']
     if installed_version != UNKNOWN_VALUE:
         installed_version = parse_version(installed_version)
@@ -170,10 +174,71 @@ def show_dashboard(context):
         not consensus_client_details['vc_service']['found']):
         consensus_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
 
-    print('Lighthouse details:')
-    print(consensus_client_details)
+    # We only need to do maintenance if either the execution or the consensus client needs
+    # maintenance.
 
-    return True
+    maintenance_needed = (
+        execution_client_details['next_step'] != MAINTENANCE_DO_NOTHING or
+        consensus_client_details['next_step'] != MAINTENANCE_DO_NOTHING)
+
+    # Build the dashboard with the details we have
+
+    maintenance_tasks_description = {
+        MAINTENANCE_DO_NOTHING: 'Nothing to perform here. Everything is good.',
+        MAINTENANCE_RESTART_SERVICE: 'Service needs to be restarted.',
+        MAINTENANCE_UPGRADE_CLIENT: 'Client needs to be upgraded.',
+        MAINTENANCE_CHECK_AGAIN_SOON: 'Check again. Client update should be available soon.',
+        MAINTENANCE_START_SERVICE: 'Service needs to be started.',
+        MAINTENANCE_REINSTALL_CLIENT: 'Client needs to be reinstalled.',
+    }
+
+    buttons = [
+        ('Quit', False),
+    ]
+
+    maintenance_message = 'Nothing is needed in terms of maintenance.'
+
+    if maintenance_needed:
+        buttons = [
+            ('Maintain', 1),
+            ('Quit', False),
+        ]
+
+        maintenance_message = 'Some maintenance tasks are pending. Click maintain to perform them.'
+
+    ec_section = (f'Geth details (I: {execution_client_details["version"]["installed"]}, '
+        f'R: {execution_client_details["version"]["running"]}, '
+        f'A: {execution_client_details["version"]["available"]}, '
+        f'L: {execution_client_details["version"]["latest"]})\n'
+        f'Maintenance task: {maintenance_tasks_description.get(execution_client_details["next_step"], UNKNOWN_VALUE)}')
+
+    cc_section = (f'Lighthouse details (I: {consensus_client_details["version"]["installed"]}, '
+        f'R: {consensus_client_details["version"]["running"]}, '
+        f'L: {consensus_client_details["version"]["latest"]})\n'
+        f'Maintenance task: {maintenance_tasks_description.get(consensus_client_details["next_step"], UNKNOWN_VALUE)}')
+
+    result = button_dialog(
+        title='Maintenance dashboard',
+        text=(HTML(
+f'''
+Here are some details about your Ethereum clients.
+
+{ec_section}
+
+{cc_section}
+
+{maintenance_message}
+
+Versions legend - I: Installed, R: Running, A: Available, L: Latest
+'''             )),
+        buttons=buttons
+    ).run()
+
+    if not result:
+        return False
+    
+    if result == 1:
+        return perform_maintenance(execution_client_details, consensus_client_details)
 
 def is_version(value):
     # Return true if this is a packaging version
@@ -525,6 +590,10 @@ def get_lighthouse_latest_version():
     log.info(f'Lighthouse latest version is {latest_version}')
 
     return latest_version
+
+def perform_maintenance(execution_client_details, consensus_client_details):
+    # TODO: Perform all the maintenance tasks
+    return False
 
 def use_default_client(context):
     # Set the default clients in context if they are not provided
