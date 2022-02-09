@@ -172,7 +172,7 @@ GETH_BUILDS_BASE_URL = 'https://gethstore.blob.core.windows.net/builds/'
 
 GETH_WINDOWS_PGP_KEY_ID = '9417309ED2A67EAC'
 GETH_ARGUMENTS = {
-    NETWORK_MAINNET: ['--cache', '2048', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof'],
+    NETWORK_MAINNET: ['--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof'],
     NETWORK_PRATER: ['--goerli', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof']
 }
 
@@ -41587,7 +41587,7 @@ Group=goeth
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart=geth --cache 2048 --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof{addparams}
+ExecStart=geth --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof{addparams}
 
 [Install]
 WantedBy=default.target
