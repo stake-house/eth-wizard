@@ -41587,6 +41587,7 @@ Group=goeth
 Type=simple
 Restart=always
 RestartSec=5
+TimeoutStopSec=180
 ExecStart=geth --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof{addparams}
 
 [Install]
@@ -41605,6 +41606,7 @@ Group=goeth
 Type=simple
 Restart=always
 RestartSec=5
+TimeoutStopSec=180
 ExecStart=geth --goerli --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof{addparams}
 
 [Install]
