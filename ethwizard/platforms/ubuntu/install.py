@@ -540,12 +540,19 @@ def test_disk_speed():
     # Test disk speed using fio tool
 
     # Install fio using APT
-    log.info('Installing fio to test disk speed...')
+    fio_package_installed = False
+    try:
+        fio_package_installed = is_package_installed('fio')
+    except Exception:
+        return False
+    
+    if not fio_package_installed:
+        log.info('Installing fio to test disk speed...')
 
-    subprocess.run([
-        'apt', '-y', 'update'])
-    subprocess.run([
-        'apt', '-y', 'install', 'fio'])
+        subprocess.run([
+            'apt', '-y', 'update'])
+        subprocess.run([
+            'apt', '-y', 'install', 'fio'])
     
     # Run fio test
     fio_path = Path(Path.home(), 'ethwizard', 'fio')
