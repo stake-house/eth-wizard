@@ -113,3 +113,19 @@ def get_systemd_service_details(service):
             service_details[sproperty] = 'unknown'
 
     return service_details
+
+def is_package_installed(package):
+    process_result = subprocess.run(['apt', '-qq', 'list', '--installed', package],
+        capture_output=True, text=True)
+
+    if process_result.returncode != 0:
+        log.error(f'Unexpected return code from apt when trying to list for installed package '
+            f'{package}. Return code: {process_result.returncode}')
+        raise Exception(f'Unexpected return code from apt when trying to list for installed '
+            f'package {package}. Return code: {process_result.returncode}')
+    
+    process_output = process_result.stdout
+    result = re.search(re.escape(package) + r'/', process_output)
+    package_is_installed = result is not None
+
+    return package_is_installed

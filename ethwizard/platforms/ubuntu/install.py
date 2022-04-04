@@ -31,7 +31,12 @@ from ethwizard.platforms.common import (
     test_context_variable
 )
 
-from ethwizard.platforms.ubuntu.common import log, quit_app, get_systemd_service_details
+from ethwizard.platforms.ubuntu.common import (
+    log,
+    quit_app,
+    get_systemd_service_details,
+    is_package_installed
+)
 
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog, radiolist_dialog, input_dialog
@@ -942,13 +947,14 @@ properly.
         if result:
             geth_location = result.group(1).strip()
 
-        process_result = subprocess.run([
-            'dpkg', '-s', 'geth'
-            ])
-        if process_result.returncode == 0:
-            # Geth package is installed
-            geth_package_installed = True
+        geth_package_installed = False
+        try:
+            geth_package_installed = is_package_installed('geth')
+        except Exception:
+            return False
 
+        if geth_package_installed:
+            # Geth package is installed
             process_result = subprocess.run([
                 'apt', 'show', 'geth'
                 ], capture_output=True, text=True)
@@ -995,6 +1001,18 @@ Do you want to skip installing the geth binary?
 
     if install_geth_binary:
         # Install Geth from PPA
+        spc_package_installed = False
+        try:
+            spc_package_installed = is_package_installed('software-properties-common')
+        except Exception:
+            return False
+        
+        if not spc_package_installed:
+            subprocess.run([
+                'apt', '-y', 'update'])
+            subprocess.run([
+                'apt', '-y', 'install', 'software-properties-common'])
+
         subprocess.run([
             'add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
         subprocess.run([
@@ -1651,16 +1669,11 @@ Do you want to skip installing the lighthouse binary?
             return False
 
         # Test if gpg is already installed
-        process_result = subprocess.run(['apt', '-qq', 'list', 'gpg'], capture_output=True, text=True)
-
-        if process_result.returncode != 0:
-            log.error(f'Unexpected return code from apt. Return code: '
-                f'{process_result.returncode}')
+        gpg_is_installed = False
+        try:
+            gpg_is_installed = is_package_installed('gpg')
+        except Exception:
             return False
-        
-        process_output = process_result.stdout
-        result = re.search(r'gpg/.+\[installed\]', process_output)
-        gpg_is_installed = result is not None
 
         if not gpg_is_installed:
             # Install gpg using APT

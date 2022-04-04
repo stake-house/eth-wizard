@@ -14,7 +14,8 @@ from ethwizard.platforms.ubuntu.common import (
     log,
     save_state,
     quit_app,
-    get_systemd_service_details
+    get_systemd_service_details,
+    is_package_installed
 )
 
 from ethwizard.constants import (
@@ -763,16 +764,11 @@ def upgrade_lighthouse():
         return False
 
     # Test if gpg is already installed
-    process_result = subprocess.run(['apt', '-qq', 'list', 'gpg'], capture_output=True, text=True)
-
-    if process_result.returncode != 0:
-        log.error(f'Unexpected return code from apt. Return code: '
-            f'{process_result.returncode}')
+    gpg_is_installed = False
+    try:
+        gpg_is_installed = is_package_installed('gpg')
+    except Exception:
         return False
-    
-    process_output = process_result.stdout
-    result = re.search(r'gpg/.+\[installed\]', process_output)
-    gpg_is_installed = result is not None
 
     if not gpg_is_installed:
         # Install gpg using APT
