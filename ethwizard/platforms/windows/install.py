@@ -12,6 +12,10 @@ import io
 
 from pathlib import Path
 
+from packaging.version import parse as parse_version
+
+from secrets import token_hex
+
 from urllib.parse import urljoin, urlparse
 
 from datetime import datetime, timedelta
@@ -41,6 +45,7 @@ from ethwizard.platforms.common import (
     progress_log_dialog,
     search_for_generated_keys,
     select_keys_directory,
+    select_fee_recipient_address,
     get_bc_validator_deposits,
     test_open_ports,
     show_whats_next,
@@ -239,6 +244,73 @@ def installation_steps(*args, **kwargs):
         step_id=OBTAIN_KEYS_STEP_ID,
         display_name='Importing or generating keys',
         exc_function=obtain_keys_function
+    )
+
+    def select_fee_recipient_address_function(step, context, step_sequence):
+        # Context variables
+        merge_ready_network = CTX_MERGE_READY_NETWORK
+        selected_fee_recipient_address = CTX_SELECTED_FEE_RECIPIENT_ADDRESS
+        
+        if not (
+            test_context_variable(context, merge_ready_network, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_app()
+
+        if context[merge_ready_network]:
+            if selected_fee_recipient_address not in context:
+                context[selected_fee_recipient_address] = select_fee_recipient_address()
+                step_sequence.save_state(step.step_id, context)
+
+            if not context[selected_fee_recipient_address]:
+                # User asked to quit
+                del context[selected_fee_recipient_address]
+                step_sequence.save_state(step.step_id, context)
+
+                quit_app()
+        else:
+            context[selected_fee_recipient_address] = ''
+
+        return context
+
+    select_fee_recipient_address_step = Step(
+        step_id=SELECT_FEE_RECIPIENT_ADDRESS_STEP_ID,
+        display_name='Select your fee recipient address',
+        exc_function=select_fee_recipient_address_function
+    )
+
+    def detect_merge_ready_function(step, context, step_sequence):
+        # Context variables
+        selected_directory = CTX_SELECTED_DIRECTORY
+        selected_network = CTX_SELECTED_NETWORK
+        selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
+        merge_ready_network = CTX_MERGE_READY_NETWORK
+
+        if not (
+            test_context_variable(context, selected_directory, log) and
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, selected_execution_client, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_app()
+
+        context[merge_ready_network] = detect_merge_ready(context[selected_directory],
+            context[selected_network], context[selected_execution_client])
+        if not context[merge_ready_network]:
+            # User asked to quit or error
+            del context[merge_ready_network]
+            step_sequence.save_state(step.step_id, context)
+
+            quit_app()
+        
+        context[merge_ready_network] = context[merge_ready_network]['result']
+        
+        return context
+
+    detect_merge_ready_step = Step(
+        step_id=DETECT_MERGE_READY_STEP_ID,
+        display_name='Detect merge ready network',
+        exc_function=detect_merge_ready_function
     )
 
     def select_eth1_fallbacks_function(step, context, step_sequence):
@@ -500,9 +572,11 @@ def installation_steps(*args, **kwargs):
         install_chocolatey_step,
         install_nssm_step,
         install_geth_step,
-        obtain_keys_step,
-        select_consensus_checkpoint_url_step,
+        detect_merge_ready_step,
         select_eth1_fallbacks_step,
+        select_consensus_checkpoint_url_step,
+        obtain_keys_step,
+        select_fee_recipient_address_step,
         install_teku_step,
         test_open_ports_step,
         install_monitoring_step,
@@ -791,6 +865,24 @@ def get_nssm_binary():
         return False
     
     return nssm_binary
+
+def setup_jwt_token_file(base_directory):
+    # Create or ensure that the JWT token file exist
+
+    create_jwt_token = False
+    jwt_token_dir = base_directory.joinpath('var', 'lib', 'ethereum')
+    jwt_token_path = jwt_token_dir.joinpath('jwttoken')
+
+    if not jwt_token_path.is_file():
+        create_jwt_token = True
+    
+    if create_jwt_token:
+        jwt_token_dir.mkdir(parents=True, exist_ok=True)
+
+        with open(jwt_token_path, 'w') as jwt_token_file:
+            jwt_token_file.write(token_hex(32))
+
+    return True
 
 def install_geth(base_directory, network, ports):
     # Install geth for the selected network
@@ -1094,6 +1186,22 @@ archive after {retry_count} retries.
         geth_extracted_binary.rename(target_geth_binary_path)
 
         geth_extracted_binary.parent.rmdir()
+
+        # Get Geth version
+        if geth_path.is_file():
+            try:
+                process_result = subprocess.run([
+                    str(geth_path), 'version'
+                    ], capture_output=True, text=True, encoding='utf8')
+                geth_found = True
+
+                process_output = process_result.stdout
+                result = re.search(r'Version: (.*?)\n', process_output)
+                if result:
+                    geth_version = result.group(1).strip()
+
+            except FileNotFoundError:
+                pass
     
     # Check if Geth directory already exists
     geth_datadir = base_directory.joinpath('var', 'lib', 'goethereum')
@@ -1146,6 +1254,34 @@ Do you want to remove this directory first and start from nothing?
     if ports['eth1'] != DEFAULT_GETH_PORT:
         geth_arguments.append('--port')
         geth_arguments.append(str(ports['eth1']))
+    
+    # Check if merge ready
+    merge_ready = False
+
+    result = re.search(r'([^-]+)', geth_version)
+    if result:
+        cleaned_geth_version = parse_version(result.group(1).strip())
+        target_geth_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][EXECUTION_CLIENT_GETH])
+        
+        if cleaned_geth_version >= target_geth_version:
+            merge_ready = True
+    
+    if merge_ready:
+        jwt_token_dir = base_directory.joinpath('var', 'lib', 'ethereum')
+        jwt_token_path = jwt_token_dir.joinpath('jwttoken')
+
+        if not setup_jwt_token_file(base_directory):
+            log.error(
+f'''
+Unable to create JWT token file in {jwt_token_path}
+'''
+            )
+
+            return False
+        
+        geth_arguments.append('--authrpc.jwtsecret')
+        geth_arguments.append(str(jwt_token_path))
 
     parameters = {
         'DisplayName': GETH_SERVICE_DISPLAY_NAME[network],
@@ -1901,6 +2037,52 @@ Do you want to skip installing the JRE?
             return False
     
     return True
+
+def detect_merge_ready(base_directory, network, execution_client):
+    is_merge_ready = False
+
+    # Check if geth is already installed and get its version
+    geth_path = base_directory.joinpath('bin', 'geth.exe')
+
+    geth_found = False
+    geth_version = 'unknown'
+
+    if geth_path.is_file():
+        try:
+            process_result = subprocess.run([
+                str(geth_path), 'version'
+                ], capture_output=True, text=True, encoding='utf8')
+            geth_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'Version: (.*?)\n', process_output)
+            if result:
+                geth_version = result.group(1).strip()
+
+        except FileNotFoundError:
+            pass
+
+    if not geth_found:
+        log.error('Could not find Geth binary. Cannot detect if this is a merge ready network.')
+
+        return False
+    
+    if geth_version == 'unknown':
+        log.error('Could not parse Geth version. Cannot detect if this is a merge ready network.')
+
+        return False
+
+    # Check if merge ready
+    result = re.search(r'([^-]+)', geth_version)
+    if result:
+        cleaned_geth_version = parse_version(result.group(1).strip())
+        target_geth_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][EXECUTION_CLIENT_GETH])
+        
+        if cleaned_geth_version >= target_geth_version:
+            is_merge_ready = True
+
+    return {'result': is_merge_ready}
 
 def install_teku(base_directory, network, keys, eth1_fallbacks, consensus_checkpoint_url, ports):
     # Install Teku for the selected network
