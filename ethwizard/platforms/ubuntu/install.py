@@ -248,6 +248,8 @@ def installation_steps():
                 step_sequence.save_state(step.step_id, context)
 
                 quit_app()
+        else:
+            context[selected_eth1_fallbacks] = []
 
         return context
 
