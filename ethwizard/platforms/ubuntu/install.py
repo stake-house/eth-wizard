@@ -13,6 +13,10 @@ from datetime import timedelta
 
 from pathlib import Path
 
+from packaging.version import parse as parse_version
+
+from secrets import token_hex
+
 from ethwizard.constants import *
 
 from ethwizard.platforms.common import (
@@ -862,6 +866,24 @@ enough</b></style> to be a fully working validator. Here are your results:
 
     return result
 
+def setup_jwt_token_file():
+    # Create or ensure that the JWT token file exist
+
+    create_jwt_token = False
+    jwt_token_path = Path(LINUX_JWT_TOKEN_FILE_PATH)
+
+    if not jwt_token_path.is_file():
+        create_jwt_token = True
+    
+    if create_jwt_token:
+        jwt_token_directory = Path(LINUX_JWT_TOKEN_DIRECTORY)
+        jwt_token_directory.mkdir(parents=True, exist_ok=True)
+
+        with open(LINUX_JWT_TOKEN_FILE_PATH, 'w') as jwt_token_file:
+            jwt_token_file.write(token_hex(32))
+
+    return True
+
 def install_geth(network, ports):
     # Install geth for the selected network
 
@@ -1033,6 +1055,17 @@ Do you want to skip installing the geth binary?
             'apt', '-y', 'update'])
         subprocess.run([
             'apt', '-y', 'install', 'geth'])
+        
+        # Get Geth version
+        process_result = subprocess.run([
+            'geth', 'version'
+            ], capture_output=True, text=True)
+        geth_found = True
+
+        process_output = process_result.stdout
+        result = re.search(r'Version: (.*?)\n', process_output)
+        if result:
+            geth_version = result.group(1).strip()
     
     # Check if Geth user or directory already exists
     geth_datadir = Path('/var/lib/goethereum')
@@ -1083,14 +1116,43 @@ Do you want to remove this directory first and start from nothing?
         'mkdir', '-p', geth_datadir])
     subprocess.run([
         'chown', '-R', 'goeth:goeth', geth_datadir])
+
+    addparams = []
+
+    # Check if merge ready
+    merge_ready = False
+
+    result = re.search(r'([^-]+)', geth_version)
+    if result:
+        cleaned_geth_version = parse_version(result.group(1).strip())
+        target_geth_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][EXECUTION_CLIENT_GETH])
+        
+        if cleaned_geth_version >= target_geth_version:
+            merge_ready = True
+    
+    if merge_ready:
+        if not setup_jwt_token_file():
+            log.error(
+f'''
+Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
+'''
+            )
+
+            return False
+        
+        addparams.append(f'--authrpc.jwtsecret {LINUX_JWT_TOKEN_FILE_PATH}')
     
     # Setup Geth systemd service
-    addparams = ''
     if ports['eth1'] != DEFAULT_GETH_PORT:
-        addparams = f' --port {ports["eth1"]}'
+        addparams.append(f'--port {ports["eth1"]}')
+    
+    addparams_string = ''
+    if len(addparams) > 0:
+        addparams_string = ' ' + ' '.join(addparams)
 
     with open('/etc/systemd/system/' + geth_service_name, 'w') as service_file:
-        service_file.write(GETH_SERVICE_DEFINITION[network].format(addparams=addparams))
+        service_file.write(GETH_SERVICE_DEFINITION[network].format(addparams=addparams_string))
     subprocess.run([
         'systemctl', 'daemon-reload'])
     subprocess.run([
