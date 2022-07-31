@@ -190,29 +190,64 @@ def installation_steps():
         exc_function=install_geth_function
     )
 
-    def select_eth1_fallbacks_function(step, context, step_sequence):
+    def detect_merge_ready_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
-        selected_eth1_fallbacks = CTX_SELECTED_ETH1_FALLBACKS
+        selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
+        selected_merge_ready_network = CTX_MERGE_READY_NETWORK
 
         if not (
-            test_context_variable(context, selected_network, log)
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, selected_execution_client, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
 
-        if selected_eth1_fallbacks not in context:
-            context[selected_eth1_fallbacks] = select_eth1_fallbacks(context[selected_network])
-            step_sequence.save_state(step.step_id, context)
-
-        if (
-            type(context[selected_eth1_fallbacks]) is not list and
-            not context[selected_eth1_fallbacks]):
-            # User asked to quit
-            del context[selected_eth1_fallbacks]
+        context[selected_merge_ready_network] = detect_merge_ready(context[selected_network],
+            context[selected_execution_client])
+        if not context[selected_merge_ready_network]:
+            # User asked to quit or error
+            del context[selected_merge_ready_network]
             step_sequence.save_state(step.step_id, context)
 
             quit_app()
+        
+        context[selected_merge_ready_network] = context[selected_merge_ready_network]['result']
+        
+        return context
+
+    detect_merge_ready_step = Step(
+        step_id=DETECT_MERGE_READY_STEP_ID,
+        display_name='Detect merge ready network',
+        exc_function=detect_merge_ready_function
+    )
+
+    def select_eth1_fallbacks_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        selected_merge_ready_network = CTX_MERGE_READY_NETWORK
+        selected_eth1_fallbacks = CTX_SELECTED_ETH1_FALLBACKS
+
+        if not (
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, selected_merge_ready_network, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_app()
+
+        if not context[selected_merge_ready_network]:
+            if selected_eth1_fallbacks not in context:
+                context[selected_eth1_fallbacks] = select_eth1_fallbacks(context[selected_network])
+                step_sequence.save_state(step.step_id, context)
+
+            if (
+                type(context[selected_eth1_fallbacks]) is not list and
+                not context[selected_eth1_fallbacks]):
+                # User asked to quit
+                del context[selected_eth1_fallbacks]
+                step_sequence.save_state(step.step_id, context)
+
+                quit_app()
 
         return context
 
@@ -445,6 +480,7 @@ def installation_steps():
         test_system_step,
         select_custom_ports_step,
         install_geth_step,
+        detect_merge_ready_step,
         select_consensus_checkpoint_url_step,
         select_eth1_fallbacks_step,
         install_lighthouse_step,
@@ -1532,6 +1568,49 @@ Connected Peers: {result['exe_connected_peers']}
     time.sleep(5)
 
     return True
+
+def detect_merge_ready(network, execution_client):
+    is_merge_ready = False
+
+    # Check if geth is already installed and get its version
+    geth_found = False
+    geth_version = 'unknown'
+
+    try:
+        process_result = subprocess.run([
+            'geth', 'version'
+            ], capture_output=True, text=True)
+        geth_found = True
+
+        process_output = process_result.stdout
+        result = re.search(r'Version: (.*?)\n', process_output)
+        if result:
+            geth_version = result.group(1).strip()
+
+    except FileNotFoundError:
+        pass
+
+    if not geth_found:
+        log.error('Could not find Geth binary. Cannot detect if this is a merge ready network.')
+
+        return False
+    
+    if geth_version == 'unknown':
+        log.error('Could not parse Geth version. Cannot detect if this is a merge ready network.')
+
+        return False
+
+    # Check if merge ready
+    result = re.search(r'([^-]+)', geth_version)
+    if result:
+        cleaned_geth_version = parse_version(result.group(1).strip())
+        target_geth_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][EXECUTION_CLIENT_GETH])
+        
+        if cleaned_geth_version >= target_geth_version:
+            is_merge_ready = True
+
+    return {'result': is_merge_ready}
 
 def install_lighthouse(network, eth1_fallbacks, consensus_checkpoint_url, ports):
     # Install Lighthouse for the selected network
