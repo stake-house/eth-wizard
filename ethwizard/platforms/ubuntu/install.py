@@ -2601,7 +2601,7 @@ staking-deposit-cli tool or Wagyu Key Gen. You can download these tools
 from:
 
 - https://github.com/ethereum/staking-deposit-cli
-- https://github.com/stake-house/wagyu-installer
+- https://github.com/stake-house/wagyu-key-gen
 
 You can put that binary on a USB drive, generate your keys on a different
 machine that is not connected to the internet, copy your keys on the USB
