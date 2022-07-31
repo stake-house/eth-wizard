@@ -1133,15 +1133,18 @@ Do you want to skip installing the geth binary?
             'apt', '-y', 'install', 'geth'])
         
         # Get Geth version
-        process_result = subprocess.run([
-            'geth', 'version'
-            ], capture_output=True, text=True)
-        geth_found = True
+        try:
+            process_result = subprocess.run([
+                'geth', 'version'
+                ], capture_output=True, text=True)
+            geth_found = True
 
-        process_output = process_result.stdout
-        result = re.search(r'Version: (.*?)\n', process_output)
-        if result:
-            geth_version = result.group(1).strip()
+            process_output = process_result.stdout
+            result = re.search(r'Version: (.*?)\n', process_output)
+            if result:
+                geth_version = result.group(1).strip()
+        except FileNotFoundError:
+            pass
     
     # Check if Geth user or directory already exists
     geth_datadir = Path('/var/lib/goethereum')
@@ -1935,15 +1938,18 @@ binary after {retry_count} retries.
         signature_path.unlink()
 
         # Get Lighthouse version
-        process_result = subprocess.run([
-            'lighthouse', '--version'
-            ], capture_output=True, text=True)
-        lighthouse_found = True
+        try:
+            process_result = subprocess.run([
+                'lighthouse', '--version'
+                ], capture_output=True, text=True)
+            lighthouse_found = True
 
-        process_output = process_result.stdout
-        result = re.search(r'Lighthouse (.*?)\n', process_output)
-        if result:
-            lighthouse_version = result.group(1).strip()
+            process_output = process_result.stdout
+            result = re.search(r'Lighthouse (.*?)\n', process_output)
+            if result:
+                lighthouse_version = result.group(1).strip()
+        except FileNotFoundError:
+            pass
 
     # Check if lighthouse beacon node user or directory already exists
     lighthouse_datadir_bn = Path('/var/lib/lighthouse/beacon')
@@ -3051,9 +3057,46 @@ We found {len(public_keys)} key(s) imported into the lighthouse validator client
     )
     time.sleep(5)
 
+    # Get Lighthouse version
+    lighthouse_found = False
+    lighthouse_version = 'unknown'
+    try:
+        process_result = subprocess.run([
+            'lighthouse', '--version'
+            ], capture_output=True, text=True)
+        lighthouse_found = True
+
+        process_output = process_result.stdout
+        result = re.search(r'Lighthouse (.*?)\n', process_output)
+        if result:
+            lighthouse_version = result.group(1).strip()
+    except FileNotFoundError:
+        pass
+
+    addparams = []
+
+    # Check if merge ready
+    merge_ready = False
+
+    result = re.search(r'([^-]+)', lighthouse_version)
+    if result:
+        cleaned_lighthouse_version = parse_version(result.group(1).strip())
+        target_lighthouse_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][CONSENSUS_CLIENT_LIGHTHOUSE])
+
+        if cleaned_lighthouse_version >= target_lighthouse_version:
+            merge_ready = True
+
+    if merge_ready:
+        addparams.append(f'--suggested-fee-recipient {fee_recipient_address}')
+    
+    addparams_string = ''
+    if len(addparams) > 0:
+        addparams_string = ' ' + ' '.join(addparams)
+
     # Setup Lighthouse validator client systemd service
     with open('/etc/systemd/system/' + lighthouse_vc_service_name, 'w') as service_file:
-        service_file.write(LIGHTHOUSE_VC_SERVICE_DEFINITION[network])
+        service_file.write(LIGHTHOUSE_VC_SERVICE_DEFINITION[network].format(addparams=addparams_string))
     subprocess.run([
         'systemctl', 'daemon-reload'])
     subprocess.run([

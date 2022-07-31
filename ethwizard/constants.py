@@ -41692,7 +41692,7 @@ Group=lighthousevalidator
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart={LIGHTHOUSE_INSTALLED_PATH} vc --network mainnet --datadir /var/lib/lighthouse --metrics
+ExecStart={LIGHTHOUSE_INSTALLED_PATH} vc --network mainnet --datadir /var/lib/lighthouse --metrics{{addparams}}
 
 [Install]
 WantedBy=multi-user.target
@@ -41710,7 +41710,7 @@ Group=lighthousevalidator
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart={LIGHTHOUSE_INSTALLED_PATH} vc --network prater --datadir /var/lib/lighthouse --metrics
+ExecStart={LIGHTHOUSE_INSTALLED_PATH} vc --network prater --datadir /var/lib/lighthouse --metrics{{addparams}}
 
 [Install]
 WantedBy=multi-user.target
