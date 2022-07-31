@@ -908,7 +908,7 @@ def progress_log_dialog(
     return app
 
 def search_for_generated_keys(validator_keys_path):
-    # Search for keys generated with the eth2.0-deposit-cli binary
+    # Search for keys
 
     deposit_data_path = None
     keystore_paths = []
@@ -1198,8 +1198,7 @@ valid keys directory.</style>'''
             text=(HTML(
 f'''
 Please enter the directory in which we can find the keys you generated. It
-should include all the files that the eth2.0-deposit-cli tool created
-including:
+should include all the files that the key tool created including:
 
 - deposit_data(...).json
 - keystore-(...).json
