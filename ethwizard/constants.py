@@ -41651,7 +41651,7 @@ User=lighthousebeacon
 Group=lighthousebeacon
 Restart=always
 RestartSec=5
-ExecStart={LIGHTHOUSE_INSTALLED_PATH} bn --network mainnet --datadir /var/lib/lighthouse --staking --eth1-endpoints {{eth1endpoints}} --validator-monitor-auto --metrics{{addparams}}
+ExecStart={LIGHTHOUSE_INSTALLED_PATH} bn --network mainnet --datadir /var/lib/lighthouse --staking --validator-monitor-auto --metrics{{addparams}}
 
 [Install]
 WantedBy=multi-user.target
@@ -41669,7 +41669,7 @@ User=lighthousebeacon
 Group=lighthousebeacon
 Restart=always
 RestartSec=5
-ExecStart={LIGHTHOUSE_INSTALLED_PATH} bn --network prater --datadir /var/lib/lighthouse --staking --eth1-endpoints {{eth1endpoints}} --validator-monitor-auto --metrics{{addparams}}
+ExecStart={LIGHTHOUSE_INSTALLED_PATH} bn --network prater --datadir /var/lib/lighthouse --staking --validator-monitor-auto --metrics{{addparams}}
 
 [Install]
 WantedBy=multi-user.target

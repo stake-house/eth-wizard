@@ -1894,6 +1894,17 @@ binary after {retry_count} retries.
         binary_path.unlink()
         signature_path.unlink()
 
+        # Get Lighthouse version
+        process_result = subprocess.run([
+            'lighthouse', '--version'
+            ], capture_output=True, text=True)
+        lighthouse_found = True
+
+        process_output = process_result.stdout
+        result = re.search(r'Lighthouse (.*?)\n', process_output)
+        if result:
+            lighthouse_version = result.group(1).strip()
+
     # Check if lighthouse beacon node user or directory already exists
     lighthouse_datadir_bn = Path('/var/lib/lighthouse/beacon')
     if lighthouse_datadir_bn.exists() and lighthouse_datadir_bn.is_dir():
@@ -1946,21 +1957,57 @@ Do you want to remove this directory first and start from nothing?
     subprocess.run([
         'chmod', '700', '/var/lib/lighthouse/beacon'])
 
+    addparams = []
+
+    # Check if merge ready
+    merge_ready = False
+
+    result = re.search(r'([^-]+)', lighthouse_version)
+    if result:
+        cleaned_lighthouse_version = parse_version(result.group(1).strip())
+        target_lighthouse_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][CONSENSUS_CLIENT_LIGHTHOUSE])
+
+        if cleaned_lighthouse_version >= target_lighthouse_version:
+            merge_ready = True
+
+    if merge_ready:
+        if not setup_jwt_token_file():
+            log.error(
+f'''
+Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
+'''
+            )
+
+            return False
+
+        addparams.append(f'--execution-jwt {LINUX_JWT_TOKEN_FILE_PATH}')
+
     # Setup Lighthouse beacon node systemd service
     service_definition = LIGHTHOUSE_BN_SERVICE_DEFINITION[network]
 
-    eth1_endpoints = ['http://127.0.0.1:8545'] + eth1_fallbacks
+    local_eth1_endpoint = 'http://127.0.0.1:8545'
+    eth1_endpoints_flag = '--eth1-endpoints'
+    if merge_ready:
+        local_eth1_endpoint = 'http://127.0.0.1:8551'
+        eth1_endpoints_flag = '--execution-endpoint'
+    
+    eth1_endpoints = [local_eth1_endpoint] + eth1_fallbacks
+    eth1_endpoints_string = ','.join(eth1_endpoints)
 
-    addparams = ''
+    addparams.append(f'{eth1_endpoints_flag} {eth1_endpoints_string}')
+
     if ports['eth2_bn'] != DEFAULT_LIGHTHOUSE_BN_PORT:
-        addparams += f' --port {ports["eth2_bn"]}'
+        addparams.append(f'--port {ports["eth2_bn"]}')
     
     if consensus_checkpoint_url != '':
-        addparams += f' --checkpoint-sync-url "{consensus_checkpoint_url}"'
+        addparams.append(f'--checkpoint-sync-url "{consensus_checkpoint_url}"')
 
-    service_definition = service_definition.format(
-        eth1endpoints=','.join(eth1_endpoints),
-        addparams=addparams)
+    addparams_string = ''
+    if len(addparams) > 0:
+        addparams_string = ' ' + ' '.join(addparams)
+
+    service_definition = service_definition.format(addparams=addparams_string)
 
     with open('/etc/systemd/system/' + lighthouse_bn_service_name, 'w') as service_file:
         service_file.write(service_definition)
