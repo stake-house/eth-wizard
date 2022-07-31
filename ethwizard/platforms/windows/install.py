@@ -2041,6 +2041,8 @@ Do you want to skip installing the JRE?
 def detect_merge_ready(base_directory, network, execution_client):
     is_merge_ready = False
 
+    base_directory = Path(base_directory)
+
     # Check if geth is already installed and get its version
     geth_path = base_directory.joinpath('bin', 'geth.exe')
 
