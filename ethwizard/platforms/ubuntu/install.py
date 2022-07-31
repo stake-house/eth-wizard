@@ -377,19 +377,55 @@ def installation_steps():
         exc_function=obtain_keys_function
     )
 
+    def select_fee_recipient_address_function(step, context, step_sequence):
+        # Context variables
+        selected_merge_ready_network = CTX_MERGE_READY_NETWORK
+        selected_fee_recipient_address = CTX_SELECTED_FEE_RECIPIENT_ADDRESS
+        
+        if not (
+            test_context_variable(context, selected_merge_ready_network, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_app()
+
+        if context[selected_merge_ready_network]:
+            if selected_fee_recipient_address not in context:
+                context[selected_fee_recipient_address] = select_fee_recipient_address()
+                step_sequence.save_state(step.step_id, context)
+
+            if not context[selected_fee_recipient_address]:
+                # User asked to quit
+                del context[selected_fee_recipient_address]
+                step_sequence.save_state(step.step_id, context)
+
+                quit_app()
+        else:
+            context[selected_fee_recipient_address] = ''
+
+        return context
+
+    select_fee_recipient_address_step = Step(
+        step_id=SELECT_FEE_RECIPIENT_ADDRESS_STEP_ID,
+        display_name='Select your fee recipient address',
+        exc_function=select_fee_recipient_address_function
+    )
+
     def install_lighthouse_validator_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
-        obtained_keys = CTX_OBTAINED_KEYS
+        obtained_keys = CTX_OBTAINED_KEYS       
+        selected_fee_recipient_address = CTX_SELECTED_FEE_RECIPIENT_ADDRESS
 
         if not (
             test_context_variable(context, selected_network, log) and
-            test_context_variable(context, obtained_keys, log)
+            test_context_variable(context, obtained_keys, log) and
+            test_context_variable(context, selected_fee_recipient_address, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
         
-        if not install_lighthouse_validator(context[selected_network], context[obtained_keys]):
+        if not install_lighthouse_validator(context[selected_network], context[obtained_keys],
+            context[selected_fee_recipient_address]):
             # User asked to quit or error
             quit_app()
 
@@ -489,6 +525,7 @@ def installation_steps():
         install_lighthouse_step,
         test_open_ports_step,
         obtain_keys_step,
+        select_fee_recipient_address_step,
         install_lighthouse_validator_step,
         # TODO: Check time synchronization and configure it if needed
         # TODO: Monitoring setup
@@ -2830,8 +2867,9 @@ Do you want to skip installing the eth2.0-deposit-cli binary?
 
     return actual_keys
 
-def install_lighthouse_validator(network, keys):
+def install_lighthouse_validator(network, keys, fee_recipient_address):
     # Import keystore(s) and configure the Lighthouse validator client
+    log.info(f'Validator install. Fee recipient address: {fee_recipient_address}')
 
     # Check for existing systemd service
     lighthouse_vc_service_exists = False
