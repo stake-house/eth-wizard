@@ -210,7 +210,7 @@ For which network would you like to perform this installation?
         ),
         values=[
             (NETWORK_MAINNET, f'Mainnet {network_queue_info[NETWORK_MAINNET]}'),
-            (NETWORK_PRATER, f'Prater {network_queue_info[NETWORK_PRATER]}')
+            (NETWORK_PRATER, f'Goerli/Prater {network_queue_info[NETWORK_PRATER]}')
         ],
         ok_text='Use this',
         cancel_text='Quit'
