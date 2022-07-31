@@ -6,6 +6,8 @@ import os
 import time
 import humanize
 import asyncio
+import re
+import sha3
 
 from rfc3986 import urlparse, builder as urlbuilder
 
@@ -1231,6 +1233,71 @@ correct network: {network.capitalize()}
         return ''
 
     return entered_directory
+
+def select_fee_recipient_address():
+    # Prompt the user for a fee recipient address
+    
+    valid_address = False
+    entered_address = None
+    input_canceled = False
+
+    while not valid_address:
+        not_valid_msg = ''
+        if entered_address is not None:
+            not_valid_msg = (
+'''
+
+<style bg="red" fg="black">Your last input was <b>not a valid Ethereum address</b>. Please make sure to enter a
+valid Ethereum address.</style>'''
+            )
+
+        entered_address = input_dialog(
+            title='Fee recipient address',
+            text=(HTML(
+f'''
+Please enter an Ethereum address to be used as your fee recipient address.
+Make sure you have control over this address. This is where the transaction
+tips for your proposed blocks will go into.
+
+* Press the tab key to switch between the controls below{not_valid_msg}
+'''             ))).run()
+
+        if not entered_address:
+            input_canceled = True
+            break
+
+        if is_address(entered_address):
+            valid_address = True
+
+    if input_canceled:
+        return ''
+    
+    if entered_address.lower()[:2] != '0x':
+        entered_address = '0x' + entered_address
+
+    return entered_address
+
+def is_checksum_address(address):
+    # Check for valid checksumed Ethereum address
+    address = address.replace('0x', '').strip()
+    address_hash = sha3.keccak_256()
+    address_hash.update(address.lower().encode('utf-8'))
+    address_hash = address_hash.hexdigest()
+
+    for i in range(0, 40):
+        if ((int(address_hash[i], 16) > 7 and address[i].upper() != address[i]) or
+                (int(address_hash[i], 16) <= 7 and address[i].lower() != address[i])):
+            return False
+    return True
+
+def is_address(address):
+    # Check for valide Ethereum address
+    if not re.match(r'^(0x)?[0-9a-f]{40}$', address, flags=re.IGNORECASE):
+        return False
+    elif re.match(r'^(0x)?[0-9a-f]{40}$', address) or re.match(r'^(0x)?[0-9A-F]{40}$', address):
+        return True
+    else:
+        return is_checksum_address(address)
 
 def show_whats_next(network, public_keys):
     # Show what's next including wait time

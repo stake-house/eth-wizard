@@ -27,6 +27,7 @@ from ethwizard.platforms.common import (
     progress_log_dialog,
     search_for_generated_keys,
     select_keys_directory,
+    select_fee_recipient_address,
     get_bc_validator_deposits,
     test_open_ports,
     show_whats_next,
