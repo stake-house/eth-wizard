@@ -195,7 +195,7 @@ def installation_steps():
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
         selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
-        selected_merge_ready_network = CTX_MERGE_READY_NETWORK
+        merge_ready_network = CTX_MERGE_READY_NETWORK
 
         if not (
             test_context_variable(context, selected_network, log) and
@@ -204,16 +204,16 @@ def installation_steps():
             # We are missing context variables, we cannot continue
             quit_app()
 
-        context[selected_merge_ready_network] = detect_merge_ready(context[selected_network],
+        context[merge_ready_network] = detect_merge_ready(context[selected_network],
             context[selected_execution_client])
-        if not context[selected_merge_ready_network]:
+        if not context[merge_ready_network]:
             # User asked to quit or error
-            del context[selected_merge_ready_network]
+            del context[merge_ready_network]
             step_sequence.save_state(step.step_id, context)
 
             quit_app()
         
-        context[selected_merge_ready_network] = context[selected_merge_ready_network]['result']
+        context[merge_ready_network] = context[merge_ready_network]['result']
         
         return context
 
@@ -226,17 +226,17 @@ def installation_steps():
     def select_eth1_fallbacks_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
-        selected_merge_ready_network = CTX_MERGE_READY_NETWORK
+        merge_ready_network = CTX_MERGE_READY_NETWORK
         selected_eth1_fallbacks = CTX_SELECTED_ETH1_FALLBACKS
 
         if not (
             test_context_variable(context, selected_network, log) and
-            test_context_variable(context, selected_merge_ready_network, log)
+            test_context_variable(context, merge_ready_network, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
 
-        if not context[selected_merge_ready_network]:
+        if not context[merge_ready_network]:
             if selected_eth1_fallbacks not in context:
                 context[selected_eth1_fallbacks] = select_eth1_fallbacks(context[selected_network])
                 step_sequence.save_state(step.step_id, context)
@@ -379,16 +379,16 @@ def installation_steps():
 
     def select_fee_recipient_address_function(step, context, step_sequence):
         # Context variables
-        selected_merge_ready_network = CTX_MERGE_READY_NETWORK
+        merge_ready_network = CTX_MERGE_READY_NETWORK
         selected_fee_recipient_address = CTX_SELECTED_FEE_RECIPIENT_ADDRESS
         
         if not (
-            test_context_variable(context, selected_merge_ready_network, log)
+            test_context_variable(context, merge_ready_network, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
 
-        if context[selected_merge_ready_network]:
+        if context[merge_ready_network]:
             if selected_fee_recipient_address not in context:
                 context[selected_fee_recipient_address] = select_fee_recipient_address()
                 step_sequence.save_state(step.step_id, context)

@@ -65,7 +65,7 @@ CTX_SELECTED_CONSENSUS_CHECKPOINT_URL = 'selected_consensus_checkpoint_url'
 CTX_OBTAINED_KEYS = 'obtained_keys'
 CTX_SELECTED_FEE_RECIPIENT_ADDRESS = 'selected_fee_recipient_address'
 CTX_PUBLIC_KEYS = 'public_keys'
-CTX_MERGE_READY_NETWORK = 'merge_ready'
+CTX_MERGE_READY_NETWORK = 'merge_ready_network'
 
 EXECUTION_CLIENT_GETH = 'Geth'
 
