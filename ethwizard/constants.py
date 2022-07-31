@@ -21,7 +21,10 @@ SPEEDTEST_SCRIPT_URL = 'https://raw.githubusercontent.com/sivel/speedtest-cli/ma
 
 STAKEHOUSE_PORT_CHECKER_URL = 'https://port-checker.vercel.app/api/checker'
 
-MIN_AVAILABLE_DISK_SPACE_GB = 900.0
+MIN_AVAILABLE_DISK_SPACE_GB = {
+    NETWORK_MAINNET: 1700.0,
+    NETWORK_PRATER: 450.0
+}
 
 MIN_SUSTAINED_K_READ_IOPS = 3.0
 MIN_SUSTAINED_K_WRITE_IOPS = 1.0

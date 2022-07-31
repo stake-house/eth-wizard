@@ -45,14 +45,21 @@ def installation_steps():
 
     def test_system_function(step, context, step_sequence):
         # Context variables
+        selected_network = CTX_SELECTED_NETWORK
         want_to_test = CTX_WANT_TO_TEST
         disk_size_tested = CTX_DISK_SIZE_TESTED
         disk_speed_tested = CTX_DISK_SPEED_TESTED
         available_ram_tested = CTX_AVAILABLE_RAM_TESTED
         internet_speed_tested = CTX_INTERNET_SPEED_TESTED
 
+        if not (
+            test_context_variable(context, selected_network, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_app()
+
         if want_to_test not in context:
-            context[want_to_test] = show_test_overview()
+            context[want_to_test] = show_test_overview(context[selected_network])
             step_sequence.save_state(step.step_id, context)
 
         if not context[want_to_test]:
@@ -64,7 +71,7 @@ def installation_steps():
 
         if context[want_to_test] == 1:
             if not context.get(disk_size_tested, False):
-                if not test_disk_size():
+                if not test_disk_size(context[selected_network]):
                     # User asked to quit
                     quit_app()
                 
@@ -430,8 +437,8 @@ def installation_steps():
     )
 
     return [
-        test_system_step,
         select_network_step,
+        test_system_step,
         select_custom_ports_step,
         install_geth_step,
         select_consensus_checkpoint_url_step,
@@ -447,7 +454,7 @@ def installation_steps():
         show_public_keys_step
     ]
 
-def show_test_overview():
+def show_test_overview(network):
     # Show the overall tests to perform
 
     result = button_dialog(
@@ -457,7 +464,7 @@ f'''
 We can test your system to make sure it is fit for being a validator. Here
 is the list of tests we will perform:
 
-* Disk size (>= {MIN_AVAILABLE_DISK_SPACE_GB:.0f}GB of available space)
+* Disk size (>= {MIN_AVAILABLE_DISK_SPACE_GB[network]:.0f}GB of available space for {network.capitalize()})
 * Disk speed (>= {MIN_SUSTAINED_K_READ_IOPS:.1f}K sustained read IOPS and >= {MIN_SUSTAINED_K_WRITE_IOPS:.1f}K sustained write IOPS)
 * Memory size (>= {MIN_AVAILABLE_RAM_GB:.1f}GB of available RAM)
 * Internet speed (>= {MIN_DOWN_MBS:.1f}MB/s down and >= {MIN_UP_MBS:.1f}MB/s up)
@@ -473,7 +480,7 @@ Do you want to test your system?
 
     return result
 
-def test_disk_size():
+def test_disk_size(network):
     # Test disk size
 
     log.info('Running df to test disk size...')
@@ -497,7 +504,7 @@ def test_disk_size():
             f'Output: {process_output}')
         return False
 
-    if not available_space_gb >= MIN_AVAILABLE_DISK_SPACE_GB:
+    if not available_space_gb >= MIN_AVAILABLE_DISK_SPACE_GB[network]:
         result = button_dialog(
             title=HTML('Disk size test <style bg="red" fg="black">failed</style>'),
             text=(HTML(
@@ -506,7 +513,7 @@ Your available space results seem to indicate that <style bg="red" fg="black">yo
 <b>smaller than</b> what would be required</style> to be a fully working validator. Here are
 your results:
 
-* Available space in /var/lib: {available_space_gb:.1f}GB (>= {MIN_AVAILABLE_DISK_SPACE_GB:.1f}GB)
+* Available space in /var/lib: {available_space_gb:.1f}GB (>= {MIN_AVAILABLE_DISK_SPACE_GB[network]:.1f}GB for {network.capitalize()})
 
 It might still be possible to be a validator but you should consider a
 larger disk for your system.
@@ -526,7 +533,7 @@ f'''
 Your available space results seem to indicate that <style bg="green" fg="white">your disk size is <b>large
 enough</b></style> to be a fully working validator. Here are your results:
 
-* Available space in /var/lib: {available_space_gb:.1f}GB (>= {MIN_AVAILABLE_DISK_SPACE_GB:.1f}GB)
+* Available space in /var/lib: {available_space_gb:.1f}GB (>= {MIN_AVAILABLE_DISK_SPACE_GB[network]:.1f}GB for {network.capitalize()})
 '''     )),
         buttons=[
             ('Keep going', True),
