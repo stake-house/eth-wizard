@@ -12,7 +12,7 @@ The eth-wizard should be stable enough to be used by everyone. It was never audi
 * Simple to use
 * Minimal
 * Mostly automated
-* For Ubuntu 20.04 using Lighthouse and Geth
+* For Ubuntu 20.04 or 22.04 using Lighthouse and Geth
 * For Windows 10 using Teku and Geth
 * No prerequisite needed
 * Internally simple to read, understand and modify
@@ -22,7 +22,7 @@ The eth-wizard should be stable enough to be used by everyone. It was never audi
 
 ## How to use
 
-### On Ubuntu 20.04
+### On Ubuntu 20.04 or 22.04
 
 You can use something like this in a terminal, to start the wizard:
 
