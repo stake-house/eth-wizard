@@ -316,26 +316,31 @@ def installation_steps(*args, **kwargs):
     def select_eth1_fallbacks_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
+        merge_ready_network = CTX_MERGE_READY_NETWORK
         selected_eth1_fallbacks = CTX_SELECTED_ETH1_FALLBACKS
 
         if not (
-            test_context_variable(context, selected_network, log)
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, merge_ready_network, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
 
-        if selected_eth1_fallbacks not in context:
-            context[selected_eth1_fallbacks] = select_eth1_fallbacks(context[selected_network])
-            step_sequence.save_state(step.step_id, context)
+        if not context[merge_ready_network]:
+            if selected_eth1_fallbacks not in context:
+                context[selected_eth1_fallbacks] = select_eth1_fallbacks(context[selected_network])
+                step_sequence.save_state(step.step_id, context)
 
-        if (
-            type(context[selected_eth1_fallbacks]) is not list and
-            not context[selected_eth1_fallbacks]):
-            # User asked to quit
-            del context[selected_eth1_fallbacks]
-            step_sequence.save_state(step.step_id, context)
+            if (
+                type(context[selected_eth1_fallbacks]) is not list and
+                not context[selected_eth1_fallbacks]):
+                # User asked to quit
+                del context[selected_eth1_fallbacks]
+                step_sequence.save_state(step.step_id, context)
 
-            quit_app()
+                quit_app()
+        else:
+            context[selected_eth1_fallbacks] = []
 
         return context
 
