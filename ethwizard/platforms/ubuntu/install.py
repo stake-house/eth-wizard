@@ -958,6 +958,11 @@ def setup_jwt_token_file():
         with open(LINUX_JWT_TOKEN_FILE_PATH, 'w') as jwt_token_file:
             jwt_token_file.write(token_hex(32))
 
+        # Make the file readable for everyone
+        st = os.stat(LINUX_JWT_TOKEN_FILE_PATH)
+        os.chmod(LINUX_JWT_TOKEN_FILE_PATH,
+            st.st_mode | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+
     return True
 
 def install_geth(network, ports):
