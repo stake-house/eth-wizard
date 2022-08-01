@@ -392,6 +392,7 @@ def installation_steps(*args, **kwargs):
         selected_eth1_fallbacks = CTX_SELECTED_ETH1_FALLBACKS
         selected_consensus_checkpoint_url = CTX_SELECTED_CONSENSUS_CHECKPOINT_URL
         selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
+        selected_fee_recipient_address = CTX_SELECTED_FEE_RECIPIENT_ADDRESS
 
         if not (
             test_context_variable(context, selected_directory, log) and
@@ -399,14 +400,16 @@ def installation_steps(*args, **kwargs):
             test_context_variable(context, obtained_keys, log) and
             test_context_variable(context, selected_ports, log) and
             test_context_variable(context, selected_eth1_fallbacks, log) and
-            test_context_variable(context, selected_consensus_checkpoint_url, log)
+            test_context_variable(context, selected_consensus_checkpoint_url, log) and
+            test_context_variable(context, selected_fee_recipient_address, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
         
         if not install_teku(context[selected_directory], context[selected_network],
             context[obtained_keys], context[selected_eth1_fallbacks],
-            context[selected_consensus_checkpoint_url], context[selected_ports]):
+            context[selected_consensus_checkpoint_url], context[selected_ports],
+            context[selected_fee_recipient_address]):
             # User asked to quit or error
             quit_app()
         
@@ -1286,7 +1289,7 @@ Unable to create JWT token file in {jwt_token_path}
             return False
         
         geth_arguments.append('--authrpc.jwtsecret')
-        geth_arguments.append(str(jwt_token_path))
+        geth_arguments.append(f'"{jwt_token_path}"')
 
     parameters = {
         'DisplayName': GETH_SERVICE_DISPLAY_NAME[network],
@@ -2091,7 +2094,8 @@ def detect_merge_ready(base_directory, network, execution_client):
 
     return {'result': is_merge_ready}
 
-def install_teku(base_directory, network, keys, eth1_fallbacks, consensus_checkpoint_url, ports):
+def install_teku(base_directory, network, keys, eth1_fallbacks, consensus_checkpoint_url, ports,
+    fee_recipient_address):
     # Install Teku for the selected network
 
     base_directory = Path(base_directory)
@@ -2403,10 +2407,46 @@ Do you want to remove this directory first and start from nothing?
     if teku_stderr_log_path.is_file():
         teku_stderr_log_path.unlink()
 
-    eth1_endpoints = ['http://127.0.0.1:8545'] + eth1_fallbacks
+    # Check if merge ready
+    merge_ready = False
+
+    result = re.search(r'([^-]+)', teku_version)
+    if result:
+        cleaned_teku_version = parse_version(result.group(1).strip())
+        target_teku_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][CONSENSUS_CLIENT_TEKU])
+
+        if cleaned_teku_version >= target_teku_version:
+            merge_ready = True
 
     teku_arguments = TEKU_ARGUMENTS[network]
-    teku_arguments.append('--eth1-endpoints=' + ','.join(eth1_endpoints))
+
+    if merge_ready:
+        jwt_token_dir = base_directory.joinpath('var', 'lib', 'ethereum')
+        jwt_token_path = jwt_token_dir.joinpath('jwttoken')
+
+        if not setup_jwt_token_file(base_directory):
+            log.error(
+f'''
+Unable to create JWT token file in {jwt_token_path}
+'''
+            )
+
+            return False
+        
+        teku_arguments.append(f'--ee-jwt-secret-file="{jwt_token_path}"')
+        teku_arguments.append(
+            f'--validators-proposer-default-fee-recipient={fee_recipient_address}')
+
+    local_eth1_endpoint = 'http://127.0.0.1:8545'
+    eth1_endpoints_flag = '--eth1-endpoints'
+    if merge_ready:
+        local_eth1_endpoint = 'http://127.0.0.1:8551'
+        eth1_endpoints_flag = '--ee-endpoint'
+
+    eth1_endpoints = [local_eth1_endpoint] + eth1_fallbacks
+    
+    teku_arguments.append(f'{eth1_endpoints_flag}=' + ','.join(eth1_endpoints))
     teku_arguments.append('--data-path=' + str(teku_datadir))
     teku_arguments.append('--validator-keys=' + str(keys['validator_keys_path']) +
         ';' + str(keys['validator_keys_path']))
