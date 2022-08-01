@@ -7,4 +7,3 @@ setuptools
 defusedxml
 python-dateutil
 beautifulsoup4
-pysha3

@@ -7,7 +7,6 @@ import time
 import humanize
 import asyncio
 import re
-import sha3
 
 from rfc3986 import urlparse, builder as urlbuilder
 
@@ -18,6 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ethwizard.constants import *
+
+from ethwizard.utils.CompactFIPS202 import Keccak_256
 
 from asyncio import get_event_loop
 
@@ -1279,9 +1280,7 @@ tips for your proposed blocks will go into.
 def is_checksum_address(address):
     # Check for valid checksumed Ethereum address
     address = address.replace('0x', '').strip()
-    address_hash = sha3.keccak_256()
-    address_hash.update(address.lower().encode('utf-8'))
-    address_hash = address_hash.hexdigest()
+    address_hash = Keccak_256(address.lower().encode('utf-8')).hex()
 
     for i in range(0, 40):
         if ((int(address_hash[i], 16) > 7 and address[i].upper() != address[i]) or
