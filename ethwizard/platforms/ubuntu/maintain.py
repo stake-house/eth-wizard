@@ -22,6 +22,7 @@ from ethwizard.platforms.ubuntu.common import (
 from ethwizard.constants import (
     CTX_SELECTED_EXECUTION_CLIENT,
     CTX_SELECTED_CONSENSUS_CLIENT,
+    CTX_SELECTED_NETWORK,
     EXECUTION_CLIENT_GETH,
     CONSENSUS_CLIENT_LIGHTHOUSE,
     WIZARD_COMPLETED_STEP_ID,
@@ -69,9 +70,11 @@ def show_dashboard(context):
 
     selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
     selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
+    selected_network = CTX_SELECTED_NETWORK
 
     current_execution_client = context[selected_execution_client]
     current_consensus_client = context[selected_consensus_client]
+    current_network = context[selected_network]
 
     # Get execution client details
 
@@ -96,6 +99,14 @@ def show_dashboard(context):
     latest_version = execution_client_details['versions']['latest']
     if latest_version != UNKNOWN_VALUE:
         latest_version = parse_version(latest_version)
+    
+    is_installed_exec_merge_ready = False
+    if installed_version != UNKNOWN_VALUE:
+        target_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[current_network][current_execution_client])
+        
+        if installed_version >= target_version:
+            is_installed_exec_merge_ready = True
 
     # If the available version is older than the latest one, we need to check again soon
     # It simply means that the updated build is not available yet for installing
@@ -258,6 +269,42 @@ def is_service_running(service_details):
         service_details['SubState'] == 'running'
     )
 
+def parse_exec_start(exec_start_struct):
+    # Parse the ExecStart output of `systemctl show` to extract important details
+
+    # Typical ExecStart value is like: { path=/usr/local/bin/lighthouse ; argv[]=/usr/local/bin/lighthouse bn --network prater --datadir /var/lib/lighthouse --http --execution-endpoint http://127.0.0.1:8551 --metrics --validator-monitor-auto --checkpoint-sync-url=https://goerli.checkpoint-sync.ethdevops.io --execution-jwt=/var/lib/ethereum/jwttoken --port 54949 --target-peers 100 --private ; ignore_errors=no ; start_time=[Wed 2022-08-03 12:57:32 UTC] ; stop_time=[n/a] ; pid=70252 ; code=(null) ; status=0/0 }
+
+    path = UNKNOWN_VALUE
+    argv = []
+
+    result = re.match(r'\{\s*(.+)\s*\}', exec_start_struct)
+    if not result:
+        return {
+            'path': path,
+            'argv': argv
+        }
+
+    without_brackets = result.group(1)
+
+    key_values = without_brackets.split(' ; ')
+
+    for item in key_values:
+        first_equal = item.find('=')
+        if first_equal < 0:
+            continue
+        key = item[:first_equal].lower()
+        value = item[first_equal + 1:]
+
+        if key == 'path':
+            path = value
+        elif key == 'argv[]':
+            argv = value.split(' ')
+
+    return {
+        'path': path,
+        'argv': argv
+    }
+
 def get_execution_client_details(execution_client):
     # Get the details for the current execution client
 
@@ -275,7 +322,12 @@ def get_execution_client_details(execution_client):
                 'running': UNKNOWN_VALUE,
                 'available': UNKNOWN_VALUE,
                 'latest': UNKNOWN_VALUE
-            }
+            },
+            'exec': {
+                'path': UNKNOWN_VALUE,
+                'argv': []
+            },
+            'is_merge_configured': UNKNOWN_VALUE
         }
         
         # Check for existing systemd service
@@ -300,6 +352,17 @@ def get_execution_client_details(execution_client):
         details['versions']['running'] = get_geth_running_version()
         details['versions']['available'] = get_geth_available_version()
         details['versions']['latest'] = get_geth_latest_version()
+
+        if 'ExecStart' in service_details:
+            details['exec'] = parse_exec_start(service_details['ExecStart'])
+
+            for arg in details['exec']['argv']:
+                if arg.lower().startswith('--authrpc.jwtsecret'):
+                    details['is_merge_configured'] = True
+                    break
+            
+            if details['is_merge_configured'] == UNKNOWN_VALUE:
+                details['is_merge_configured'] = False
 
         return details
 
@@ -464,6 +527,14 @@ def get_consensus_client_details(consensus_client):
                 'installed': UNKNOWN_VALUE,
                 'running': UNKNOWN_VALUE,
                 'latest': UNKNOWN_VALUE
+            },
+            'bn_exec': {
+                'path': UNKNOWN_VALUE,
+                'argv': []
+            },
+            'vc_exec': {
+                'path': UNKNOWN_VALUE,
+                'argv': []
             }
         }
         
@@ -482,6 +553,9 @@ def get_consensus_client_details(consensus_client):
             details['bn_service']['sub'] = service_details['SubState']
             details['bn_service']['running'] = is_service_running(service_details)
 
+        if 'ExecStart' in service_details:
+            details['bn_exec'] = parse_exec_start(service_details['ExecStart'])
+
         lighthouse_vc_service_exists = False
         lighthouse_vc_service_name = LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME
 
@@ -495,6 +569,9 @@ def get_consensus_client_details(consensus_client):
             details['vc_service']['active'] = service_details['ActiveState']
             details['vc_service']['sub'] = service_details['SubState']
             details['vc_service']['running'] = is_service_running(service_details)
+
+        if 'ExecStart' in service_details:
+            details['vc_exec'] = parse_exec_start(service_details['ExecStart'])
 
         details['versions']['installed'] = get_lighthouse_installed_version()
         details['versions']['running'] = get_lighthouse_running_version()
