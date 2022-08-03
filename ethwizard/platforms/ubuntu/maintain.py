@@ -15,7 +15,8 @@ from ethwizard.platforms.ubuntu.common import (
     save_state,
     quit_app,
     get_systemd_service_details,
-    is_package_installed
+    is_package_installed,
+    is_adx_supported
 )
 
 from ethwizard.constants import (
@@ -703,21 +704,31 @@ def upgrade_lighthouse():
     binary_asset = None
     signature_asset = None
 
+    archive_filename_comp = 'x86_64-unknown-linux-gnu.tar.gz'
+
+    use_optimized_binary = is_adx_supported()
+    if not use_optimized_binary:
+        log.warn('CPU does not support ADX instructions. '
+            'Using the portable version for Lighthouse.')
+        archive_filename_comp = 'x86_64-unknown-linux-gnu-portable.tar.gz'
+    
+    archive_filename_sig_comp = archive_filename_comp + '.asc'
+
     for asset in release_json['assets']:
         if 'name' not in asset:
             continue
         if 'browser_download_url' not in asset:
             continue
-    
+
         file_name = asset['name']
         file_url = asset['browser_download_url']
 
-        if file_name.endswith('x86_64-unknown-linux-gnu.tar.gz'):
+        if file_name.endswith(archive_filename_comp):
             binary_asset = {
                 'file_name': file_name,
                 'file_url': file_url
             }
-        elif file_name.endswith('x86_64-unknown-linux-gnu.tar.gz.asc'):
+        elif file_name.endswith(archive_filename_sig_comp):
             signature_asset = {
                 'file_name': file_name,
                 'file_url': file_url

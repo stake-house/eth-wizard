@@ -129,3 +129,20 @@ def is_package_installed(package):
     package_is_installed = result is not None
 
     return package_is_installed
+
+def is_adx_supported():
+    # Detect if ADX instructions set is support on this CPU
+
+    with open('/proc/cpuinfo', 'r') as cpuinfo_file:
+        line = cpuinfo_file.readline()
+        while line:
+            result = re.search(r'flags\s+\:\s*(.*)', line)
+            if result:
+                cpuflags = set(result.group(1).strip().lower().split(' '))
+                return 'adx' in cpuflags
+            line = cpuinfo_file.readline()
+        
+        log.warn('No CPU flags found in /proc/cpuinfo. '
+            'Could not find if ADX instructions are supported.')
+
+    return False
