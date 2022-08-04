@@ -109,9 +109,9 @@ def show_dashboard(context):
     if latest_version != UNKNOWN_VALUE:
         latest_version = parse_version(latest_version)
     
-    # Merge tests
+    # Merge tests for execution client
     merge_ready_exec_version = parse_version(
-            MIN_CLIENT_VERSION_FOR_MERGE[current_network][current_execution_client])
+        MIN_CLIENT_VERSION_FOR_MERGE[current_network][current_execution_client])
 
     is_installed_exec_merge_ready = False
     if is_version(installed_version) and is_version(merge_ready_exec_version):
@@ -187,6 +187,20 @@ def show_dashboard(context):
     if latest_version != UNKNOWN_VALUE:
         latest_version = parse_version(latest_version)
     
+    # Merge tests for consensus client
+    merge_ready_cons_version = parse_version(
+        MIN_CLIENT_VERSION_FOR_MERGE[current_network][current_consensus_client])
+
+    is_installed_cons_merge_ready = False
+    if is_version(installed_version) and is_version(merge_ready_cons_version):
+        if installed_version >= merge_ready_cons_version:
+            is_installed_cons_merge_ready = True
+
+    is_latest_cons_merge_ready = False
+    if is_version(latest_version) and is_version(merge_ready_cons_version):
+        if latest_version >= merge_ready_cons_version:
+            is_latest_cons_merge_ready = True
+
     # If the service is not running, we need to start it
 
     if not consensus_client_details['bn_service']['running']:
@@ -758,7 +772,7 @@ def perform_maintenance(execution_client, execution_client_details, consensus_cl
                 log.error('We could not upgrade the Geth client.')
                 return False
         
-        elif consensus_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT_MERGE:
+        elif execution_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT_MERGE:
             if not config_geth_merge():
                 log.error('We could not configure Geth for the merge.')
                 return False
@@ -767,7 +781,7 @@ def perform_maintenance(execution_client, execution_client_details, consensus_cl
                 log.error('We could not upgrade the Geth client.')
                 return False
     
-        elif consensus_client_details['next_step'] == MAINTENANCE_CONFIG_CLIENT_MERGE:
+        elif execution_client_details['next_step'] == MAINTENANCE_CONFIG_CLIENT_MERGE:
             if not config_geth_merge():
                 log.error('We could not configure Geth for the merge.')
                 return False
