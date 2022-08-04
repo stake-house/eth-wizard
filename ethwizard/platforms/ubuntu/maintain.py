@@ -217,11 +217,28 @@ def show_dashboard(context):
         if running_version < installed_version:
             consensus_client_details['next_step'] = MAINTENANCE_RESTART_SERVICE
 
+    # If the installed version is merge ready but the client is not configured for the merge,
+    # we need to configure the client for the merge
+
+    if is_version(installed_version):
+        if is_installed_cons_merge_ready and (
+            not consensus_client_details['is_bn_merge_configured'] or
+            not consensus_client_details['is_vc_merge_configured']):
+            consensus_client_details['next_step'] = MAINTENANCE_CONFIG_CLIENT_MERGE
+
     # If the installed version is older than the latest one, we need to upgrade the client
 
     if is_version(installed_version) and is_version(latest_version):
         if installed_version < latest_version:
             consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
+        
+        # If the next version is merge ready and we are not configured yet, we need to upgrade and
+        # configure the client
+
+        if is_latest_cons_merge_ready and (
+            not consensus_client_details['is_bn_merge_configured'] or
+            not consensus_client_details['is_vc_merge_configured']):
+            consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
 
     # If the service is not installed or found, we need to reinstall the client
 
