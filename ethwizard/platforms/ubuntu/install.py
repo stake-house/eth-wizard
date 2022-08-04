@@ -15,8 +15,6 @@ from pathlib import Path
 
 from packaging.version import parse as parse_version
 
-from secrets import token_hex
-
 from ethwizard.constants import *
 
 from ethwizard.platforms.common import (
@@ -41,7 +39,8 @@ from ethwizard.platforms.ubuntu.common import (
     quit_app,
     get_systemd_service_details,
     is_package_installed,
-    is_adx_supported
+    is_adx_supported,
+    setup_jwt_token_file
 )
 
 from prompt_toolkit.formatted_text import HTML
@@ -942,29 +941,6 @@ enough</b></style> to be a fully working validator. Here are your results:
     ).run()
 
     return result
-
-def setup_jwt_token_file():
-    # Create or ensure that the JWT token file exist
-
-    create_jwt_token = False
-    jwt_token_path = Path(LINUX_JWT_TOKEN_FILE_PATH)
-
-    if not jwt_token_path.is_file():
-        create_jwt_token = True
-    
-    if create_jwt_token:
-        jwt_token_directory = Path(LINUX_JWT_TOKEN_DIRECTORY)
-        jwt_token_directory.mkdir(parents=True, exist_ok=True)
-
-        with open(LINUX_JWT_TOKEN_FILE_PATH, 'w') as jwt_token_file:
-            jwt_token_file.write(token_hex(32))
-
-        # Make the file readable for everyone
-        st = os.stat(LINUX_JWT_TOKEN_FILE_PATH)
-        os.chmod(LINUX_JWT_TOKEN_FILE_PATH,
-            st.st_mode | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
-
-    return True
 
 def install_geth(network, ports):
     # Install geth for the selected network

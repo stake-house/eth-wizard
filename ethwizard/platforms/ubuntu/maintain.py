@@ -10,13 +10,18 @@ from prompt_toolkit.shortcuts import button_dialog
 
 from pathlib import Path
 
+from ethwizard.platforms.common import (
+    select_fee_recipient_address
+)
+
 from ethwizard.platforms.ubuntu.common import (
     log,
     save_state,
     quit_app,
     get_systemd_service_details,
     is_package_installed,
-    is_adx_supported
+    is_adx_supported,
+    setup_jwt_token_file
 )
 
 from ethwizard.constants import (
@@ -31,9 +36,12 @@ from ethwizard.constants import (
     GETH_LATEST_RELEASE,
     GITHUB_API_VERSION,
     GETH_SYSTEMD_SERVICE_NAME,
+    LINUX_JWT_TOKEN_FILE_PATH,
     MAINTENANCE_DO_NOTHING,
     MAINTENANCE_RESTART_SERVICE,
     MAINTENANCE_UPGRADE_CLIENT,
+    MAINTENANCE_UPGRADE_CLIENT_MERGE,
+    MAINTENANCE_CONFIG_CLIENT_MERGE,
     MAINTENANCE_CHECK_AGAIN_SOON,
     MAINTENANCE_START_SERVICE,
     MAINTENANCE_REINSTALL_CLIENT,
@@ -100,13 +108,19 @@ def show_dashboard(context):
     if latest_version != UNKNOWN_VALUE:
         latest_version = parse_version(latest_version)
     
-    is_installed_exec_merge_ready = False
-    if installed_version != UNKNOWN_VALUE:
-        target_version = parse_version(
+    # Merge tests
+    merge_ready_exec_version = parse_version(
             MIN_CLIENT_VERSION_FOR_MERGE[current_network][current_execution_client])
-        
-        if installed_version >= target_version:
+
+    is_installed_exec_merge_ready = False
+    if is_version(installed_version) and is_version(merge_ready_exec_version):
+        if installed_version >= merge_ready_exec_version:
             is_installed_exec_merge_ready = True
+
+    is_available_exec_merge_ready = False
+    if is_version(available_version) and is_version(merge_ready_exec_version):
+        if available_version >= merge_ready_exec_version:
+            is_available_exec_merge_ready = True
 
     # If the available version is older than the latest one, we need to check again soon
     # It simply means that the updated build is not available yet for installing
@@ -126,11 +140,25 @@ def show_dashboard(context):
         if running_version < installed_version:
             execution_client_details['next_step'] = MAINTENANCE_RESTART_SERVICE
 
+    # If the installed version is merge ready but the client is not configured for the merge,
+    # we need to configure the client for the merge
+
+    if is_version(installed_version):
+        if is_installed_exec_merge_ready and not execution_client_details['is_merge_configured']:
+            execution_client_details['next_step'] = MAINTENANCE_CONFIG_CLIENT_MERGE
+
     # If the installed version is older than the available one, we need to upgrade the client
 
     if is_version(installed_version) and is_version(available_version):
         if installed_version < available_version:
             execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
+        
+        # If the next version is merge ready and we are not configured yet, we need to upgrade and
+        # configure the client
+
+        if is_available_exec_merge_ready and not execution_client_details['is_merge_configured']:
+            execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
+
 
     # If the service is not installed or found, we need to reinstall the client
 
@@ -197,6 +225,9 @@ def show_dashboard(context):
         MAINTENANCE_DO_NOTHING: 'Nothing to perform here. Everything is good.',
         MAINTENANCE_RESTART_SERVICE: 'Service needs to be restarted.',
         MAINTENANCE_UPGRADE_CLIENT: 'Client needs to be upgraded.',
+        MAINTENANCE_UPGRADE_CLIENT_MERGE: (
+            'Client needs to be upgraded and configured for the merge.'),
+        MAINTENANCE_CONFIG_CLIENT_MERGE: 'Client needs to be configured for the merge.',
         MAINTENANCE_CHECK_AGAIN_SOON: 'Check again. Client update should be available soon.',
         MAINTENANCE_START_SERVICE: 'Service needs to be started.',
         MAINTENANCE_REINSTALL_CLIENT: 'Client needs to be reinstalled.',
@@ -724,7 +755,25 @@ def perform_maintenance(execution_client, execution_client_details, consensus_cl
             if not upgrade_geth():
                 log.error('We could not upgrade the Geth client.')
                 return False
+        
+        elif consensus_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT_MERGE:
+            if not config_geth_merge():
+                log.error('We could not configure Geth for the merge.')
+                return False
             
+            if not upgrade_geth():
+                log.error('We could not upgrade the Geth client.')
+                return False
+    
+        elif consensus_client_details['next_step'] == MAINTENANCE_CONFIG_CLIENT_MERGE:
+            if not config_geth_merge():
+                log.error('We could not configure Geth for the merge.')
+                return False
+            
+            log.info('Restarting Geth service...')
+
+            subprocess.run(['systemctl', 'restart', GETH_SYSTEMD_SERVICE_NAME])
+
         elif execution_client_details['next_step'] == MAINTENANCE_START_SERVICE:
             log.info('Starting Geth service...')
 
@@ -749,6 +798,14 @@ def perform_maintenance(execution_client, execution_client_details, consensus_cl
             if not upgrade_lighthouse():
                 log.error('We could not upgrade the Lighthouse client.')
                 return False
+        
+        elif consensus_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT_MERGE:
+            # TODO: Implement
+            pass
+    
+        elif consensus_client_details['next_step'] == MAINTENANCE_CONFIG_CLIENT_MERGE:
+            # TODO: Implement
+            pass
             
         elif consensus_client_details['next_step'] == MAINTENANCE_START_SERVICE:
             log.info('Starting Lighthouse services...')
@@ -775,6 +832,39 @@ def upgrade_geth():
     subprocess.run(['systemctl', 'restart', GETH_SYSTEMD_SERVICE_NAME])
 
     return True
+
+def config_geth_merge():
+    # Configure Geth for the merge
+    log.info('Configuring Geth for the merge...')
+
+    log.info('Creating JWT token file if needed...')
+    if not setup_jwt_token_file():
+        log.error(
+f'''
+Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
+'''
+        )
+
+        return False
+    
+    geth_service_name = GETH_SYSTEMD_SERVICE_NAME
+    geth_service_content = ''
+
+    log.info('Adding JWT token configuration to Geth...')
+    with open('/etc/systemd/system/' + geth_service_name, 'r') as service_file:
+        geth_service_content = service_file.read()
+
+    geth_service_content = re.sub(r'ExecStart\s*=\s*(.*)geth([^\\\n]+(\\\s+)?)+',
+        rf'\g<0> --authrpc.jwtsecret {LINUX_JWT_TOKEN_FILE_PATH}', geth_service_content)
+
+    # Write back configuration
+    with open('/etc/systemd/system/' + geth_service_name, 'w') as service_file:
+        service_file.write(geth_service_content)
+
+    # Reload configuration
+    log.info('Reloading service configurations...')
+    subprocess.run(['systemctl', 'daemon-reload'])
+
 
 def upgrade_lighthouse():
     # Upgrade the Lighthouse client

@@ -2,11 +2,15 @@ import sys
 import json
 import subprocess
 import re
+import os
+import stat
 
 import logging
 import logging.handlers
 
 from pathlib import Path
+
+from secrets import token_hex
 
 from typing import Optional
 
@@ -14,7 +18,8 @@ from ethwizard import __version__
 
 from ethwizard.constants import (
     LINUX_SAVE_DIRECTORY,
-    STATE_FILE
+    STATE_FILE,
+    LINUX_JWT_TOKEN_DIRECTORY
 )
 
 log = logging.getLogger(__name__)
@@ -146,3 +151,26 @@ def is_adx_supported():
             'Could not find if ADX instructions are supported.')
 
     return False
+
+def setup_jwt_token_file():
+    # Create or ensure that the JWT token file exist
+
+    create_jwt_token = False
+    jwt_token_path = Path(LINUX_JWT_TOKEN_FILE_PATH)
+
+    if not jwt_token_path.is_file():
+        create_jwt_token = True
+    
+    if create_jwt_token:
+        jwt_token_directory = Path(LINUX_JWT_TOKEN_DIRECTORY)
+        jwt_token_directory.mkdir(parents=True, exist_ok=True)
+
+        with open(LINUX_JWT_TOKEN_FILE_PATH, 'w') as jwt_token_file:
+            jwt_token_file.write(token_hex(32))
+
+        # Make the file readable for everyone
+        st = os.stat(LINUX_JWT_TOKEN_FILE_PATH)
+        os.chmod(LINUX_JWT_TOKEN_FILE_PATH,
+            st.st_mode | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+
+    return True

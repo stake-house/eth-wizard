@@ -102,6 +102,8 @@ MAINTENANCE_DO_NOTHING = 'do_nothing'
 MAINTENANCE_START_SERVICE = 'start_service'
 MAINTENANCE_RESTART_SERVICE = 'restart_service'
 MAINTENANCE_UPGRADE_CLIENT = 'upgrade_client'
+MAINTENANCE_UPGRADE_CLIENT_MERGE = 'upgrade_client_merge'
+MAINTENANCE_CONFIG_CLIENT_MERGE = 'config_client_merge'
 MAINTENANCE_CHECK_AGAIN_SOON = 'check_again_soon'
 MAINTENANCE_REINSTALL_CLIENT = 'reinstall_client'
 
