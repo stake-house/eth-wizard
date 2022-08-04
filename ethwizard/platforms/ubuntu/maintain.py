@@ -882,6 +882,8 @@ Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
     log.info('Reloading service configurations...')
     subprocess.run(['systemctl', 'daemon-reload'])
 
+    return True
+
 def upgrade_lighthouse():
     # Upgrade the Lighthouse client
     log.info('Upgrading Lighthouse client...')
