@@ -19,7 +19,8 @@ from ethwizard import __version__
 from ethwizard.constants import (
     LINUX_SAVE_DIRECTORY,
     STATE_FILE,
-    LINUX_JWT_TOKEN_DIRECTORY
+    LINUX_JWT_TOKEN_DIRECTORY,
+    LINUX_JWT_TOKEN_FILE_PATH
 )
 
 log = logging.getLogger(__name__)
