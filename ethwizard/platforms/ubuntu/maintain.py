@@ -825,6 +825,7 @@ def upgrade_geth():
     # Upgrade the Geth client
     log.info('Upgrading Geth client...')
 
+    subprocess.run(['add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
     subprocess.run(['apt', '-y', 'update'])
     subprocess.run(['apt', '-y', 'install', 'geth'])
 
@@ -864,7 +865,6 @@ Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
     # Reload configuration
     log.info('Reloading service configurations...')
     subprocess.run(['systemctl', 'daemon-reload'])
-
 
 def upgrade_lighthouse():
     # Upgrade the Lighthouse client
