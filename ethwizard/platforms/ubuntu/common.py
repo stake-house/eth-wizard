@@ -175,3 +175,31 @@ def setup_jwt_token_file():
             st.st_mode | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
 
     return True
+
+def is_ethereum_ppa_added():
+    # Check if the official Ethereum PPA has been added
+
+    sources_content = ''
+    with open('/etc/apt/sources.list', 'r') as sources_file:
+        sources_content = sources_file.read()
+    
+    result = re.search(r'$deb\s+http\://ppa\.launchpad\.net/ethereum/ethereum/ubuntu',
+        sources_content, re.MULTILINE)
+    if result:
+        return True
+    
+    with os.scandir('/etc/apt/sources.list.d/') as it:
+        for entry in it:
+            if entry.name.startswith('.') or not entry.is_file():
+                continue
+
+            sources_content = ''
+            with open(entry.path, 'r') as sources_file:
+                sources_content = sources_file.read()
+            
+            result = re.search(r'$deb\s+http\://ppa\.launchpad\.net/ethereum/ethereum/ubuntu',
+                sources_content, re.MULTILINE)
+            if result:
+                return True
+                
+    return False

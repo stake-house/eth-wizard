@@ -22,7 +22,8 @@ from ethwizard.platforms.ubuntu.common import (
     get_systemd_service_details,
     is_package_installed,
     is_adx_supported,
-    setup_jwt_token_file
+    setup_jwt_token_file,
+    is_ethereum_ppa_added
 )
 
 from ethwizard.constants import (
@@ -493,8 +494,12 @@ def get_geth_available_version():
 
     log.info('Getting Geth available version...')
 
-    subprocess.run(['add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
-    subprocess.run(['apt', '-y', 'update'])
+    # Add Ethereum PPA if not already added.
+    if not is_ethereum_ppa_added():
+        subprocess.run(['add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
+    else:
+        subprocess.run(['apt', '-y', 'update'])
+    
     process_result = subprocess.run(['apt-cache', 'policy', 'geth'], capture_output=True,
         text=True)
     
@@ -842,8 +847,11 @@ def upgrade_geth():
     # Upgrade the Geth client
     log.info('Upgrading Geth client...')
 
-    subprocess.run(['add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
-    subprocess.run(['apt', '-y', 'update'])
+    # Add Ethereum PPA if not already added.
+    if not is_ethereum_ppa_added():
+        subprocess.run(['add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
+    else:
+        subprocess.run(['apt', '-y', 'update'])
 
     env = os.environ.copy()
     env['DEBIAN_FRONTEND'] = 'noninteractive'
