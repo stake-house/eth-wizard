@@ -535,7 +535,9 @@ def get_consensus_client_details(consensus_client):
             'vc_exec': {
                 'path': UNKNOWN_VALUE,
                 'argv': []
-            }
+            },
+            'is_bn_merge_configured': UNKNOWN_VALUE,
+            'is_vc_merge_configured': UNKNOWN_VALUE
         }
         
         # Check for existing systemd services
@@ -556,6 +558,19 @@ def get_consensus_client_details(consensus_client):
         if 'ExecStart' in service_details:
             details['bn_exec'] = parse_exec_start(service_details['ExecStart'])
 
+            execution_jwt_flag_found = False
+            execution_endpoint_flag_found = False
+            for arg in details['bn_exec']['argv']:
+                if arg.lower().startswith('--execution-jwt'):
+                    execution_jwt_flag_found = True
+                if arg.lower().startswith('--execution-endpoint'):
+                    execution_endpoint_flag_found = True
+                if execution_jwt_flag_found and execution_endpoint_flag_found:
+                    break
+            
+            details['is_bn_merge_configured'] = (
+                execution_jwt_flag_found and execution_endpoint_flag_found)
+
         lighthouse_vc_service_exists = False
         lighthouse_vc_service_name = LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME
 
@@ -572,6 +587,14 @@ def get_consensus_client_details(consensus_client):
 
         if 'ExecStart' in service_details:
             details['vc_exec'] = parse_exec_start(service_details['ExecStart'])
+
+            for arg in details['vc_exec']['argv']:
+                if arg.lower().startswith('--suggested-fee-recipient'):
+                    details['is_vc_merge_configured'] = True
+                    break
+            
+            if details['is_vc_merge_configured'] == UNKNOWN_VALUE:
+                details['is_vc_merge_configured'] = False
 
         details['versions']['installed'] = get_lighthouse_installed_version()
         details['versions']['running'] = get_lighthouse_running_version()
