@@ -2,6 +2,7 @@ import subprocess
 import httpx
 import re
 import time
+import os
 
 from packaging.version import parse as parse_version, Version
 
@@ -843,7 +844,11 @@ def upgrade_geth():
 
     subprocess.run(['add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
     subprocess.run(['apt', '-y', 'update'])
-    subprocess.run(['apt', '-y', 'install', 'geth'])
+
+    env = os.environ.copy()
+    env['DEBIAN_FRONTEND'] = 'noninteractive'
+
+    subprocess.run(['apt', '-y', 'install', 'geth'], env=env)
 
     log.info('Restarting Geth service...')
     subprocess.run(['systemctl', 'restart', GETH_SYSTEMD_SERVICE_NAME])
