@@ -496,6 +496,18 @@ def get_geth_available_version():
 
     # Add Ethereum PPA if not already added.
     if not is_ethereum_ppa_added():
+        spc_package_installed = False
+        try:
+            spc_package_installed = is_package_installed('software-properties-common')
+        except Exception:
+            return False
+        
+        if not spc_package_installed:
+            subprocess.run([
+                'apt', '-y', 'update'])
+            subprocess.run([
+                'apt', '-y', 'install', 'software-properties-common'])
+
         subprocess.run(['add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
     else:
         subprocess.run(['apt', '-y', 'update'])
@@ -849,6 +861,18 @@ def upgrade_geth():
 
     # Add Ethereum PPA if not already added.
     if not is_ethereum_ppa_added():
+        spc_package_installed = False
+        try:
+            spc_package_installed = is_package_installed('software-properties-common')
+        except Exception:
+            return False
+        
+        if not spc_package_installed:
+            subprocess.run([
+                'apt', '-y', 'update'])
+            subprocess.run([
+                'apt', '-y', 'install', 'software-properties-common'])
+
         subprocess.run(['add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
     else:
         subprocess.run(['apt', '-y', 'update'])
