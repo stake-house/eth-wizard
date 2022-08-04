@@ -478,6 +478,7 @@ def get_geth_available_version():
 
     log.info('Getting Geth available version...')
 
+    subprocess.run(['add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
     subprocess.run(['apt', '-y', 'update'])
     process_result = subprocess.run(['apt-cache', 'policy', 'geth'], capture_output=True,
         text=True)
