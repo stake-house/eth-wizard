@@ -851,12 +851,23 @@ def perform_maintenance(execution_client, execution_client_details, consensus_cl
                 return False
         
         elif consensus_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT_MERGE:
-            # TODO: Implement
-            pass
+            if not config_lighthouse_merge():
+                log.error('We could not configure Lighthouse for the merge.')
+                return False
+
+            if not upgrade_lighthouse():
+                log.error('We could not upgrade the Lighthouse client.')
+                return False
     
         elif consensus_client_details['next_step'] == MAINTENANCE_CONFIG_CLIENT_MERGE:
-            # TODO: Implement
-            pass
+            if not config_lighthouse_merge():
+                log.error('We could not configure Lighthouse for the merge.')
+                return False
+            
+            log.info('Restarting Lighthouse services...')
+
+            subprocess.run(['systemctl', 'restart', LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME,
+                LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME])
             
         elif consensus_client_details['next_step'] == MAINTENANCE_START_SERVICE:
             log.info('Starting Lighthouse services...')
@@ -922,6 +933,7 @@ Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
     geth_service_content = ''
 
     log.info('Adding JWT token configuration to Geth...')
+
     with open('/etc/systemd/system/' + geth_service_name, 'r') as service_file:
         geth_service_content = service_file.read()
 
@@ -1116,6 +1128,95 @@ binary after {retry_count} retries.
     # Remove download leftovers
     binary_path.unlink()
     signature_path.unlink()
+
+    return True
+
+def config_lighthouse_merge():
+    # Configure Lighthouse for the merge
+    log.info('Configuring Lighthouse for the merge...')
+
+    fee_recipient_address = select_fee_recipient_address()
+    if not fee_recipient_address:
+        log.error('No fee recipient address entered.')
+        return False
+
+    log.info('Creating JWT token file if needed...')
+    if not setup_jwt_token_file():
+        log.error(
+f'''
+Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
+'''
+        )
+
+        return False
+    
+    # Configure the Lighthouse beacon node
+
+    lighthouse_bn_service_name = LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME
+    lighthouse_bn_service_content = ''
+
+    log.info('Adding JWT token configuration to Lighthouse beacon node and '
+        'using the correct API port...')
+
+    with open('/etc/systemd/system/' + lighthouse_bn_service_name, 'r') as service_file:
+        lighthouse_bn_service_content = service_file.read()
+
+    # Remove all --eth1-endpoints related configuration
+    lighthouse_bn_service_content = re.sub(
+        (r'(?P<first>ExecStart\s*=\s*(.*)lighthouse([^\\\n]*?(\\\s+)?)*?)'
+            r'( --eth1-endpoints?\s*=?\s*\S+)'
+            r'(?P<second>([^\\\n]*(\\\s+)?)*)'),
+        r'\g<first>\g<second>', lighthouse_bn_service_content)
+
+    # Add --execution-endpoint configuration
+    lighthouse_bn_service_content = re.sub(
+        (r'(?P<first>ExecStart\s*=\s*(.*)lighthouse([^\\\n]*?(\\\s+)?)*?)'
+            r'( --execution-endpoints?\s*=?\s*\S+)'
+            r'(?P<second>([^\\\n]*(\\\s+)?)*)'),
+        r'\g<first>\g<second>', lighthouse_bn_service_content)
+
+    lighthouse_bn_service_content = re.sub(r'ExecStart\s*=\s*(.*)lighthouse([^\\\n]+(\\\s+)?)+',
+        r'\g<0> --execution-endpoint http://127.0.0.1:8551', lighthouse_bn_service_content)
+
+    # Add --execution-jwt configuration
+    lighthouse_bn_service_content = re.sub(
+        (r'(?P<first>ExecStart\s*=\s*(.*)lighthouse([^\\\n]*?(\\\s+)?)*?)'
+            r'( --execution-jwt\s*=?\s*\S+)'
+            r'(?P<second>([^\\\n]*(\\\s+)?)*)'),
+        r'\g<first>\g<second>', lighthouse_bn_service_content)
+
+    lighthouse_bn_service_content = re.sub(r'ExecStart\s*=\s*(.*)lighthouse([^\\\n]+(\\\s+)?)+',
+        rf'\g<0> --execution-jwt {LINUX_JWT_TOKEN_FILE_PATH}', lighthouse_bn_service_content)
+
+    # Write back configuration
+    with open('/etc/systemd/system/' + lighthouse_bn_service_name, 'w') as service_file:
+        service_file.write(lighthouse_bn_service_content)
+
+    # Configure the Lighthouse validator client
+
+    lighthouse_vc_service_name = LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME
+    lighthouse_vc_service_content = ''
+
+    with open('/etc/systemd/system/' + lighthouse_vc_service_name, 'r') as service_file:
+        lighthouse_vc_service_content = service_file.read()
+    
+    # Add fee recipient address
+    lighthouse_vc_service_content = re.sub(
+        (r'(?P<first>ExecStart\s*=\s*(.*)lighthouse([^\\\n]*?(\\\s+)?)*?)'
+            r'( --suggested-fee-recipient\s*=?\s*\S+)'
+            r'(?P<second>([^\\\n]*(\\\s+)?)*)'),
+        r'\g<first>\g<second>', lighthouse_vc_service_content)
+
+    lighthouse_vc_service_content = re.sub(r'ExecStart\s*=\s*(.*)lighthouse([^\\\n]+(\\\s+)?)+',
+        rf'\g<0> --suggested-fee-recipient {fee_recipient_address}', lighthouse_vc_service_content)
+
+    # Write back configuration
+    with open('/etc/systemd/system/' + lighthouse_vc_service_name, 'w') as service_file:
+        service_file.write(lighthouse_vc_service_content)
+
+    # Reload configuration
+    log.info('Reloading service configurations...')
+    subprocess.run(['systemctl', 'daemon-reload'])
 
     return True
 
