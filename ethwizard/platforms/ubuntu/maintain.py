@@ -937,8 +937,19 @@ Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
     with open('/etc/systemd/system/' + geth_service_name, 'r') as service_file:
         geth_service_content = service_file.read()
 
-    geth_service_content = re.sub(r'ExecStart\s*=\s*(.*)geth([^\\\n]+(\\\s+)?)+',
-        rf'\g<0> --authrpc.jwtsecret {LINUX_JWT_TOKEN_FILE_PATH}', geth_service_content)
+    result = re.search(r'ExecStart\s*=\s*(.*?)geth([^\\\n]*(\\\s+)?)*', geth_service_content)
+    if not result:
+        log.error('Cannot parse Geth service file.')
+        return False
+    
+    exec_start = result.group(0)
+
+    # Add --authrpc.jwtsecret configuration
+    exec_start = re.sub(r'(\s*\\)?\s+--authrpc.jwtsecret\s*=?\s*\S+', '', exec_start)
+    exec_start = exec_start + f' --authrpc.jwtsecret {LINUX_JWT_TOKEN_FILE_PATH}'
+
+    geth_service_content = re.sub(r'ExecStart\s*=\s*(.*?)geth([^\\\n]*(\\\s+)?)*',
+        exec_start, geth_service_content)
 
     # Write back configuration
     with open('/etc/systemd/system/' + geth_service_name, 'w') as service_file:
