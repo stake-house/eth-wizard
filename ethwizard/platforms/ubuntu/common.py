@@ -183,7 +183,7 @@ def is_ethereum_ppa_added():
     with open('/etc/apt/sources.list', 'r') as sources_file:
         sources_content = sources_file.read()
 
-    result = re.search(r'$deb\s+https?\://ppa\.launchpad(content)?\.net/ethereum/ethereum/ubuntu',
+    result = re.search(r'^deb\s+https?\://ppa\.launchpad(content)?\.net/ethereum/ethereum/ubuntu',
         sources_content, re.MULTILINE)
     if result:
         return True
@@ -197,7 +197,7 @@ def is_ethereum_ppa_added():
             with open(entry.path, 'r') as sources_file:
                 sources_content = sources_file.read()
             
-            result = re.search(r'$deb\s+https?\://ppa\.launchpad(content)?\.net/ethereum/ethereum/ubuntu',
+            result = re.search(r'^deb\s+https?\://ppa\.launchpad(content)?\.net/ethereum/ethereum/ubuntu',
                 sources_content, re.MULTILINE)
             if result:
                 return True
