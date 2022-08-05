@@ -1180,7 +1180,7 @@ Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
     exec_start = exec_start + f' --execution-jwt {LINUX_JWT_TOKEN_FILE_PATH}'
 
     lighthouse_bn_service_content = re.sub(r'ExecStart\s*=\s*(.*?)lighthouse([^\\\n]*(\\\s+)?)*',
-        re.escape(exec_start), lighthouse_bn_service_content)
+        exec_start, lighthouse_bn_service_content)
 
     # Write back configuration
     with open('/etc/systemd/system/' + lighthouse_bn_service_name, 'w') as service_file:
@@ -1206,7 +1206,7 @@ Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
     exec_start = exec_start + f' --suggested-fee-recipient {fee_recipient_address}'
     
     lighthouse_vc_service_content = re.sub(r'ExecStart\s*=\s*(.*?)lighthouse([^\\\n]*(\\\s+)?)*',
-        re.escape(exec_start), lighthouse_vc_service_content)
+        exec_start, lighthouse_vc_service_content)
 
     # Write back configuration
     with open('/etc/systemd/system/' + lighthouse_vc_service_name, 'w') as service_file:
