@@ -1247,8 +1247,8 @@ def select_fee_recipient_address():
             not_valid_msg = (
 '''
 
-<style bg="red" fg="black">Your last input was <b>not a valid Ethereum address</b>. Please make sure to enter a
-valid Ethereum address.</style>'''
+<style bg="red" fg="black">Your last input was <b>not a valid Ethereum address</b>. Please make sure to enter
+a valid Ethereum address.</style>'''
             )
 
         entered_address = input_dialog(
