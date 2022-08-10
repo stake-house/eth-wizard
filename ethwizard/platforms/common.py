@@ -376,7 +376,7 @@ f'''
 The Ethereum Foundation (EF) is offering a free and public endpoint for
 <b>{network.capitalize()}</b>. We recommend using it.
 '''
-        ).trim() + '\n\n'
+        ).strip() + '\n\n'
 
     initial_state_url = None
 
