@@ -124,7 +124,7 @@ LAUNCHPAD_URLS = {
 
 BEACONCHA_IN_URLS = {
     NETWORK_MAINNET: 'https://beaconcha.in',
-    NETWORK_PRATER: 'https://goerli.beaconcha.in'
+    NETWORK_PRATER: 'https://prater.beaconcha.in'
 }
 
 INFURA_BEACON_NODE_DOMAINS = {
