@@ -437,6 +437,19 @@ def installation_steps():
         exc_function=install_lighthouse_validator_function
     )
 
+    def install_chrony_function(step, context, step_sequence):
+        if not install_chrony():
+            # User asked to quit or error
+            quit_app()
+
+        return context
+
+    install_chrony_step = Step(
+        step_id=INSTALL_CHRONY_STEP_ID,
+        display_name='Install chrony',
+        exc_function=install_chrony_function
+    )
+
     def initiate_deposit_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
@@ -527,7 +540,7 @@ def installation_steps():
         obtain_keys_step,
         select_fee_recipient_address_step,
         install_lighthouse_validator_step,
-        # TODO: Check time synchronization and configure it if needed
+        install_chrony_step,
         # TODO: Monitoring setup
         initiate_deposit_step,
         show_whats_next_step,
@@ -3162,6 +3175,42 @@ $ sudo journalctl -ru {lighthouse_vc_service_name}
         )
 
         return False
+
+    return True
+
+def install_chrony():
+    # Prompt the user to install chrony to improve time sync
+
+    if is_package_installed('chrony'):
+        return True
+    
+    result = button_dialog(
+        title='Improve time synchronization',
+        text=(
+'''
+Time synchronization is very important for a validator setup. Being out of
+sync can lead to lower rewards and other undesirable results.
+
+The default Network Time Synchronization service installed can be improved
+by replacing it with chrony. This is a simple change that can significantly
+improve your time sync configuration for your machine.
+
+Would you like to improve your time synchronization?
+'''     ),
+        buttons=[
+            ('Improve', 1),
+            ('Skip', 2),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if result == 2:
+        return True
+
+    if not result:
+        return result
+    
+    subprocess.run(['apt', '-y', 'install', 'chrony'])
 
     return True
 
