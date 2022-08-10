@@ -127,6 +127,10 @@ INFURA_BEACON_NODE_DOMAINS = {
     NETWORK_PRATER: 'eth2-beacon-prater.infura.io'
 }
 
+EF_DEVOPS_CHECKPOINT_EP = {
+  NETWORK_PRATER: 'https://goerli.checkpoint-sync.ethdevops.io'
+}
+
 VERY_LARGE_VERSION_NUMBER = '500.0.0'
 
 MIN_CLIENT_VERSION_FOR_MERGE = {

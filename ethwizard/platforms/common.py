@@ -358,6 +358,26 @@ def select_consensus_checkpoint_provider(network, log):
 
     infura_bn_domain = INFURA_BEACON_NODE_DOMAINS[network]
 
+    ef_endpoint = EF_DEVOPS_CHECKPOINT_EP.get(network, False)
+    ef_text = ''
+    
+    buttons = [
+        ('Infura', 1),
+        ('Custom', 2),
+        ('Skip', 3),
+        ('Quit', False)
+    ]
+
+    if ef_endpoint:
+        buttons.insert(0, ('EF', 4))
+
+        ef_text = (
+f'''
+The Ethereum Foundation (EF) is offering a free and public endpoint for
+<b>{network.capitalize()}</b>. We recommend using it.
+'''
+        ).trim() + '\n\n'
+
     initial_state_url = None
 
     while initial_state_url is None:
@@ -370,9 +390,7 @@ Having a consensus checkpoint provider is highly recommended for your
 beacon node. It makes it possible to get a fully synced beacon in just a
 few minutes compared to having to wait hours or days.
 
-An easy way to get a provider is to create a free account on Infura. Your
-Infura account can also be used later on in the wizard to provide an eth1
-fallback node.
+{ef_text}An easy way to get a provider is to create a free account on Infura.
 
 https://infura.io/
 
@@ -382,18 +400,15 @@ that beacon node with the custom option. That beacon node should be on the
 
 Do you want add a consensus checkpoint provider?
 '''             )),
-                buttons=[
-                    ('Infura', 1),
-                    ('Custom', 2),
-                    ('Skip', 3),
-                    ('Quit', False)
-                ]
+                buttons=buttons
             ).run()
         
         if not result:
             return result
         
-        if result == 3:
+        if result == 4:
+            return ef_endpoint
+        elif result == 3:
             return ''
         elif result == 1:
             valid_url = False
