@@ -1404,10 +1404,10 @@ $ sudo journalctl -ru {geth_service_name}
             first_display = True
             if journalctl_cursor is None:
                 command = ['journalctl', '--no-pager', '--show-cursor', '-q', '-n', '25',
-                    '-u', geth_service_name]
+                    '-o', 'cat', '-u', geth_service_name]
             else:
                 command = ['journalctl', '--no-pager', '--show-cursor', '-q',
-                    '--after-cursor=' + journalctl_cursor, '-u', geth_service_name]
+                    '-o', 'cat', '--after-cursor=' + journalctl_cursor, '-u', geth_service_name]
                 first_display = False
 
             process_result = subprocess.run(command, capture_output=True, text=True)
@@ -2282,10 +2282,11 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
             first_display = True
             if journalctl_cursor is None:
                 command = ['journalctl', '--no-pager', '--show-cursor', '-q', '-n', '25',
-                    '-u', lighthouse_bn_service_name]
+                    '-o', 'cat', '-u', lighthouse_bn_service_name]
             else:
                 command = ['journalctl', '--no-pager', '--show-cursor', '-q',
-                    '--after-cursor=' + journalctl_cursor, '-u', lighthouse_bn_service_name]
+                    '-o', 'cat', '--after-cursor=' + journalctl_cursor, '-u',
+                    lighthouse_bn_service_name]
                 first_display = False
 
             process_result = subprocess.run(command, capture_output=True, text=True)
@@ -3126,7 +3127,7 @@ normal to see while your beacon node is syncing.
     time.sleep(delay)
     try:
         subprocess.run([
-            'journalctl', '-fu', lighthouse_vc_service_name
+            'journalctl', '-o', 'cat', '-fu', lighthouse_vc_service_name
         ], timeout=30)
     except subprocess.TimeoutExpired:
         pass
@@ -3389,10 +3390,11 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
                 first_display = True
                 if journalctl_cursor is None:
                     command = ['journalctl', '--no-pager', '--show-cursor', '-q', '-n', '25',
-                        '-u', lighthouse_bn_service_name]
+                        '-o', 'cat', '-u', lighthouse_bn_service_name]
                 else:
                     command = ['journalctl', '--no-pager', '--show-cursor', '-q',
-                        '--after-cursor=' + journalctl_cursor, '-u', lighthouse_bn_service_name]
+                        '-o', 'cat', '--after-cursor=' + journalctl_cursor, '-u',
+                        lighthouse_bn_service_name]
                     first_display = False
 
                 process_result = subprocess.run(command, capture_output=True, text=True)
