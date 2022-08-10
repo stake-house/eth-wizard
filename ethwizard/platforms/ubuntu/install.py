@@ -3210,7 +3210,10 @@ Would you like to improve your time synchronization?
     if not result:
         return result
     
-    subprocess.run(['apt', '-y', 'install', 'chrony'])
+    env = os.environ.copy()
+    env['DEBIAN_FRONTEND'] = 'noninteractive'
+
+    subprocess.run(['apt', '-y', 'install', 'chrony'], env=env)
 
     return True
 
