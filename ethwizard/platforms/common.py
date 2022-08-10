@@ -210,8 +210,8 @@ For which network would you like to perform this installation?
 '''
         ),
         values=[
-            (NETWORK_MAINNET, f'Mainnet {network_queue_info[NETWORK_MAINNET]}'),
-            (NETWORK_PRATER, f'Goerli/Prater {network_queue_info[NETWORK_PRATER]}')
+            (NETWORK_MAINNET, f'{NETWORK_LABEL[NETWORK_MAINNET]} {network_queue_info[NETWORK_MAINNET]}'),
+            (NETWORK_PRATER, f'{NETWORK_LABEL[NETWORK_PRATER]} {network_queue_info[NETWORK_PRATER]}')
         ],
         ok_text='Use this',
         cancel_text='Quit'
@@ -374,7 +374,7 @@ def select_consensus_checkpoint_provider(network, log):
         ef_text = (
 f'''
 The Ethereum Foundation (EF) is offering a free and public endpoint for
-<b>{network.capitalize()}</b>. We recommend using it.
+<b>{NETWORK_LABEL[network]}</b>. We recommend using it.
 '''
         ).strip() + '\n\n'
 
@@ -396,7 +396,7 @@ https://infura.io/
 
 If you have access to a custom beacon node, you can enter your own URL to
 that beacon node with the custom option. That beacon node should be on the
-<b>{network.capitalize()}</b> Ethereum network.
+<b>{NETWORK_LABEL[network]}</b> Ethereum network.
 
 Do you want add a consensus checkpoint provider?
 '''             )),
@@ -492,7 +492,7 @@ f'''
 Please enter your beacon node URL:
 
 It usually starts with 'https://' and it should point to the root of a
-running beacon node on the <b>{network.capitalize()}</b> Ethereum network that supports the
+running beacon node on the <b>{NETWORK_LABEL[network]}</b> Ethereum network that supports the
 Ethereum Beacon Node API. It should implement these endpoints:
 
 - {BN_DEPOSIT_CONTRACT_URL}
@@ -1220,7 +1220,7 @@ should include all the files that the key tool created including:
 - keystore-(...).json
 
 When creating your keys offline or elsewhere, make sure you select the
-correct network: {network.capitalize()}
+correct network: {NETWORK_LABEL[network]}
 
 * Press the tab key to switch between the controls below{not_valid_msg}
 '''             ))).run()
@@ -1322,7 +1322,7 @@ def show_whats_next(network, public_keys):
         text=(
 f'''
 You just completed all the steps needed to become an active validator on
-the {network.capitalize()} Ethereum network. You created {len(public_keys)} validator(s)
+the {NETWORK_LABEL[network]} Ethereum network. You created {len(public_keys)} validator(s)
 that will soon be activated.
 
 You can monitor your activation period and all the details about your
@@ -1350,7 +1350,7 @@ def show_public_keys(network, public_keys, log):
 f'''
 eth-wizard completed!
 
-Network: {network.capitalize()}
+Network: {NETWORK_LABEL[network]}
 Number of validator(s): {len(public_keys)}
 
 Make sure to note or save your public keys somewhere. Your validator public

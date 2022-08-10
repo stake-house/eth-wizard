@@ -13,6 +13,11 @@ ETH2_DEPOSIT_CLI_LATEST_RELEASE = '/repos/ethereum/staking-deposit-cli/releases/
 NETWORK_MAINNET = 'mainnet'
 NETWORK_PRATER = 'prater'
 
+NETWORK_LABEL = {
+  NETWORK_MAINNET: 'Mainnet',
+  NETWORK_PRATER: 'Goerli'
+}
+
 DEFAULT_GETH_PORT = 30303
 DEFAULT_LIGHTHOUSE_BN_PORT = 9000
 DEFAULT_TEKU_BN_PORT = 9000
@@ -114,12 +119,12 @@ CHOCOLATEY_DEFAULT_BIN_PATH = r'C:\ProgramData\chocolatey\bin'
 
 LAUNCHPAD_URLS = {
     NETWORK_MAINNET: 'https://launchpad.ethereum.org',
-    NETWORK_PRATER: 'https://prater.launchpad.ethereum.org'
+    NETWORK_PRATER: 'https://goerli.launchpad.ethereum.org'
 }
 
 BEACONCHA_IN_URLS = {
     NETWORK_MAINNET: 'https://beaconcha.in',
-    NETWORK_PRATER: 'https://prater.beaconcha.in'
+    NETWORK_PRATER: 'https://goerli.beaconcha.in'
 }
 
 INFURA_BEACON_NODE_DOMAINS = {

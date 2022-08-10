@@ -557,7 +557,7 @@ f'''
 We can test your system to make sure it is fit for being a validator. Here
 is the list of tests we will perform:
 
-* Disk size (>= {MIN_AVAILABLE_DISK_SPACE_GB[network]:.0f}GB of available space for {network.capitalize()})
+* Disk size (>= {MIN_AVAILABLE_DISK_SPACE_GB[network]:.0f}GB of available space for {NETWORK_LABEL[network]})
 * Disk speed (>= {MIN_SUSTAINED_K_READ_IOPS:.1f}K sustained read IOPS and >= {MIN_SUSTAINED_K_WRITE_IOPS:.1f}K sustained write IOPS)
 * Memory size (>= {MIN_AVAILABLE_RAM_GB:.1f}GB of available RAM)
 * Internet speed (>= {MIN_DOWN_MBS:.1f}MB/s down and >= {MIN_UP_MBS:.1f}MB/s up)
@@ -606,7 +606,7 @@ Your available space results seem to indicate that <style bg="red" fg="black">yo
 <b>smaller than</b> what would be required</style> to be a fully working validator. Here are
 your results:
 
-* Available space in /var/lib: {available_space_gb:.1f}GB (>= {MIN_AVAILABLE_DISK_SPACE_GB[network]:.1f}GB for {network.capitalize()})
+* Available space in /var/lib: {available_space_gb:.1f}GB (>= {MIN_AVAILABLE_DISK_SPACE_GB[network]:.1f}GB for {NETWORK_LABEL[network]})
 
 It might still be possible to be a validator but you should consider a
 larger disk for your system.
@@ -626,7 +626,7 @@ f'''
 Your available space results seem to indicate that <style bg="green" fg="white">your disk size is <b>large
 enough</b></style> to be a fully working validator. Here are your results:
 
-* Available space in /var/lib: {available_space_gb:.1f}GB (>= {MIN_AVAILABLE_DISK_SPACE_GB[network]:.1f}GB for {network.capitalize()})
+* Available space in /var/lib: {available_space_gb:.1f}GB (>= {MIN_AVAILABLE_DISK_SPACE_GB[network]:.1f}GB for {NETWORK_LABEL[network]})
 '''     )),
         buttons=[
             ('Keep going', True),
@@ -3574,7 +3574,7 @@ f'''
 It is a good idea to wait for your beacon node to be in sync before doing
 the deposit so you do not miss any reward. Activating a validator after the
 deposit takes around 15 hours unless the join queue is longer. There is
-currently {network_queue_info} for the <b>{network.capitalize()}</b>
+currently {network_queue_info} for the <b>{NETWORK_LABEL[network]}</b>
 Ethereum network.
 '''         )),
             status_text=(
