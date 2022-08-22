@@ -30,16 +30,16 @@ The eth-wizard should be stable enough to be used by everyone. It was never audi
 You can use something like this in a terminal, to start the wizard:
 
 ```
-wget https://github.com/stake-house/eth-wizard/releases/download/v0.8.5/ethwizard-0.8.5.pyz && sudo python3 ethwizard-0.8.5.pyz
+wget https://github.com/stake-house/eth-wizard/releases/download/v0.9.0/ethwizard-0.9.0.pyz && sudo python3 ethwizard-0.9.0.pyz
 ```
 
 ### On Windows 10
 
 Please note that some antivirus software might detect the wizard binary as a threat and delete it or prevent its execution.
 
-Download and run [the wizard binary](https://github.com/stake-house/eth-wizard/releases/download/v0.8.5/ethwizard-0.8.5.exe)
+Download and run [the wizard binary](https://github.com/stake-house/eth-wizard/releases/download/v0.9.0/ethwizard-0.9.0.exe)
 
-As an alternative, you can download and install [a recent version of Python](https://www.python.org/downloads/) (make sure to select the option for file associations which is included in the default *Install Now* option), download [the latest pyz bundle](https://github.com/stake-house/eth-wizard/releases/download/v0.8.5/ethwizard-0.8.5.pyz) and double-click on it. This alternative is less likely to trigger your antivirus software.
+As an alternative, you can download and install [a recent version of Python](https://www.python.org/downloads/) (make sure to select the option for file associations which is included in the default *Install Now* option), download [the latest pyz bundle](https://github.com/stake-house/eth-wizard/releases/download/v0.9.0/ethwizard-0.9.0.pyz) and double-click on it. This alternative is less likely to trigger your antivirus software.
 
 ## Demonstration
 
