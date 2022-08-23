@@ -3463,6 +3463,8 @@ the local system account can access the keys and the password file.
 def initiate_deposit(base_directory, network, keys):
     # Initiate and explain the deposit on launchpad
 
+    base_directory = Path(base_directory)
+
     # Check if we have the deposit data file
     deposit_file_path = base_directory.joinpath('var', 'lib', 'eth', 'deposit',
         'deposit_data.json')
@@ -3470,8 +3472,6 @@ def initiate_deposit(base_directory, network, keys):
         log.warn('No deposit file found. We will assume that the deposit was already performed.')
 
         return True
-
-    base_directory = Path(base_directory)
 
     nssm_binary = get_nssm_binary()
     if not nssm_binary:
