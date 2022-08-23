@@ -706,7 +706,7 @@ def install_chocolatey():
             
             log.warning('Chocolatey is already installed, we will update it to the latest version')
             subprocess.run([
-                'choco', 'upgrade', 'chocolatey'])
+                'choco', 'upgrade', 'chocolatey', '-y'])
 
     except FileNotFoundError:
         choco_installed = False
