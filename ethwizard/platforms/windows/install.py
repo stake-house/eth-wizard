@@ -3126,7 +3126,7 @@ Would you like to import your keys or generate them here?
                 for entry in it:
                     if entry.name.startswith('.'):
                         continue
-                    
+
                     if not entry.is_file():
                         continue
 
@@ -3424,7 +3424,8 @@ Do you want to skip installing the staking-deposit-cli binary?
         shutil.rmtree(deposit_data_directory)
     deposit_data_directory.mkdir(parents=True, exist_ok=True)
     
-    os.rename(actual_keys['deposit_data_path'], target_deposit_data_path)
+    if actual_keys['deposit_data_path'] is not None:
+        os.rename(actual_keys['deposit_data_path'], target_deposit_data_path)
 
     # Generate password files
     keystore_password = input_dialog(
