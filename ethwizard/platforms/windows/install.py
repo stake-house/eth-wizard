@@ -3405,6 +3405,25 @@ the local system account can access the keys and the password file.
 def initiate_deposit(base_directory, network, keys):
     # Initiate and explain the deposit on launchpad
 
+    # Check if we have the deposit data file
+    if keys['deposit_data_path'] is None:
+        log.warn('No deposit file found. We will assume that the deposit was already performed.')
+
+        # Get the public keys from the keystore files
+        public_keys = []
+
+        for keystore_path in keys['keystore_paths']:
+            with open(keystore_path, 'r') as keystore_file:
+                keystore = json.loads(keystore_file.read(204800))
+                
+                if 'pubkey' not in keystore:
+                    log.error(f'No pubkey found in keystore file {keystore_path}')
+                
+                public_key = keystore['pubkey']
+                public_keys.append('0x' + public_key)
+
+        return public_keys
+
     base_directory = Path(base_directory)
 
     nssm_binary = get_nssm_binary()

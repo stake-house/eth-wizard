@@ -1196,18 +1196,28 @@ def select_keys_directory(network):
     # network
 
     valid_keys_directory = False
+    no_deposit_data_found = False
     entered_directory = None
     input_canceled = False
 
     while not valid_keys_directory:
         not_valid_msg = ''
-        if entered_directory is not None:
+        if no_deposit_data_found:
+            not_valid_msg = (
+'''
+
+Your last input was a directory that did not include the deposit data file.
+Please make sure to enter a directory that includes the deposit data file.'''
+            )
+        elif entered_directory is not None:
             not_valid_msg = (
 '''
 
 <style bg="red" fg="black">Your last input was <b>not a valid keys directory</b>. Please make sure to enter a
 valid keys directory.</style>'''
             )
+        
+        no_deposit_data_found = False
 
         entered_directory = input_dialog(
             title='Keys directory',
@@ -1239,10 +1249,41 @@ correct network: {NETWORK_LABEL[network]}
             continue
         
         generated_keys = search_for_generated_keys(entered_directory)
-        if (
-            generated_keys['deposit_data_path'] is not None and
-            len(generated_keys['keystore_paths']) > 0):
-            valid_keys_directory = True
+
+        if len(generated_keys['keystore_paths']) > 0:
+
+            if generated_keys['deposit_data_path'] is None:
+
+                result = button_dialog(
+                    title='No deposit file found',
+                    text=(
+f'''
+We could not find a deposit data file. This could be fine if you already
+did your deposit.
+
+If this is your first setup with these keystore files, we strongly suggest
+you include your deposit data file along with your keystore files so we can
+guide you better.
+
+Would you like to retry with a directory that has your deposit data file?
+'''             ),
+                    buttons=[
+                        ('Retry', 1),
+                        ('Skip', 2),
+                        ('Quit', False)
+                    ]
+                ).run()
+
+                if not result:
+                    return result
+                
+                if result == 2:
+                    valid_keys_directory = True
+                
+                no_deposit_data_found = True
+
+            else:
+                valid_keys_directory = True
 
     if input_canceled:
         return ''
