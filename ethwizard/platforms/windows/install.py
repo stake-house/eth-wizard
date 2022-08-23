@@ -3124,8 +3124,20 @@ Would you like to import your keys or generate them here?
             # Copy keys into keys_path
             with os.scandir(selected_keys_directory) as it:
                 for entry in it:
+                    if entry.name.startswith('.'):
+                        continue
+                    
                     if not entry.is_file():
                         continue
+
+                    if not entry.name.endswith('.json'):
+                        continue
+
+                    if not (
+                        entry.name.startswith('deposit_data') or
+                        entry.name.startswith('keystore')):
+                        continue
+
                     target_path = keys_path.joinpath(entry.name)
                     os.rename(entry.path, target_path)
 
