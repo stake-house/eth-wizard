@@ -415,6 +415,7 @@ def installation_steps():
         selected_network = CTX_SELECTED_NETWORK
         obtained_keys = CTX_OBTAINED_KEYS       
         selected_fee_recipient_address = CTX_SELECTED_FEE_RECIPIENT_ADDRESS
+        public_keys = CTX_PUBLIC_KEYS
 
         if not (
             test_context_variable(context, selected_network, log) and
@@ -424,9 +425,15 @@ def installation_steps():
             # We are missing context variables, we cannot continue
             quit_app()
         
-        if not install_lighthouse_validator(context[selected_network], context[obtained_keys],
-            context[selected_fee_recipient_address]):
-            # User asked to quit or error
+        
+        context[public_keys] = install_lighthouse_validator(context[selected_network],
+            context[obtained_keys], context[selected_fee_recipient_address])
+
+        if type(context[public_keys]) is not list and not context[public_keys]:
+            # User asked to quit
+            del context[public_keys]
+            step_sequence.save_state(step.step_id, context)
+
             quit_app()
 
         return context
@@ -454,7 +461,6 @@ def installation_steps():
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
         obtained_keys = CTX_OBTAINED_KEYS
-        public_keys = CTX_PUBLIC_KEYS
 
         if not (
             test_context_variable(context, selected_network, log) and
@@ -462,17 +468,9 @@ def installation_steps():
             ):
             # We are missing context variables, we cannot continue
             quit_app()
-        
-        if public_keys not in context:
-            context[public_keys] = initiate_deposit(context[selected_network],
-                context[obtained_keys])
-            step_sequence.save_state(step.step_id, context)
 
-        if not context[public_keys]:
+        if not initiate_deposit(context[selected_network], context[obtained_keys]):
             # User asked to quit
-            del context[public_keys]
-            step_sequence.save_state(step.step_id, context)
-
             quit_app()
 
         return context
@@ -2881,11 +2879,12 @@ Do you want to skip installing the staking-deposit-cli binary?
 
 def install_lighthouse_validator(network, keys, fee_recipient_address):
     # Import keystore(s) and configure the Lighthouse validator client
-    log.info(f'Validator install. Fee recipient address: {fee_recipient_address}')
+    # Returns a list of public keys when done
 
     # Check for existing systemd service
     lighthouse_vc_service_exists = False
     lighthouse_vc_service_name = LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME
+    lighthouse_datadir = Path('/var/lib/lighthouse')
 
     service_details = get_systemd_service_details(lighthouse_vc_service_name)
 
@@ -2921,7 +2920,18 @@ client?
             return result
         
         if result == 1:
-            return True
+            public_keys = []
+
+            process_result = subprocess.run([
+                LIGHTHOUSE_INSTALLED_PATH, '--network', network, 'account', 'validator', 'list',
+                '--datadir', lighthouse_datadir
+                ], capture_output=True, text=True)
+            if process_result.returncode == 0:
+                process_output = process_result.stdout
+                public_keys = re.findall(r'0x[0-9a-f]{96}', process_output)
+                public_keys = list(map(lambda x: x.strip(), public_keys))
+            
+            return public_keys
         
         # User wants to proceed, make sure the lighthouse validator service is stopped first
         subprocess.run([
@@ -3006,8 +3016,6 @@ this directory will also remove any key imported previously.
         'chmod', '700', lighthouse_datadir_vc])
     
     # Import keystore(s) if we have some
-    lighthouse_datadir = Path('/var/lib/lighthouse')
-
     if len(keys['keystore_paths']) > 0:
         subprocess.run([
             LIGHTHOUSE_INSTALLED_PATH, '--network', network, 'account', 'validator', 'import',
@@ -3026,7 +3034,7 @@ this directory will also remove any key imported previously.
         ], capture_output=True, text=True)
     if process_result.returncode == 0:
         process_output = process_result.stdout
-        public_keys = re.findall(r'0x[0-9a-f]{96}\s', process_output)
+        public_keys = re.findall(r'0x[0-9a-f]{96}', process_output)
         public_keys = list(map(lambda x: x.strip(), public_keys))
         
     if len(public_keys) == 0:
@@ -3175,7 +3183,7 @@ $ sudo journalctl -ru {lighthouse_vc_service_name}
 
         return False
 
-    return True
+    return public_keys
 
 def install_chrony():
     # Prompt the user to install chrony to improve time sync
@@ -3223,20 +3231,7 @@ def initiate_deposit(network, keys):
     if keys['deposit_data_path'] is None:
         log.warn('No deposit file found. We will assume that the deposit was already performed.')
 
-        # Get the public keys from the keystore files
-        public_keys = []
-
-        for keystore_path in keys['keystore_paths']:
-            with open(keystore_path, 'r') as keystore_file:
-                keystore = json.loads(keystore_file.read(204800))
-                
-                if 'pubkey' not in keystore:
-                    log.error(f'No pubkey found in keystore file {keystore_path}')
-                
-                public_key = keystore['pubkey']
-                public_keys.append('0x' + public_key)
-
-        return public_keys
+        return True
 
     # Check for syncing status before prompting for deposit
 

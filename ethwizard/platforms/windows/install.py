@@ -393,6 +393,7 @@ def installation_steps(*args, **kwargs):
         selected_consensus_checkpoint_url = CTX_SELECTED_CONSENSUS_CHECKPOINT_URL
         selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
         selected_fee_recipient_address = CTX_SELECTED_FEE_RECIPIENT_ADDRESS
+        public_keys = CTX_PUBLIC_KEYS
 
         if not (
             test_context_variable(context, selected_directory, log) and
@@ -406,11 +407,16 @@ def installation_steps(*args, **kwargs):
             # We are missing context variables, we cannot continue
             quit_app()
         
-        if not install_teku(context[selected_directory], context[selected_network],
-            context[obtained_keys], context[selected_eth1_fallbacks],
+        context[public_keys] = install_teku(context[selected_directory],
+            context[selected_network], context[obtained_keys], context[selected_eth1_fallbacks],
             context[selected_consensus_checkpoint_url], context[selected_ports],
-            context[selected_fee_recipient_address]):
+            context[selected_fee_recipient_address])
+
+        if type(context[public_keys]) is not list and not context[public_keys]:
             # User asked to quit or error
+            del context[public_keys]
+            step_sequence.save_state(step.step_id, context)
+
             quit_app()
         
         context[selected_consensus_client] = CONSENSUS_CLIENT_TEKU
@@ -498,7 +504,6 @@ def installation_steps(*args, **kwargs):
         selected_directory = CTX_SELECTED_DIRECTORY
         selected_network = CTX_SELECTED_NETWORK
         obtained_keys = CTX_OBTAINED_KEYS
-        public_keys = CTX_PUBLIC_KEYS
 
         if not (
             test_context_variable(context, selected_directory, log) and
@@ -508,16 +513,9 @@ def installation_steps(*args, **kwargs):
             # We are missing context variables, we cannot continue
             quit_app()
         
-        if public_keys not in context:
-            context[public_keys] = initiate_deposit(context[selected_directory],
-                context[selected_network], context[obtained_keys])
-            step_sequence.save_state(step.step_id, context)
-
-        if not context[public_keys]:
+        if not initiate_deposit(context[selected_directory], context[selected_network],
+            context[obtained_keys]):
             # User asked to quit
-            del context[public_keys]
-            step_sequence.save_state(step.step_id, context)
-
             quit_app()
 
         return context
@@ -2096,7 +2094,7 @@ def detect_merge_ready(base_directory, network, execution_client):
 
 def install_teku(base_directory, network, keys, eth1_fallbacks, consensus_checkpoint_url, ports,
     fee_recipient_address):
-    # Install Teku for the selected network
+    # Install Teku for the selected network and return a list of public keys
 
     base_directory = Path(base_directory)
 
@@ -2140,7 +2138,30 @@ Do you want to skip installing teku and its service?
             return result
         
         if result == 1:
-            return True
+            public_keys = []
+
+            with os.scandir(keys['validator_keys_path']) as it:
+                for entry in it:
+                    if not entry.is_file():
+                        continue
+
+                    if not entry.name.startswith('keystore'):
+                        continue
+
+                    if not entry.name.endswith('.json'):
+                        continue
+
+                    with open(entry.path, 'r') as keystore_file:
+                        keystore = json.loads(keystore_file.read(204800))
+                
+                        if 'pubkey' not in keystore:
+                            log.error(f'No pubkey found in keystore file {entry.path}')
+                            continue
+                        
+                        public_key = keystore['pubkey']
+                        public_keys.append('0x' + public_key)
+
+            return public_keys
         
         # User wants to proceed, make sure the teku service is stopped first
         subprocess.run([
@@ -2930,7 +2951,30 @@ Connected Peers: {result['bn_connected_peers']}
 ''' )
     time.sleep(5)
 
-    return True
+    public_keys = []
+
+    with os.scandir(keys['validator_keys_path']) as it:
+        for entry in it:
+            if not entry.is_file():
+                continue
+
+            if not entry.name.startswith('keystore'):
+                continue
+
+            if not entry.name.endswith('.json'):
+                continue
+
+            with open(entry.path, 'r') as keystore_file:
+                keystore = json.loads(keystore_file.read(204800))
+        
+                if 'pubkey' not in keystore:
+                    log.error(f'No pubkey found in keystore file {entry.path}')
+                    continue
+                
+                public_key = keystore['pubkey']
+                public_keys.append('0x' + public_key)
+
+    return public_keys
 
 def obtain_keys(base_directory, network):
     # Obtain validator keys for the selected network
@@ -3407,20 +3451,7 @@ def initiate_deposit(base_directory, network, keys):
     if keys['deposit_data_path'] is None:
         log.warn('No deposit file found. We will assume that the deposit was already performed.')
 
-        # Get the public keys from the keystore files
-        public_keys = []
-
-        for keystore_path in keys['keystore_paths']:
-            with open(keystore_path, 'r') as keystore_file:
-                keystore = json.loads(keystore_file.read(204800))
-                
-                if 'pubkey' not in keystore:
-                    log.error(f'No pubkey found in keystore file {keystore_path}')
-                
-                public_key = keystore['pubkey']
-                public_keys.append('0x' + public_key)
-
-        return public_keys
+        return True
 
     base_directory = Path(base_directory)
 
@@ -3978,7 +4009,7 @@ deposit(s).
     # Clean up deposit data file
     deposit_file_path.unlink()
     
-    return public_keys
+    return True
 
 def improve_time_sync():
     # Improve time sync
