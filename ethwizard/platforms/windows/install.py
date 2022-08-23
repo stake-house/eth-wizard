@@ -2140,6 +2140,10 @@ Do you want to skip installing teku and its service?
         if result == 1:
             public_keys = []
 
+            subprocess.run([
+                'icacls', keys['validator_keys_path'], '/grant', 'Everyone:(R,RD)', '/t'
+            ])
+
             with os.scandir(keys['validator_keys_path']) as it:
                 for entry in it:
                     if not entry.is_file():
@@ -2160,6 +2164,10 @@ Do you want to skip installing teku and its service?
                         
                         public_key = keystore['pubkey']
                         public_keys.append('0x' + public_key)
+
+            subprocess.run([
+                'icacls', keys['validator_keys_path'], '/remove:g', 'Everyone', '/t'
+            ])
 
             return public_keys
         
@@ -2953,6 +2961,10 @@ Connected Peers: {result['bn_connected_peers']}
 
     public_keys = []
 
+    subprocess.run([
+        'icacls', keys['validator_keys_path'], '/grant', 'Everyone:(R,RD)', '/t'
+    ])      
+
     with os.scandir(keys['validator_keys_path']) as it:
         for entry in it:
             if not entry.is_file():
@@ -2973,6 +2985,10 @@ Connected Peers: {result['bn_connected_peers']}
                 
                 public_key = keystore['pubkey']
                 public_keys.append('0x' + public_key)
+
+    subprocess.run([
+        'icacls', keys['validator_keys_path'], '/remove:g', 'Everyone', '/t'
+    ])
 
     return public_keys
 
