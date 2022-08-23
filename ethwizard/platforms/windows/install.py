@@ -3464,7 +3464,9 @@ def initiate_deposit(base_directory, network, keys):
     # Initiate and explain the deposit on launchpad
 
     # Check if we have the deposit data file
-    if keys['deposit_data_path'] is None:
+    deposit_file_path = base_directory.joinpath('var', 'lib', 'eth', 'deposit',
+        'deposit_data.json')
+    if not deposit_file_path.is_file():
         log.warn('No deposit file found. We will assume that the deposit was already performed.')
 
         return True
@@ -3884,15 +3886,6 @@ Connected Peers: {syncing_status['bn_connected_peers']}
 
     launchpad_url = LAUNCHPAD_URLS[network]
     currency = NETWORK_CURRENCY[network]
-
-    # Find the deposit file
-    deposit_file_path = base_directory.joinpath('var', 'lib', 'eth', 'deposit',
-        'deposit_data.json')
-    if not deposit_file_path.is_file():
-        log.warning(f'We could not find the deposit data file in {deposit_file_path} . If you '
-            f'already performed your deposit on the launchpad, you should be good. If not, there '
-            f'was an issue somewhere during the installation.')
-        return False
 
     # TODO: Create an alternative way to easily obtain the deposit file with a simple HTTP server
 
