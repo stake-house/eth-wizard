@@ -3072,9 +3072,7 @@ Would you like to import your keys or generate them here?
             # Verify the generated keys
             imported_keys = search_for_generated_keys(keys_path)
             
-            if (
-                imported_keys['deposit_data_path'] is None or
-                len(imported_keys['keystore_paths']) == 0):
+            if len(imported_keys['keystore_paths']) == 0:
                 log.warning(f'No key has been found while importing them from {keys_path}')
             else:
                 actual_keys = imported_keys
