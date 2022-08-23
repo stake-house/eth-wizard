@@ -2313,20 +2313,93 @@ Do you want to skip installing the teku binary distribution?
         if teku_archive_path.is_file():
             teku_archive_path.unlink()
 
-        try:
-            with open(teku_archive_path, 'wb') as binary_file:
-                log.info(f'Downloading teku archive {url_file_name}...')
-                with httpx.stream('GET', zip_url, follow_redirects=True) as http_stream:
-                    if http_stream.status_code != 200:
-                        log.error(f'Cannot download teku archive {zip_url}.\n'
-                            f'Unexpected status code {http_stream.status_code}')
-                        return False
-                    for data in http_stream.iter_bytes():
-                        binary_file.write(data)
-                        teku_archive_hash.update(data)
-        except httpx.RequestError as exception:
-            log.error(f'Exception while downloading teku archive. Exception {exception}')
-            return False
+        keep_retrying = True
+
+        retry_index = 0
+        retry_count = 6
+        retry_delay = 30
+        retry_delay_increase = 10
+        last_exception = None
+        last_status_code = None
+
+        while keep_retrying and retry_index < retry_count:
+            last_exception = None
+            last_status_code = None
+            try:
+                with open(teku_archive_path, 'wb') as binary_file:
+                    log.info(f'Downloading teku archive {url_file_name}...')
+                    with httpx.stream('GET', zip_url, follow_redirects=True) as http_stream:
+                        if http_stream.status_code != 200:
+                            log.error(f'Cannot download teku archive {zip_url}.\n'
+                                f'Unexpected status code {http_stream.status_code}')
+                            last_status_code = http_stream.status_code
+
+                            retry_index = retry_index + 1
+                            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+                            time.sleep(retry_delay)
+                            retry_delay = retry_delay + retry_delay_increase
+                            continue
+
+                        for data in http_stream.iter_bytes():
+                            binary_file.write(data)
+                            teku_archive_hash.update(data)
+                    
+                    keep_retrying = False
+
+            except httpx.RequestError as exception:
+                
+                log.error(f'Exception while downloading teku archive. Exception {exception}')
+                last_exception = exception
+
+                retry_index = retry_index + 1
+                log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+                time.sleep(retry_delay)
+                retry_delay = retry_delay + retry_delay_increase
+                continue
+        
+        if keep_retrying:
+            if last_exception is not None:
+                result = button_dialog(
+                    title='Cannot download Teku archive',
+                    text=(
+f'''
+We could not download the teku archive. Here are some details for this
+last test we tried to perform:
+
+URL: {zip_url}
+Method: GET
+Exception: {last_exception}
+
+We cannot proceed if we cannot download the teku archive. Make sure there
+is no network issue when we try to connect to the Internet.
+'''                 ),
+                    buttons=[
+                        ('Quit', False)
+                    ]
+                ).run()
+
+                return False
+            elif last_status_code is not None:
+                result = button_dialog(
+                    title='Cannot download Teku archive',
+                    text=(
+f'''
+We could not download the teku archive. Here are some details for this
+last test we tried to perform:
+
+URL: {zip_url}
+Method: GET
+Status code: {last_status_code}
+
+We cannot proceed if we cannot download the teku archive. Make sure there
+is no network issue when we try to connect to the Internet.
+'''                 ),
+                    buttons=[
+                        ('Quit', False)
+                    ]
+                ).run()
+
+                return False
 
         # Verify checksum
         log.info('Verifying teku archive checksum...')
