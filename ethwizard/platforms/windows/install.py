@@ -2963,7 +2963,7 @@ Connected Peers: {result['bn_connected_peers']}
 
     subprocess.run([
         'icacls', keys['validator_keys_path'], '/grant', 'Everyone:(R,RD)', '/t'
-    ])      
+    ])
 
     with os.scandir(keys['validator_keys_path']) as it:
         for entry in it:
