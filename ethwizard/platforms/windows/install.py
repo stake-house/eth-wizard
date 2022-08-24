@@ -54,7 +54,12 @@ from ethwizard.platforms.common import (
     test_context_variable
 )
 
-from ethwizard.platforms.windows.common import log, quit_app
+from ethwizard.platforms.windows.common import (
+    log,
+    quit_app,
+    get_service_details,
+    get_nssm_binary
+)
 
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import button_dialog, input_dialog
@@ -843,35 +848,6 @@ def directory_validator(directory):
 
     return False
 
-def get_nssm_binary():
-    # Check for nssm install and path
-    nssm_path = Path(CHOCOLATEY_DEFAULT_BIN_PATH, 'nssm')
-    nssm_binary = 'nssm'
-
-    nssm_installed = False
-
-    try:
-        process_result = subprocess.run(['nssm', '--version'])
-
-        if process_result.returncode == 0:
-            nssm_installed = True
-        
-    except FileNotFoundError:
-        try:
-            process_result = subprocess.run([str(nssm_path), '--version'])
-
-            if process_result.returncode == 0:
-                nssm_installed = True
-                nssm_binary = nssm_path
-        except FileNotFoundError:
-            nssm_installed = False
-    
-    if not nssm_installed:
-        log.error('NSSM is not installed, we cannot continue.')
-        return False
-    
-    return nssm_binary
-
 def setup_jwt_token_file(base_directory):
     # Create or ensure that the JWT token file exist
 
@@ -1256,7 +1232,7 @@ Do you want to remove this directory first and start from nothing?
 
     geth_arguments = GETH_ARGUMENTS[network]
     geth_arguments.append('--datadir')
-    geth_arguments.append(str(geth_datadir))
+    geth_arguments.append(f'"{geth_datadir}"')
     if ports['eth1'] != DEFAULT_GETH_PORT:
         geth_arguments.append('--port')
         geth_arguments.append(str(ports['eth1']))
@@ -1697,43 +1673,6 @@ def create_service(nssm_binary, service_name, binary_path, binary_args, paramete
                 return False
     
     return True
-
-def get_service_details(nssm_binary, service):
-    # Return some service details
-
-    process_result = subprocess.run([
-        str(nssm_binary), 'dump', service
-        ], capture_output=True, text=True, encoding='utf8')
-    
-    if process_result.returncode != 0:
-        return None
-
-    service_details = {
-        'install': None,
-        'status': None,
-        'parameters': {}
-    }
-
-    process_output = process_result.stdout
-    result = re.search(r'nssm\.exe install \S+( (?P<install>.+))?', process_output)
-    if result:
-        service_details['install'] = result.group('install')
-
-    for result in re.finditer(r'nssm.exe set \S+( (?P<param>\S+))?( (?P<quote>")?(?P<value>.+?)(?P=quote)?)?(\n|$)', process_output):
-        param = result.group('param')
-        value = result.group('value')
-        if param is not None:
-            service_details['parameters'][param] = value
-    
-    process_result = subprocess.run([
-        str(nssm_binary), 'status', service
-        ], capture_output=True, text=True, encoding='utf8')
-    
-    if process_result.returncode == 0:
-        process_output = process_result.stdout
-        service_details['status'] = process_output.strip()
-
-    return service_details
 
 def is_stable_windows_amd64_archive(name):
     return (
