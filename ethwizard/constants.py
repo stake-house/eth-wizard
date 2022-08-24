@@ -232,7 +232,7 @@ ADOPTIUM_17_API_PARAMS = {
 
 TEKU_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Teku Ethereum Client (Mainnet)',
-    NETWORK_PRATER: 'Teku Ethereum Client (Prater)'
+    NETWORK_PRATER: 'Teku Ethereum Client (Görli)'
 }
 
 TEKU_ARGUMENTS = {
@@ -41673,7 +41673,7 @@ WantedBy=multi-user.target
     NETWORK_PRATER: (
 f'''
 [Unit]
-Description=Lighthouse Ethereum Client Beacon Node (Prater)
+Description=Lighthouse Ethereum Client Beacon Node (Görli)
 Wants=network-online.target
 After=network-online.target
 
@@ -41712,7 +41712,7 @@ WantedBy=multi-user.target
     NETWORK_PRATER: (
 f'''
 [Unit]
-Description=Lighthouse Ethereum Client Validator Client (Prater)
+Description=Lighthouse Ethereum Client Validator Client (Görli)
 Wants=network-online.target
 After=network-online.target
 
