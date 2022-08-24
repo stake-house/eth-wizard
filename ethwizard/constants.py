@@ -236,8 +236,8 @@ TEKU_SERVICE_DISPLAY_NAME = {
 }
 
 TEKU_ARGUMENTS = {
-    NETWORK_MAINNET: ['--network=mainnet', '--metrics-enabled', '--rest-api-enabled'],
-    NETWORK_PRATER: ['--network=prater', '--metrics-enabled', '--rest-api-enabled']
+    NETWORK_MAINNET: ['--network=mainnet', '--metrics-enabled', '--rest-api-enabled', '--log-color-enabled=false'],
+    NETWORK_PRATER: ['--network=prater', '--metrics-enabled', '--rest-api-enabled', '--log-color-enabled=false']
 }
 
 PROMETHEUS_CONFIG_WINDOWS = (
