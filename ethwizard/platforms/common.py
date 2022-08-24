@@ -1364,8 +1364,7 @@ def show_whats_next(network, public_keys):
         text=(
 f'''
 You just completed all the steps needed to become an active validator on
-the {NETWORK_LABEL[network]} Ethereum network. {len(public_keys)} validator{'s' if len(public_keys) > 1 else ''}
-{'are' if len(public_keys) > 1 else 'is' } now running on this machine.
+the {NETWORK_LABEL[network]} Ethereum network. {len(public_keys)} validator{'s' if len(public_keys) > 1 else ''} {'are' if len(public_keys) > 1 else 'is' } now running on this machine.
 
 You can monitor your activation period and all the details about your
 validator(s) on the beaconcha.in website at the following URL:
