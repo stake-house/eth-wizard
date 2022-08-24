@@ -2688,8 +2688,7 @@ To examine your teku service logs, inspect the following files:
                 log_part = ''
                 try:
                     with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
-                        log_file.seek(-1024, 2)
-                        log_part = log_file.read(1024)
+                        log_part = log_file.read(1024 * 100)
                 except OSError as os_exception:
                     log.warning(f'Unable to read Teku log file in {teku_stderr_log_path}. '
                         f'{os_exception}')
