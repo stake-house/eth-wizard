@@ -12,7 +12,9 @@ from prompt_toolkit.shortcuts import button_dialog
 from pathlib import Path
 
 from ethwizard.platforms.common import (
-    select_fee_recipient_address
+    select_fee_recipient_address,
+    get_geth_running_version,
+    get_geth_latest_version
 )
 
 from ethwizard.platforms.ubuntu.common import (
@@ -380,7 +382,8 @@ def get_execution_client_details(execution_client):
                 'found': False,
                 'load': UNKNOWN_VALUE,
                 'active': UNKNOWN_VALUE,
-                'sub': UNKNOWN_VALUE
+                'sub': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE
             },
             'versions': {
                 'installed': UNKNOWN_VALUE,
@@ -414,9 +417,9 @@ def get_execution_client_details(execution_client):
         details['service']['running'] = is_service_running(service_details)
 
         details['versions']['installed'] = get_geth_installed_version()
-        details['versions']['running'] = get_geth_running_version()
+        details['versions']['running'] = get_geth_running_version(log)
         details['versions']['available'] = get_geth_available_version()
-        details['versions']['latest'] = get_geth_latest_version()
+        details['versions']['latest'] = get_geth_latest_version(log)
 
         if 'ExecStart' in service_details:
             details['exec'] = parse_exec_start(service_details['ExecStart'])
@@ -460,52 +463,6 @@ def get_geth_installed_version():
 
     return installed_version
 
-def get_geth_running_version():
-    # Get the running version for Geth
-
-    log.info('Getting Geth running version...')
-
-    local_geth_jsonrpc_url = 'http://127.0.0.1:8545'
-    request_json = {
-        'jsonrpc': '2.0',
-        'method': 'web3_clientVersion',
-        'id': 67
-    }
-    headers = {
-        'Content-Type': 'application/json'
-    }
-    try:
-        response = httpx.post(local_geth_jsonrpc_url, json=request_json, headers=headers)
-    except httpx.RequestError as exception:
-        log.error(f'Cannot connect to Geth. Exception: {exception}')
-        return UNKNOWN_VALUE
-
-    if response.status_code != 200:
-        log.error(f'Unexpected status code from {local_geth_jsonrpc_url}. Status code: '
-            f'{response.status_code}')
-        return UNKNOWN_VALUE
-    
-    response_json = response.json()
-
-    if 'result' not in response_json:
-        log.error(f'Unexpected JSON response from {local_geth_jsonrpc_url}. result not found.')
-        return UNKNOWN_VALUE
-    
-    version_agent = response_json['result']
-
-    # Version agent should look like: Geth/v1.10.12-stable-6c4dc6c3/linux-amd64/go1.17.2
-    result = re.search(r'Geth/v(?P<version>[^-/]+)(-(?P<stable>[^-/]+))?(-(?P<commit>[^-/]+))?',
-        version_agent)
-    if not result:
-        log.error(f'Cannot parse {version_agent} for Geth version.')
-        return UNKNOWN_VALUE
-
-    running_version = result.group('version')
-
-    log.info(f'Geth running version is {running_version}')
-
-    return running_version
-
 def get_geth_available_version():
     # Get the available version for Geth, potentially for update
 
@@ -548,44 +505,6 @@ def get_geth_available_version():
     log.info(f'Geth available version is {available_version}')
 
     return available_version
-
-def get_geth_latest_version():
-    # Get the latest stable version for Geth, potentially not available yet for update
-
-    log.info('Getting Geth latest version...')
-
-    geth_gh_release_url = GITHUB_REST_API_URL + GETH_LATEST_RELEASE
-    headers = {'Accept': GITHUB_API_VERSION}
-    try:
-        response = httpx.get(geth_gh_release_url, headers=headers,
-            follow_redirects=True)
-    except httpx.RequestError as exception:
-        log.error(f'Exception while getting the latest stable version for Geth. {exception}')
-        return UNKNOWN_VALUE
-
-    if response.status_code != 200:
-        log.error(f'HTTP error while getting the latest stable version for Geth. '
-            f'Status code {response.status_code}')
-        return UNKNOWN_VALUE
-    
-    release_json = response.json()
-
-    if 'tag_name' not in release_json or not isinstance(release_json['tag_name'], str):
-        log.error(f'Unable to find tag name in Github response while getting the latest stable '
-            f'version for Geth.')
-        return UNKNOWN_VALUE
-    
-    tag_name = release_json['tag_name']
-    result = re.search(r'v?(?P<version>.+)', tag_name)
-    if not result:
-        log.error(f'Cannot parse tag name {tag_name} for Geth version.')
-        return UNKNOWN_VALUE
-    
-    latest_version = result.group('version')
-
-    log.info(f'Geth latest version is {latest_version}')
-
-    return latest_version
 
 def get_consensus_client_details(consensus_client):
     # Get the details for the current consensus client
