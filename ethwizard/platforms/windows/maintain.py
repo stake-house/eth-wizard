@@ -43,7 +43,11 @@ from ethwizard.constants import (
     MAINTENANCE_UPGRADE_CLIENT,
     MAINTENANCE_UPGRADE_CLIENT_MERGE,
     MAINTENANCE_REINSTALL_CLIENT,
-    WINDOWS_SERVICE_RUNNING
+    WINDOWS_SERVICE_RUNNING,
+    BN_VERSION_EP,
+    GITHUB_REST_API_URL,
+    GITHUB_API_VERSION,
+    TEKU_LATEST_RELEASE
 )
 
 def enter_maintenance(context):
@@ -146,15 +150,14 @@ def show_dashboard(context):
     if not execution_client_details['service']['found']:
         execution_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
 
-    return False
-
     # Get consensus client details
 
-    """consensus_client_details = get_consensus_client_details(current_consensus_client)
+    consensus_client_details = get_consensus_client_details(current_directory,
+        current_consensus_client)
     if not consensus_client_details:
         log.error('Unable to get consensus client details.')
         return False
-    
+
     # Find out if we need to do maintenance for the consensus client
 
     consensus_client_details['next_step'] = MAINTENANCE_DO_NOTHING
@@ -242,7 +245,6 @@ def show_dashboard(context):
         MAINTENANCE_UPGRADE_CLIENT_MERGE: (
             'Client needs to be upgraded and configured for the merge.'),
         MAINTENANCE_CONFIG_CLIENT_MERGE: 'Client needs to be configured for the merge.',
-        MAINTENANCE_CHECK_AGAIN_SOON: 'Check again. Client update should be available soon.',
         MAINTENANCE_START_SERVICE: 'Service needs to be started.',
         MAINTENANCE_REINSTALL_CLIENT: 'Client needs to be reinstalled.',
     }
@@ -263,12 +265,11 @@ def show_dashboard(context):
 
     ec_section = (f'<b>Geth</b> details (I: {execution_client_details["versions"]["installed"]}, '
         f'R: {execution_client_details["versions"]["running"]}, '
-        f'A: {execution_client_details["versions"]["available"]}, '
         f'L: {execution_client_details["versions"]["latest"]})\n'
         f'Service is running: {execution_client_details["service"]["running"]}\n'
         f'<b>Maintenance task</b>: {maintenance_tasks_description.get(execution_client_details["next_step"], UNKNOWN_VALUE)}')
 
-    cc_section = (f'<b>Lighthouse</b> details (I: {consensus_client_details["versions"]["installed"]}, '
+    cc_section = (f'<b>Teku</b> details (I: {consensus_client_details["versions"]["installed"]}, '
         f'R: {consensus_client_details["versions"]["running"]}, '
         f'L: {consensus_client_details["versions"]["latest"]})\n'
         f'Running services - Beacon node: {consensus_client_details["bn_service"]["running"]}, Validator client: {consensus_client_details["vc_service"]["running"]}\n'
@@ -286,7 +287,7 @@ Here are some details about your Ethereum clients.
 
 {maintenance_message}
 
-Versions legend - I: Installed, R: Running, A: Available, L: Latest
+Versions legend - I: Installed, R: Running, L: Latest
 '''             )),
         buttons=buttons
     ).run()
@@ -300,7 +301,7 @@ Versions legend - I: Installed, R: Running, A: Available, L: Latest
             return show_dashboard(context)
         else:
             log.error('We could not perform all the maintenance tasks.')
-            return False"""
+            return False
 
 def is_version(value):
     # Return true if this is a packaging version
@@ -407,6 +408,233 @@ def get_geth_installed_version(base_directory):
 
     return installed_version
 
+def get_consensus_client_details(base_directory, consensus_client):
+    # Get the details for the current consensus client
+
+    base_directory = Path(base_directory)
+
+    nssm_binary = get_nssm_binary()
+    if not nssm_binary:
+        return False
+
+    if consensus_client == CONSENSUS_CLIENT_TEKU:
+
+        details = {
+            'bn_service': {
+                'found': False,
+                'status': UNKNOWN_VALUE,
+                'binary': UNKNOWN_VALUE,
+                'parameters': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE
+            },
+            'vc_service': {
+                'found': False,
+                'status': UNKNOWN_VALUE,
+                'binary': UNKNOWN_VALUE,
+                'parameters': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE
+            },
+            'versions': {
+                'installed': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE,
+                'latest': UNKNOWN_VALUE
+            },
+            'bn_exec': {
+                'path': UNKNOWN_VALUE,
+                'argv': []
+            },
+            'vc_exec': {
+                'path': UNKNOWN_VALUE,
+                'argv': []
+            },
+            'is_bn_merge_configured': UNKNOWN_VALUE,
+            'is_vc_merge_configured': UNKNOWN_VALUE
+        }
+        
+        # Check for existing service
+        teku_service_exists = False
+        teku_service_name = 'teku'
+
+        service_details = get_service_details(nssm_binary, teku_service_name)
+
+        if service_details is not None:
+            teku_service_exists = True
+        
+        if not teku_service_exists:
+            return details
+
+        details['bn_service']['found'] = True
+        details['bn_service']['status'] = service_details['status']
+        details['bn_service']['binary'] = service_details['install']
+        details['bn_service']['parameters'] = service_details['parameters']['AppParameters']
+        details['bn_service']['running'] = is_service_running(service_details)
+
+        details['bn_exec']['path'] = service_details['install']
+        details['bn_exec']['argv'] = shlex.split(service_details['parameters']['AppParameters'], posix=False)
+
+        details['vc_service']['found'] = details['bn_service']['found']
+        details['vc_service']['status'] = details['bn_service']['status']
+        details['vc_service']['binary'] = details['bn_service']['binary']
+        details['vc_service']['parameters'] = details['bn_service']['parameters']
+        details['vc_service']['running'] = details['bn_service']['running']
+
+        details['vc_exec']['path'] = details['bn_exec']['path']
+        details['vc_exec']['argv'] = details['bn_exec']['argv']
+
+        execution_jwt_flag_found = False
+        execution_endpoint_flag_found = False
+        for arg in details['bn_exec']['argv']:
+            if arg.lower().startswith('--ee-jwt-secret-file'):
+                execution_jwt_flag_found = True
+            if arg.lower().startswith('--ee-endpoint'):
+                execution_endpoint_flag_found = True
+            if execution_jwt_flag_found and execution_endpoint_flag_found:
+                break
+        
+        details['is_bn_merge_configured'] = (
+            execution_jwt_flag_found and execution_endpoint_flag_found)
+        
+        for arg in details['vc_exec']['argv']:
+            if arg.lower().startswith('--validators-proposer-default-fee-recipient'):
+                details['is_vc_merge_configured'] = True
+                break
+        
+        if details['is_vc_merge_configured'] == UNKNOWN_VALUE:
+            details['is_vc_merge_configured'] = False
+
+        details['versions']['installed'] = get_teku_installed_version(base_directory)
+        details['versions']['running'] = get_teku_running_version()
+        details['versions']['latest'] = get_teku_latest_version()
+
+        return details
+
+    else:
+        log.error(f'Unknown consensus client {consensus_client}.')
+        return False
+
+def get_teku_installed_version(base_directory):
+    # Get the installed version for Teku
+
+    log.info('Getting Teku installed version...')
+
+    teku_path = base_directory.joinpath('bin', 'teku')
+    teku_batch_file = teku_path.joinpath('bin', 'teku.bat')
+
+    teku_found = False
+    teku_version = UNKNOWN_VALUE
+
+    java_home = base_directory.joinpath('bin', 'jre')
+
+    if teku_batch_file.is_file():
+        try:
+            env = os.environ.copy()
+            env['JAVA_HOME'] = str(java_home)
+
+            process_result = subprocess.run([
+                str(teku_batch_file), '--version'
+                ], capture_output=True, text=True, env=env)
+            
+            if process_result.returncode != 0:
+                log.error(f'Unexpected return code from Teku. Return code: '
+                    f'{process_result.returncode}')
+                return UNKNOWN_VALUE
+
+            teku_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'teku/(?P<version>[^/]+)', process_output)
+            if result:
+                teku_version = result.group('version').strip()
+            else:
+                log.error(f'We could not parse Teku version from output: {process_result.stdout}')
+
+        except FileNotFoundError:
+            pass
+
+    if teku_found:
+        log.info(f'Teku installed version is {teku_version}')
+
+        return teku_version
+    
+    return UNKNOWN_VALUE
+
+def get_teku_running_version():
+    # Get the running version for Teku
+
+    log.info('Getting Teku running version...')
+
+    local_teku_bn_version_url = 'http://127.0.0.1:5051' + BN_VERSION_EP
+
+    try:
+        response = httpx.get(local_teku_bn_version_url)
+    except httpx.RequestError as exception:
+        log.error(f'Cannot connect to Teku. Exception: {exception}')
+        return UNKNOWN_VALUE
+
+    if response.status_code != 200:
+        log.error(f'Unexpected status code from {local_teku_bn_version_url}. Status code: '
+            f'{response.status_code}')
+        return UNKNOWN_VALUE
+    
+    response_json = response.json()
+
+    if 'data' not in response_json or 'version' not in response_json['data']:
+        log.error(f'Unexpected JSON response from {local_teku_bn_version_url}. result not found.')
+        return UNKNOWN_VALUE
+    
+    version_agent = response_json['data']['version']
+
+    # Version agent should look like: teku/v22.8.1/windows-x86_64/-eclipseadoptium-openjdk64bitservervm-java-17
+    result = re.search(r'teku/v(?P<version>[^-/]+)(-(?P<commit>[^-/]+))?',
+        version_agent)
+    if not result:
+        log.error(f'Cannot parse {version_agent} for Teku version.')
+        return UNKNOWN_VALUE
+
+    running_version = result.group('version')
+
+    log.info(f'Teku running version is {running_version}')
+
+    return running_version
+
+def get_teku_latest_version():
+    # Get the latest version for Teku
+
+    log.info('Getting Teku latest version...')
+
+    lighthouse_gh_release_url = GITHUB_REST_API_URL + TEKU_LATEST_RELEASE
+    headers = {'Accept': GITHUB_API_VERSION}
+    try:
+        response = httpx.get(lighthouse_gh_release_url, headers=headers,
+            follow_redirects=True)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while getting the latest stable version for Teku. {exception}')
+        return UNKNOWN_VALUE
+
+    if response.status_code != 200:
+        log.error(f'HTTP error while getting the latest stable version for Teku. '
+            f'Status code {response.status_code}')
+        return UNKNOWN_VALUE
+    
+    release_json = response.json()
+
+    if 'tag_name' not in release_json or not isinstance(release_json['tag_name'], str):
+        log.error(f'Unable to find tag name in Github response while getting the latest stable '
+            f'version for Teku.')
+        return UNKNOWN_VALUE
+    
+    tag_name = release_json['tag_name']
+    result = re.search(r'v?(?P<version>.+)', tag_name)
+    if not result:
+        log.error(f'Cannot parse tag name {tag_name} for Teku version.')
+        return UNKNOWN_VALUE
+    
+    latest_version = result.group('version')
+
+    log.info(f'Teku latest version is {latest_version}')
+
+    return latest_version
+
 def use_default_client(context):
     # Set the default clients in context if they are not provided
 
@@ -428,3 +656,9 @@ def use_default_client(context):
             return None
 
     return context
+
+def perform_maintenance(execution_client, execution_client_details, consensus_client,
+    consensus_client_details):
+    # TODO: Perform all the maintenance tasks
+
+    return False
