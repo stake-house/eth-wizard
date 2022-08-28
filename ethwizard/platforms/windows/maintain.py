@@ -269,10 +269,14 @@ def show_dashboard(context):
         f'Service is running: {execution_client_details["service"]["running"]}\n'
         f'<b>Maintenance task</b>: {maintenance_tasks_description.get(execution_client_details["next_step"], UNKNOWN_VALUE)}')
 
+    cc_services = f'Running services - Beacon node: {consensus_client_details["bn_service"]["running"]}, Validator client: {consensus_client_details["vc_service"]["running"]}\n'
+    if consensus_client_details['unified_service']:
+        cc_services = f'Service is running: {consensus_client_details["bn_service"]["running"]}\n'
+
     cc_section = (f'<b>Teku</b> details (I: {consensus_client_details["versions"]["installed"]}, '
         f'R: {consensus_client_details["versions"]["running"]}, '
         f'L: {consensus_client_details["versions"]["latest"]})\n'
-        f'Running services - Beacon node: {consensus_client_details["bn_service"]["running"]}, Validator client: {consensus_client_details["vc_service"]["running"]}\n'
+        f'{cc_services}'
         f'<b>Maintenance task</b>: {maintenance_tasks_description.get(consensus_client_details["next_step"], UNKNOWN_VALUE)}')
 
     result = button_dialog(
@@ -420,6 +424,7 @@ def get_consensus_client_details(base_directory, consensus_client):
     if consensus_client == CONSENSUS_CLIENT_TEKU:
 
         details = {
+            'unified_service': True,
             'bn_service': {
                 'found': False,
                 'status': UNKNOWN_VALUE,
