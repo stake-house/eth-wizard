@@ -4,10 +4,12 @@ import re
 import time
 import os
 import shlex
+import hashlib
+import shutil
 
 from pathlib import Path
 
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from defusedxml import ElementTree
 
@@ -1018,185 +1020,217 @@ Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
 def upgrade_teku(base_directory, nssm_binary):
     # Upgrade the Teku client
     log.info('Upgrading Teku client...')
-    # TODO: Implemention
 
-    """# Getting latest Teku release files
+    teku_path = base_directory.joinpath('bin', 'teku')
+    teku_batch_file = teku_path.joinpath('bin', 'teku.bat')
+
+    java_home = base_directory.joinpath('bin', 'jre')
+
+    # Getting latest Teku release files
     teku_gh_release_url = GITHUB_REST_API_URL + TEKU_LATEST_RELEASE
     headers = {'Accept': GITHUB_API_VERSION}
     try:
-        response = httpx.get(teku_gh_release_url, headers=headers,
-            follow_redirects=True)
+        response = httpx.get(teku_gh_release_url, headers=headers, follow_redirects=True)
     except httpx.RequestError as exception:
-        log.error(f'Exception while downloading teku binary. {exception}')
+        log.error(f'Cannot connect to Github. Exception {exception}')
         return False
 
     if response.status_code != 200:
-        log.error(f'HTTP error while downloading teku binary. '
-            f'Status code {response.status_code}')
+        log.error(f'Github returned error code. Status code {response.status_code}')
         return False
     
     release_json = response.json()
 
-    if 'assets' not in release_json:
-        log.error('No assets in Github release for teku.')
+    if 'body' not in release_json:
+        log.error('Unexpected response from github release. We cannot continue.')
         return False
     
-    binary_asset = None
-    signature_asset = None
+    release_desc = release_json['body']
 
-    archive_filename_comp = 'x86_64-unknown-linux-gnu.tar.gz'
+    zip_url = None
+    zip_sha256 = None
 
-    use_optimized_binary = is_adx_supported()
-    if not use_optimized_binary:
-        log.warn('CPU does not support ADX instructions. '
-            'Using the portable version for Teku.')
-        archive_filename_comp = 'x86_64-unknown-linux-gnu-portable.tar.gz'
-    
-    archive_filename_sig_comp = archive_filename_comp + '.asc'
+    result = re.search(r'\[zip\]\((?P<url>[^\)]+)\)\s*\(\s*sha256\s*:?\s*`(?P<sha256>[^`]+)`\s*\)',
+        release_desc)
+    if result:
+        zip_url = result.group('url')
+        if zip_url is not None:
+            zip_url = zip_url.strip()
+        
+        zip_sha256 = result.group('sha256')
+        if zip_sha256 is not None:
+            zip_sha256 = zip_sha256.strip()
 
-    for asset in release_json['assets']:
-        if 'name' not in asset:
-            continue
-        if 'browser_download_url' not in asset:
-            continue
-
-        file_name = asset['name']
-        file_url = asset['browser_download_url']
-
-        if file_name.endswith(archive_filename_comp):
-            binary_asset = {
-                'file_name': file_name,
-                'file_url': file_url
-            }
-        elif file_name.endswith(archive_filename_sig_comp):
-            signature_asset = {
-                'file_name': file_name,
-                'file_url': file_url
-            }
-
-    if binary_asset is None or signature_asset is None:
-        log.error('Could not find binary or signature asset in Github release.')
+    if zip_url is None or zip_sha256 is None:
+        log.error('Could not find binary distribution zip or checksum in Github release body. '
+            'We cannot continue.')
         return False
     
-    # Downloading latest Teku release files
-    download_path = Path(Path.home(), 'ethwizard', 'downloads')
+    # Downloading latest Teku binary distribution archive
+    download_path = base_directory.joinpath('downloads')
     download_path.mkdir(parents=True, exist_ok=True)
 
-    binary_path = Path(download_path, binary_asset['file_name'])
+    url_file_name = urlparse(zip_url).path.split('/')[-1]
 
-    try:
-        with open(binary_path, 'wb') as binary_file:
-            with httpx.stream('GET', binary_asset['file_url'],
-                follow_redirects=True) as http_stream:
-                if http_stream.status_code != 200:
-                    log.error(f'HTTP error while downloading Teku binary from Github. '
-                        f'Status code {http_stream.status_code}')
-                    return False
-                for data in http_stream.iter_bytes():
-                    binary_file.write(data)
-    except httpx.RequestError as exception:
-        log.error(f'Exception while downloading Teku binary from Github. {exception}')
-        return False
+    teku_archive_path = download_path.joinpath(url_file_name)
+    teku_archive_hash = hashlib.sha256()
+    if teku_archive_path.is_file():
+        teku_archive_path.unlink()
+
+    keep_retrying = True
+
+    retry_index = 0
+    retry_count = 6
+    retry_delay = 30
+    retry_delay_increase = 10
+    last_exception = None
+    last_status_code = None
+
+    while keep_retrying and retry_index < retry_count:
+        last_exception = None
+        last_status_code = None
+        try:
+            with open(teku_archive_path, 'wb') as binary_file:
+                log.info(f'Downloading teku archive {url_file_name}...')
+                with httpx.stream('GET', zip_url, follow_redirects=True) as http_stream:
+                    if http_stream.status_code != 200:
+                        log.error(f'Cannot download teku archive {zip_url}.\n'
+                            f'Unexpected status code {http_stream.status_code}')
+                        last_status_code = http_stream.status_code
+
+                        retry_index = retry_index + 1
+                        log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+                        time.sleep(retry_delay)
+                        retry_delay = retry_delay + retry_delay_increase
+                        continue
+
+                    for data in http_stream.iter_bytes():
+                        binary_file.write(data)
+                        teku_archive_hash.update(data)
+                
+                keep_retrying = False
+
+        except httpx.RequestError as exception:
+            
+            log.error(f'Exception while downloading teku archive. Exception {exception}')
+            last_exception = exception
+
+            retry_index = retry_index + 1
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            retry_delay = retry_delay + retry_delay_increase
+            continue
     
-    signature_path = Path(download_path, signature_asset['file_name'])
-
-    try:
-        with open(signature_path, 'wb') as signature_file:
-            with httpx.stream('GET', signature_asset['file_url'],
-                follow_redirects=True) as http_stream:
-                if http_stream.status_code != 200:
-                    log.error(f'HTTP error while downloading Teku signature from Github. '
-                        f'Status code {http_stream.status_code}')
-                    return False
-                for data in http_stream.iter_bytes():
-                    signature_file.write(data)
-    except httpx.RequestError as exception:
-        log.error(f'Exception while downloading Teku signature from Github. {exception}')
-        return False
-
-    # Test if gpg is already installed
-    gpg_is_installed = False
-    try:
-        gpg_is_installed = is_package_installed('gpg')
-    except Exception:
-        return False
-
-    if not gpg_is_installed:
-        # Install gpg using APT
-        subprocess.run([
-            'apt', '-y', 'update'])
-        subprocess.run([
-            'apt', '-y', 'install', 'gpg'])
-
-    # Verify PGP signature
-
-    command_line = ['gpg', '--list-keys', '--with-colons', LIGHTHOUSE_PRIME_PGP_KEY_ID]
-    process_result = subprocess.run(command_line)
-    pgp_key_found = process_result.returncode == 0
-
-    if not pgp_key_found:
-        retry_index = 0
-        retry_count = 15
-
-        key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
-        log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
-        command_line = ['gpg', '--keyserver', key_server, '--recv-keys',
-            LIGHTHOUSE_PRIME_PGP_KEY_ID]
-        process_result = subprocess.run(command_line)
-
-        if process_result.returncode != 0:
-            # GPG failed to download Sigma Prime's PGP key, let's wait and retry a few times
-            while process_result.returncode != 0 and retry_index < retry_count:
-                retry_index = retry_index + 1
-                delay = 5
-                log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
-                    f'and try again from a different server.')
-                time.sleep(delay)
-
-                key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
-                log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
-                command_line = ['gpg', '--keyserver', key_server, '--recv-keys',
-                    LIGHTHOUSE_PRIME_PGP_KEY_ID]
-
-                process_result = subprocess.run(command_line)
-        
-        if process_result.returncode != 0:
-            log.error(
+    if keep_retrying:
+        if last_exception is not None:
+            result = button_dialog(
+                title='Cannot download Teku archive',
+                text=(
 f'''
-We failed to download the Sigma Prime's PGP key to verify the teku
-binary after {retry_count} retries.
-'''
-            )
+We could not download the teku archive. Here are some details for this
+last test we tried to perform:
+
+URL: {zip_url}
+Method: GET
+Exception: {last_exception}
+
+We cannot proceed if we cannot download the teku archive. Make sure there
+is no network issue when we try to connect to the Internet.
+'''                 ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
             return False
-    
-    process_result = subprocess.run([
-        'gpg', '--verify', signature_path])
-    if process_result.returncode != 0:
-        log.error('The teku binary signature is wrong. '
-            'We will stop here to protect you.')
+        elif last_status_code is not None:
+            result = button_dialog(
+                title='Cannot download Teku archive',
+                text=(
+f'''
+We could not download the teku archive. Here are some details for this
+last test we tried to perform:
+
+URL: {zip_url}
+Method: GET
+Status code: {last_status_code}
+
+We cannot proceed if we cannot download the teku archive. Make sure there
+is no network issue when we try to connect to the Internet.
+'''                 ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            return False
+
+    # Verify checksum
+    log.info('Verifying teku archive checksum...')
+    teku_archive_hexdigest = teku_archive_hash.hexdigest()
+    if teku_archive_hexdigest.lower() != zip_sha256.lower():
+        log.error('Teku archive checksum does not match. We will stop here to protect you.')
         return False
     
-    # Stopping Teku services before updating the binary
-    log.info('Stopping Teku services...')
-    subprocess.run(['systemctl', 'stop', LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME,
-        LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME])
+    # Unzip teku archive
+    archive_members = None
 
-    # Extracting the Teku binary archive
-    log.info('Updating Teku binary...')
-    subprocess.run([
-        'tar', 'xvf', binary_path, '--directory', LIGHTHOUSE_INSTALLED_DIRECTORY])
+    log.info(f'Extracting teku archive {url_file_name}...')
+    with ZipFile(teku_archive_path, 'r') as zip_file:
+        archive_members = zip_file.namelist()
+        zip_file.extractall(download_path)
     
-    # Restarting Teku services after updating the binary
-    log.info('Starting Teku services...')
-    subprocess.run(['systemctl', 'start', LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME,
-        LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME])
-
     # Remove download leftovers
-    binary_path.unlink()
-    signature_path.unlink()
+    teku_archive_path.unlink()
 
-    return True"""
-    return False
+    if archive_members is None or len(archive_members) == 0:
+        log.error('No files found in teku archive. We cannot continue.')
+        return False
+    
+    teku_service_name = 'teku'
+    subprocess.run([str(nssm_binary), 'stop', teku_service_name])
+
+    # Move all those extracted files into their final destination
+    if teku_path.is_dir():
+        shutil.rmtree(teku_path)
+    teku_path.mkdir(parents=True, exist_ok=True)
+
+    archive_extracted_dir = download_path.joinpath(Path(archive_members[0]).parts[0])
+
+    with os.scandir(archive_extracted_dir) as it:
+        for diritem in it:
+            shutil.move(diritem.path, teku_path)
+        
+    # Make sure teku was installed properly
+    teku_found = False
+    if teku_batch_file.is_file():
+        try:
+            env = os.environ.copy()
+            env['JAVA_HOME'] = str(java_home)
+
+            process_result = subprocess.run([
+                str(teku_batch_file), '--version'
+                ], capture_output=True, text=True, env=env)
+            teku_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'teku/(?P<version>[^/]+)', process_output)
+            if result:
+                teku_version = result.group('version').strip()
+
+        except FileNotFoundError:
+            pass
+
+    if not teku_found:
+        log.error(f'We could not find the teku binary distribution from the installed archive '
+            f'in {teku_path}. We cannot continue.')
+        return False
+    else:
+        log.info(f'Teku version {teku_version} installed.')
+    
+    subprocess.run([str(nssm_binary), 'start', teku_service_name])
+
+    return True
 
 def config_teku_merge(base_directory, nssm_binary):
     # Configure Teku for the merge
