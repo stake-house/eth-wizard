@@ -7,6 +7,14 @@ import shlex
 
 from pathlib import Path
 
+from urllib.parse import urljoin
+
+from defusedxml import ElementTree
+
+from dateutil.parser import parse as dateparse
+
+from zipfile import ZipFile
+
 from packaging.version import parse as parse_version, Version
 
 from prompt_toolkit.formatted_text import HTML
@@ -23,7 +31,9 @@ from ethwizard.platforms.windows.common import (
     log,
     quit_app,
     get_service_details,
-    get_nssm_binary
+    get_nssm_binary,
+    is_stable_windows_amd64_archive,
+    install_gpg
 )
 
 from ethwizard.constants import (
@@ -47,7 +57,12 @@ from ethwizard.constants import (
     BN_VERSION_EP,
     GITHUB_REST_API_URL,
     GITHUB_API_VERSION,
-    TEKU_LATEST_RELEASE
+    TEKU_LATEST_RELEASE,
+    GETH_STORE_BUILDS_PARAMS,
+    GETH_STORE_BUILDS_URL,
+    GETH_BUILDS_BASE_URL,
+    PGP_KEY_SERVERS,
+    GETH_WINDOWS_PGP_KEY_ID
 )
 
 def enter_maintenance(context):
@@ -763,36 +778,194 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
 def upgrade_geth(base_directory, nssm_binary):
     # Upgrade the Geth client
     log.info('Upgrading Geth client...')
-    # TODO: Implement
 
-    """# Add Ethereum PPA if not already added.
-    if not is_ethereum_ppa_added():
-        spc_package_installed = False
-        try:
-            spc_package_installed = is_package_installed('software-properties-common')
-        except Exception:
-            return False
+    # Get list of geth releases/builds from their store
+    next_marker = None
+    page_end_found = False
+
+    windows_builds = []
+
+    try:
+        log.info('Getting geth builds...')
+        while not page_end_found:
+            params = GETH_STORE_BUILDS_PARAMS.copy()
+            if next_marker is not None:
+                params['marker'] = next_marker
+
+            response = httpx.get(GETH_STORE_BUILDS_URL, params=params, follow_redirects=True)
+
+            if response.status_code != 200:
+                log.error(f'Cannot connect to geth builds URL {GETH_STORE_BUILDS_URL}.\n'
+                    f'Unexpected status code {response.status_code}')
+                return False
+            
+            builds_tree_root = ElementTree.fromstring(response.text)
+            blobs = builds_tree_root.findall('.//Blobs/Blob')
+
+            for blob in blobs:
+                build_name = blob.find('Name').text.strip()
+                if build_name.endswith('.asc'):
+                    continue
+
+                if not is_stable_windows_amd64_archive(build_name):
+                    continue
+
+                build_properties = blob.find('Properties')
+                last_modified_date = dateparse(build_properties.find('Last-Modified').text)
+
+                windows_builds.append({
+                    'name': build_name,
+                    'last_modified_date': last_modified_date
+                })
+
+            next_marker = builds_tree_root.find('.//NextMarker').text
+            if next_marker is None:
+                page_end_found = True
+
+    except httpx.RequestError as exception:
+        log.error(f'Cannot connect to geth builds URL {GETH_STORE_BUILDS_URL}.\n'
+            f'Exception {exception}')
+        return False
+
+    if len(windows_builds) <= 0:
+        log.error('No geth builds found on geth store. We cannot continue.')
+        return False
+
+    # Download latest geth build and its signature
+    windows_builds.sort(key=lambda x: (x['last_modified_date'], x['name']), reverse=True)
+    latest_build = windows_builds[0]
+
+    download_path = base_directory.joinpath('downloads')
+    download_path.mkdir(parents=True, exist_ok=True)
+
+    geth_archive_path = download_path.joinpath(latest_build['name'])
+    if geth_archive_path.is_file():
+        geth_archive_path.unlink()
+
+    latest_build_url = urljoin(GETH_BUILDS_BASE_URL, latest_build['name'])
+
+    try:
+        with open(geth_archive_path, 'wb') as binary_file:
+            log.info(f'Downloading geth archive {latest_build["name"]}...')
+            with httpx.stream('GET', latest_build_url, follow_redirects=True) as http_stream:
+                if http_stream.status_code != 200:
+                    log.error(f'Cannot download geth archive {latest_build_url}.\n'
+                        f'Unexpected status code {http_stream.status_code}')
+                    return False
+                for data in http_stream.iter_bytes():
+                    binary_file.write(data)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading geth archive. Exception {exception}')
+        return False
+
+    geth_archive_sig_path = download_path.joinpath(latest_build['name'] + '.asc')
+    if geth_archive_sig_path.is_file():
+        geth_archive_sig_path.unlink()
+
+    latest_build_sig_url = urljoin(GETH_BUILDS_BASE_URL, latest_build['name'] + '.asc')
+
+    try:
+        with open(geth_archive_sig_path, 'wb') as binary_file:
+            log.info(f'Downloading geth archive signature {latest_build["name"]}.asc...')
+            with httpx.stream('GET', latest_build_sig_url,
+                follow_redirects=True) as http_stream:
+                if http_stream.status_code != 200:
+                    log.error(f'Cannot download geth archive signature {latest_build_sig_url}.\n'
+                        f'Unexpected status code {http_stream.status_code}')
+                    return False
+                for data in http_stream.iter_bytes():
+                    binary_file.write(data)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading geth archive signature. Exception {exception}')
+        return False
+
+    if not install_gpg(base_directory):
+        return False
+    
+    # Verify PGP signature
+    gpg_binary_path = base_directory.joinpath('bin', 'gpg.exe')
+
+    command_line = [str(gpg_binary_path), '--list-keys', '--with-colons', GETH_WINDOWS_PGP_KEY_ID]
+    process_result = subprocess.run(command_line)
+    pgp_key_found = process_result.returncode == 0
+
+    if not pgp_key_found:
+
+        retry_index = 0
+        retry_count = 15
+
+        key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+        log.info(f'Downloading Geth Windows Builder PGP key from {key_server} ...')
+        command_line = [str(gpg_binary_path), '--keyserver', key_server,
+            '--recv-keys', GETH_WINDOWS_PGP_KEY_ID]
+        process_result = subprocess.run(command_line)
+
+        if process_result.returncode != 0:
+            # GPG failed to download Geth Windows Builder PGP key, let's wait and retry a few times
+            while process_result.returncode != 0 and retry_index < retry_count:
+                retry_index = retry_index + 1
+                delay = 5
+                log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
+                    f'and try again from a different server.')
+                time.sleep(delay)
+
+                key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+                log.info(f'Downloading Geth Windows Builder PGP key from {key_server} ...')
+                command_line = [str(gpg_binary_path), '--keyserver', key_server,
+                    '--recv-keys', GETH_WINDOWS_PGP_KEY_ID]
+
+                process_result = subprocess.run(command_line)
         
-        if not spc_package_installed:
-            subprocess.run([
-                'apt', '-y', 'update'])
-            subprocess.run([
-                'apt', '-y', 'install', 'software-properties-common'])
+        if process_result.returncode != 0:
+            log.error(
+f'''
+We failed to download the Geth Windows Builder PGP key to verify the geth
+archive after {retry_count} retries.
+'''
+            )
+            return False
+    
+    process_result = subprocess.run([
+        str(gpg_binary_path), '--verify', str(geth_archive_sig_path)])
+    if process_result.returncode != 0:
+        log.error('The geth archive signature is wrong. We\'ll stop here to protect you.')
+        return False
+    
+    # Remove download leftovers
+    geth_archive_sig_path.unlink()        
 
-        subprocess.run(['add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
-    else:
-        subprocess.run(['apt', '-y', 'update'])
+    # Unzip geth archive
+    bin_path = base_directory.joinpath('bin')
+    bin_path.mkdir(parents=True, exist_ok=True)
 
-    env = os.environ.copy()
-    env['DEBIAN_FRONTEND'] = 'noninteractive'
+    geth_extracted_binary = None
 
-    subprocess.run(['apt', '-y', 'install', 'geth'], env=env)
+    with ZipFile(geth_archive_path, 'r') as zip_file:
+        for name in zip_file.namelist():
+            if name.endswith('geth.exe'):
+                geth_extracted_binary = Path(zip_file.extract(name, download_path))
+    
+    # Remove download leftovers
+    geth_archive_path.unlink()
+
+    if geth_extracted_binary is None:
+        log.error('The geth binary was not found in the archive. We cannot continue.')
+        return False
+
+    # Move geth back into bin directory
+    target_geth_binary_path = bin_path.joinpath('geth.exe')
+    if target_geth_binary_path.is_file():
+        target_geth_binary_path.unlink()
+    
+    geth_extracted_binary.rename(target_geth_binary_path)
+
+    geth_extracted_binary.parent.rmdir()
 
     log.info('Restarting Geth service...')
-    subprocess.run(['systemctl', 'restart', GETH_SYSTEMD_SERVICE_NAME])
+    geth_service_name = 'geth'
+    subprocess.run([str(nssm_binary), 'restart', geth_service_name])
 
-    return True"""
-    return False
+    return True
 
 def config_geth_merge(base_directory, nssm_binary):
     # Configure Geth for the merge

@@ -3,10 +3,13 @@ import sys
 import json
 import subprocess
 import re
+import httpx
 
 import logging
 
 from pathlib import Path
+
+from urllib.parse import urljoin, urlparse
 
 from typing import Optional
 
@@ -14,7 +17,8 @@ from ethwizard import __version__
 
 from ethwizard.constants import (
     STATE_FILE,
-    CHOCOLATEY_DEFAULT_BIN_PATH
+    CHOCOLATEY_DEFAULT_BIN_PATH,
+    GNUPG_DOWNLOAD_URL
 )
 
 log = logging.getLogger(__name__)
@@ -173,3 +177,110 @@ def get_nssm_binary():
         return False
     
     return nssm_binary
+
+def is_stable_windows_amd64_archive(name):
+    return (
+        name.find('windows') != -1 and
+        name.endswith('.zip') and
+        name.find('amd64') != -1 and
+        name.find('unstable') == -1 and
+        name.find('alltools') == -1
+    )
+
+def install_gpg(base_directory):
+    # Install the GPG binary
+
+    # Check if gnupg is already installed
+    gpg_installed = False
+
+    gpg_binary_path = base_directory.joinpath('bin', 'gpg.exe')
+
+    if gpg_binary_path.is_file():
+        process_result = subprocess.run([
+            str(gpg_binary_path), '--version'
+        ])
+
+        if process_result.returncode == 0:
+            gpg_installed = True
+
+    if gpg_installed:
+        log.info('GNUPG is already installed, no need to install it')
+        return True
+
+    # Get the gnupg install URL
+    gpg_installer_url = None
+    try:
+        response = httpx.get(GNUPG_DOWNLOAD_URL, follow_redirects=True)
+        
+        if response.status_code != 200:
+            log.error(f'Cannot connect to GNUPG download URL {GNUPG_DOWNLOAD_URL}.\n'
+                f'Unexpected status code {response.status_code}')
+            return False
+        
+        response_text = response.text
+        match = re.search(r'href="(?P<url>[^"]+gnupg-w32-[^"]+.exe)"', response_text)
+        if not match:
+            log.error(f'Cannot find GNUPG installer on GNUPG download URL {GNUPG_DOWNLOAD_URL}.')
+            return False
+        
+        gpg_installer_url = urljoin(GNUPG_DOWNLOAD_URL, match.group('url'))
+    except httpx.RequestError as exception:
+        log.error(f'Cannot connect to GNUPG download URL {GNUPG_DOWNLOAD_URL}.\n'
+            f'Exception {exception}')
+        return False
+
+    if gpg_installer_url is None:
+        return False
+    
+    download_path = base_directory.joinpath('downloads')
+    download_path.mkdir(parents=True, exist_ok=True)
+
+    # Download the gnupg installer
+    file_name = urlparse(gpg_installer_url).path.split('/')[-1]
+    download_installer_path = download_path.joinpath(file_name)
+
+    if download_installer_path.is_file():
+        download_installer_path.unlink()
+
+    try:
+        with open(download_installer_path, 'wb') as binary_file:
+            log.info('Downloading GNUPG installer...')
+            with httpx.stream('GET', gpg_installer_url, follow_redirects=True) as http_stream:
+                if http_stream.status_code != 200:
+                    log.error(f'Cannot download GNUPG installer {gpg_installer_url}.\n'
+                        f'Unexpected status code {http_stream.status_code}')
+                    return False
+                for data in http_stream.iter_bytes():
+                    binary_file.write(data)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading GNUPG installer. Exception {exception}')
+        return False
+
+    # Run installer silently
+    log.info('Installing GNUPG...')
+
+    process_result = subprocess.run([
+        str(download_installer_path), '/S', '/D=' + str(base_directory)
+    ])
+
+    if process_result.returncode != 0:
+        log.error(f'Failed to install GNUPG. Return code {process_result.returncode}')
+        return False
+
+    # Remove download leftovers
+    download_installer_path.unlink()
+
+    if not gpg_binary_path.is_file():
+        log.error(f'Could not find GPG binary after installation. '
+            f'Expected to be in {gpg_binary_path}')
+        return False
+    
+    process_result = subprocess.run([
+        str(gpg_binary_path), '--version'
+    ])
+
+    if process_result.returncode != 0:
+        log.error(f'Unexpected return from gpg binary. Return code {process_result.returncode}')
+        return False
+
+    return True
