@@ -14,8 +14,6 @@ from pathlib import Path
 
 from packaging.version import parse as parse_version
 
-from secrets import token_hex
-
 from urllib.parse import urljoin, urlparse
 
 from datetime import datetime, timedelta
@@ -29,8 +27,6 @@ from bs4 import BeautifulSoup
 from rfc3986 import builder as urlbuilder
 
 from zipfile import ZipFile
-
-from collections.abc import Collection
 
 from functools import partial
 
@@ -60,7 +56,9 @@ from ethwizard.platforms.windows.common import (
     get_service_details,
     get_nssm_binary,
     is_stable_windows_amd64_archive,
-    install_gpg
+    install_gpg,
+    set_service_param,
+    setup_jwt_token_file
 )
 
 from prompt_toolkit.formatted_text import HTML
@@ -849,24 +847,6 @@ def directory_validator(directory):
         return False
 
     return False
-
-def setup_jwt_token_file(base_directory):
-    # Create or ensure that the JWT token file exist
-
-    create_jwt_token = False
-    jwt_token_dir = base_directory.joinpath('var', 'lib', 'ethereum')
-    jwt_token_path = jwt_token_dir.joinpath('jwttoken')
-
-    if not jwt_token_path.is_file():
-        create_jwt_token = True
-    
-    if create_jwt_token:
-        jwt_token_dir.mkdir(parents=True, exist_ok=True)
-
-        with open(jwt_token_path, 'w') as jwt_token_file:
-            jwt_token_file.write(token_hex(32))
-
-    return True
 
 def install_geth(base_directory, network, ports):
     # Install geth for the selected network
@@ -1657,21 +1637,7 @@ def create_service(nssm_binary, service_name, binary_path, binary_args, paramete
     # Set all the other parameters
     if parameters is not None:
         for param, value in parameters.items():
-            if type(value) is str:
-                process_result = subprocess.run([
-                    str(nssm_binary), 'set', service_name, param, value
-                    ])
-            elif isinstance(value, Collection):
-                process_result = subprocess.run([
-                    str(nssm_binary), 'set', service_name, param
-                    ] + list(value))
-            else:
-                log.error(f'Unexpected parameter value {value} for parameter {param}.')
-                return False
-            
-            if process_result.returncode != 0:
-                log.error(f'Unexpected return code from NSSM when modifying at parameter. '
-                    f'Return code {process_result.returncode}')
+            if not set_service_param(nssm_binary, service_name, param, value):
                 return False
     
     return True

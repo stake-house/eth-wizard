@@ -35,7 +35,9 @@ from ethwizard.platforms.windows.common import (
     get_service_details,
     get_nssm_binary,
     is_stable_windows_amd64_archive,
-    install_gpg
+    install_gpg,
+    set_service_param,
+    setup_jwt_token_file
 )
 
 from ethwizard.constants import (
@@ -704,7 +706,7 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
                 return False
         
         elif execution_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT_MERGE:
-            if not config_geth_merge(base_directory, nssm_binary):
+            if not config_geth_merge(base_directory, nssm_binary, execution_client_details):
                 log.error('We could not configure Geth for the merge.')
                 return False
             
@@ -713,7 +715,7 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
                 return False
     
         elif execution_client_details['next_step'] == MAINTENANCE_CONFIG_CLIENT_MERGE:
-            if not config_geth_merge(base_directory, nssm_binary):
+            if not config_geth_merge(base_directory, nssm_binary, execution_client_details):
                 log.error('We could not configure Geth for the merge.')
                 return False
             
@@ -972,53 +974,35 @@ archive after {retry_count} retries.
 
     return True
 
-def config_geth_merge(base_directory, nssm_binary):
+def config_geth_merge(base_directory, nssm_binary, client_details):
     # Configure Geth for the merge
     log.info('Configuring Geth for the merge...')
-    # TODO: Implemention
 
-    """log.info('Creating JWT token file if needed...')
-    if not setup_jwt_token_file():
+    jwt_token_dir = base_directory.joinpath('var', 'lib', 'ethereum')
+    jwt_token_path = jwt_token_dir.joinpath('jwttoken')
+
+    log.info('Creating JWT token file if needed...')
+    if not setup_jwt_token_file(base_directory):
         log.error(
 f'''
-Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
+Unable to create JWT token file in {jwt_token_path}
 '''
         )
 
         return False
     
-    geth_service_name = GETH_SYSTEMD_SERVICE_NAME
-    geth_service_content = ''
+    geth_service_name = 'geth'
 
     log.info('Adding JWT token configuration to Geth...')
 
-    with open('/etc/systemd/system/' + geth_service_name, 'r') as service_file:
-        geth_service_content = service_file.read()
+    geth_arguments = client_details['exec']['argv']
+    geth_arguments.append('--authrpc.jwtsecret')
+    geth_arguments.append(f'"{jwt_token_path}"')
 
-    result = re.search(r'ExecStart\s*=\s*(.*?)geth([^\\\n]*(\\\s+)?)*', geth_service_content)
-    if not result:
-        log.error('Cannot parse Geth service file.')
+    if not set_service_param(nssm_binary, geth_service_name, 'AppParameters', geth_arguments):
         return False
-    
-    exec_start = result.group(0)
 
-    # Add --authrpc.jwtsecret configuration
-    exec_start = re.sub(r'(\s*\\)?\s+--authrpc.jwtsecret\s*=?\s*\S+', '', exec_start)
-    exec_start = exec_start + f' --authrpc.jwtsecret {LINUX_JWT_TOKEN_FILE_PATH}'
-
-    geth_service_content = re.sub(r'ExecStart\s*=\s*(.*?)geth([^\\\n]*(\\\s+)?)*',
-        exec_start, geth_service_content)
-
-    # Write back configuration
-    with open('/etc/systemd/system/' + geth_service_name, 'w') as service_file:
-        service_file.write(geth_service_content)
-
-    # Reload configuration
-    log.info('Reloading service configurations...')
-    subprocess.run(['systemctl', 'daemon-reload'])
-
-    return True"""
-    return False
+    return True
 
 def upgrade_teku(base_directory, nssm_binary):
     # Upgrade the Teku client

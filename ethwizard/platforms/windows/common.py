@@ -11,6 +11,10 @@ from pathlib import Path
 
 from urllib.parse import urljoin, urlparse
 
+from collections.abc import Collection
+
+from secrets import token_hex
+
 from typing import Optional
 
 from ethwizard import __version__
@@ -282,5 +286,44 @@ def install_gpg(base_directory):
     if process_result.returncode != 0:
         log.error(f'Unexpected return from gpg binary. Return code {process_result.returncode}')
         return False
+
+    return True
+
+def set_service_param(nssm_binary, service_name, param, value):
+    # Configure an NSSM service paramater with a value
+    if type(value) is str:
+        process_result = subprocess.run([
+            str(nssm_binary), 'set', service_name, param, value
+            ])
+    elif isinstance(value, Collection):
+        process_result = subprocess.run([
+            str(nssm_binary), 'set', service_name, param
+            ] + list(value))
+    else:
+        log.error(f'Unexpected parameter value {value} for parameter {param}.')
+        return False
+    
+    if process_result.returncode != 0:
+        log.error(f'Unexpected return code from NSSM when modifying at parameter. '
+            f'Return code {process_result.returncode}')
+        return False
+    
+    return True
+
+def setup_jwt_token_file(base_directory):
+    # Create or ensure that the JWT token file exist
+
+    create_jwt_token = False
+    jwt_token_dir = base_directory.joinpath('var', 'lib', 'ethereum')
+    jwt_token_path = jwt_token_dir.joinpath('jwttoken')
+
+    if not jwt_token_path.is_file():
+        create_jwt_token = True
+    
+    if create_jwt_token:
+        jwt_token_dir.mkdir(parents=True, exist_ok=True)
+
+        with open(jwt_token_path, 'w') as jwt_token_file:
+            jwt_token_file.write(token_hex(32))
 
     return True
