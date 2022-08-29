@@ -55,7 +55,7 @@ def supported_platform():
                 return PLATFORM_UBUNTU
     elif (
         uname.system == 'Windows' and
-        uname.release == '10' and
+        (uname.release == '10' or uname.release == '11') and
         uname.machine.lower() == 'amd64'):
 
         return PLATFORM_WINDOWS10
