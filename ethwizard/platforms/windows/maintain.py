@@ -71,7 +71,7 @@ def enter_maintenance(context):
     # Maintenance entry point for Windows.
     # Maintenance is started after the wizard has completed.
 
-    log.info(f'Entering maintenance mode. To be implemented.')
+    log.info(f'Entering maintenance mode.')
 
     if context is None:
         log.error('Missing context.')
