@@ -954,6 +954,10 @@ archive after {retry_count} retries.
         log.error('The geth binary was not found in the archive. We cannot continue.')
         return False
 
+    geth_service_name = 'geth'
+    log.info('Stoping Geth service...')
+    subprocess.run([str(nssm_binary), 'stop', geth_service_name])
+
     # Move geth back into bin directory
     target_geth_binary_path = bin_path.joinpath('geth.exe')
     if target_geth_binary_path.is_file():
@@ -963,9 +967,8 @@ archive after {retry_count} retries.
 
     geth_extracted_binary.parent.rmdir()
 
-    log.info('Restarting Geth service...')
-    geth_service_name = 'geth'
-    subprocess.run([str(nssm_binary), 'restart', geth_service_name])
+    log.info('Starting Geth service...')
+    subprocess.run([str(nssm_binary), 'start', geth_service_name])
 
     return True
 
