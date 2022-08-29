@@ -158,11 +158,11 @@ def show_dashboard(context):
         if installed_version < latest_version:
             execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
         
-        # If the next version is merge ready and we are not configured yet, we need to upgrade and
-        # configure the client
+            # If the next version is merge ready and we are not configured yet, we need to upgrade and
+            # configure the client
 
-        if is_latest_exec_merge_ready and not execution_client_details['is_merge_configured']:
-            execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
+            if is_latest_exec_merge_ready and not execution_client_details['is_merge_configured']:
+                execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
 
     # If the service is not installed or found, we need to reinstall the client
 
@@ -234,13 +234,13 @@ def show_dashboard(context):
         if installed_version < latest_version:
             consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
         
-        # If the next version is merge ready and we are not configured yet, we need to upgrade and
-        # configure the client
+            # If the next version is merge ready and we are not configured yet, we need to upgrade and
+            # configure the client
 
-        if is_latest_cons_merge_ready and (
-            not consensus_client_details['is_bn_merge_configured'] or
-            not consensus_client_details['is_vc_merge_configured']):
-            consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
+            if is_latest_cons_merge_ready and (
+                not consensus_client_details['is_bn_merge_configured'] or
+                not consensus_client_details['is_vc_merge_configured']):
+                consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
 
     # If the service is not installed or found, we need to reinstall the client
 
@@ -749,7 +749,7 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
                 return False
         
         elif consensus_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT_MERGE:
-            if not config_teku_merge(base_directory, nssm_binary):
+            if not config_teku_merge(base_directory, nssm_binary, consensus_client_details):
                 log.error('We could not configure Teku for the merge.')
                 return False
 
@@ -758,7 +758,7 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
                 return False
     
         elif consensus_client_details['next_step'] == MAINTENANCE_CONFIG_CLIENT_MERGE:
-            if not config_teku_merge(base_directory, nssm_binary):
+            if not config_teku_merge(base_directory, nssm_binary, consensus_client_details):
                 log.error('We could not configure Teku for the merge.')
                 return False
             
@@ -1272,71 +1272,142 @@ Unable to create JWT token file in {jwt_token_path}
 
         return False
     
-    # Configure the Teku beacon node
+    teku_service_name = 'teku'
 
-    """teku_bn_service_name = LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME
-    teku_bn_service_content = ''
+    teku_arguments = client_details['bn_exec']['argv']
 
-    log.info('Adding JWT token configuration to Teku beacon node and '
-        'using the correct API port...')
+    # JWT token configuration (--ee-jwt-secret-file)
+    has_jwt_config = False
 
-    with open('/etc/systemd/system/' + teku_bn_service_name, 'r') as service_file:
-        teku_bn_service_content = service_file.read()
+    replaced_index = None
+    replaced_arg = None
+    replace_next = False
 
-    result = re.search(r'ExecStart\s*=\s*(.*?)teku([^\\\n]*(\\\s+)?)*', teku_bn_service_content)
-    if not result:
-        log.error('Cannot parse Teku beacon node service file.')
+    for index, arg in enumerate(teku_arguments):
+        if replace_next:
+            replaced_index = index
+            replaced_arg = f'"{jwt_token_path}"'
+            break
+        elif arg.lower().startswith('--ee-jwt-secret-file'):
+            has_jwt_config = True
+            if '=' in arg:
+                replaced_index = index
+                replaced_arg = f'--ee-jwt-secret-file="{jwt_token_path}"'
+                break
+            else:
+                replace_next = True
+
+    if not has_jwt_config:
+        log.info('Adding JWT token configuration to Teku...')
+
+        teku_arguments.append(f'--ee-jwt-secret-file="{jwt_token_path}"')
+    else:
+        log.warn('Teku was already configured with a JWT token. We will try to update or make '
+            'sure the configuration is correct.')
+        
+        if replaced_index is None or replaced_arg is None:
+            log.error('No replacement found for JWT token argument.')
+            return False
+        
+        teku_arguments[replaced_index] = replaced_arg
+
+    # Fee Recipient address configuration (--validators-proposer-default-fee-recipient)
+    has_fee_recipient_config = False
+
+    replaced_index = None
+    replaced_arg = None
+    replace_next = False
+
+    for index, arg in enumerate(teku_arguments):
+        if replace_next:
+            replaced_index = index
+            replaced_arg = fee_recipient_address
+            break
+        elif arg.lower().startswith('--validators-proposer-default-fee-recipient'):
+            has_fee_recipient_config = True
+            if '=' in arg:
+                replaced_index = index
+                replaced_arg = f'--validators-proposer-default-fee-recipient={fee_recipient_address}'
+                break
+            else:
+                replace_next = True
+
+    if not has_fee_recipient_config:
+        log.info('Adding fee recipient address configuration to Teku...')
+
+        teku_arguments.append(f'--validators-proposer-default-fee-recipient={fee_recipient_address}')
+    else:
+        log.warn('Teku was already configured with a fee recipient address. We will try to update '
+            'or make sure the configuration is correct.')
+        
+        if replaced_index is None or replaced_arg is None:
+            log.error('No replacement found for fee recipient address argument.')
+            return False
+        
+        teku_arguments[replaced_index] = replaced_arg
+
+    # Execution endpoint (--ee-endpoint)
+    has_execution_endpoint_config = False
+
+    replaced_index = None
+    replaced_arg = None
+    replace_next = False
+
+    for index, arg in enumerate(teku_arguments):
+        if replace_next:
+            replaced_index = index
+            replaced_arg = 'http://127.0.0.1:8551'
+            break
+        elif arg.lower().startswith('--ee-endpoint'):
+            has_execution_endpoint_config = True
+            if '=' in arg:
+                replaced_index = index
+                replaced_arg = f'--ee-endpoint=http://127.0.0.1:8551'
+                break
+            else:
+                replace_next = True
+
+    if not has_execution_endpoint_config:
+        log.info('Adding execution endpoint configuration to Teku...')
+
+        teku_arguments.append(f'--ee-endpoint=http://127.0.0.1:8551')
+    else:
+        log.warn('Teku was already configured with an execution endpoint. We will try to update '
+            'or make sure the configuration is correct.')
+        
+        if replaced_index is None or replaced_arg is None:
+            log.error('No replacement found for execution endpoint argument.')
+            return False
+        
+        teku_arguments[replaced_index] = replaced_arg
+
+    # Remove any old eth1 endpoint configuration (--eth1-endpoint(s))
+    has_eth1_endpoint_config = False
+
+    remove_start = None
+    remove_length = None
+
+    for index, arg in enumerate(teku_arguments):
+        if arg.lower().startswith('--eth1-endpoint'):
+            has_eth1_endpoint_config = True
+            if '=' in arg:
+                remove_start = index
+                remove_length = 1
+            else:
+                remove_start = index
+                remove_length = 2
+            break
+    
+    if has_eth1_endpoint_config:
+        log.info('Removing old eth1 endpoint configuration from Teku...')
+
+        if remove_start is None or remove_length is None:
+            log.error('No remove start or length for eth1 endpoint argument.')
+            return False
+
+        del teku_arguments[remove_start:remove_start + remove_length]
+    
+    if not set_service_param(nssm_binary, teku_service_name, 'AppParameters', teku_arguments):
         return False
-    
-    exec_start = result.group(0)
 
-    # Remove all --eth1-endpoints related configuration
-    exec_start = re.sub(r'(\s*\\)?\s+--eth1-endpoints?\s*=?\s*\S+', '', exec_start)
-
-    # Add --execution-endpoint configuration
-    exec_start = re.sub(r'(\s*\\)?\s+--execution-endpoints?\s*=?\s*\S+', '', exec_start)
-    exec_start = exec_start + ' --execution-endpoint http://127.0.0.1:8551'
-
-    # Add --execution-jwt configuration
-    exec_start = re.sub(r'(\s*\\)?\s+--execution-jwt\s*=?\s*\S+', '', exec_start)
-    exec_start = exec_start + f' --execution-jwt {LINUX_JWT_TOKEN_FILE_PATH}'
-
-    teku_bn_service_content = re.sub(r'ExecStart\s*=\s*(.*?)teku([^\\\n]*(\\\s+)?)*',
-        exec_start, teku_bn_service_content)
-
-    # Write back configuration
-    with open('/etc/systemd/system/' + teku_bn_service_name, 'w') as service_file:
-        service_file.write(teku_bn_service_content)
-
-    # Configure the Teku validator client
-
-    teku_vc_service_name = LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME
-    teku_vc_service_content = ''
-
-    with open('/etc/systemd/system/' + teku_vc_service_name, 'r') as service_file:
-        teku_vc_service_content = service_file.read()
-    
-    result = re.search(r'ExecStart\s*=\s*(.*?)teku([^\\\n]*(\\\s+)?)*', teku_vc_service_content)
-    if not result:
-        log.error('Cannot parse Teku validator client service file.')
-        return False
-
-    exec_start = result.group(0)
-
-    # Add fee recipient address
-    exec_start = re.sub(r'(\s*\\)?\s+--suggested-fee-recipient\s*=?\s*\S+', '', exec_start)
-    exec_start = exec_start + f' --suggested-fee-recipient {fee_recipient_address}'
-    
-    teku_vc_service_content = re.sub(r'ExecStart\s*=\s*(.*?)teku([^\\\n]*(\\\s+)?)*',
-        exec_start, teku_vc_service_content)
-
-    # Write back configuration
-    with open('/etc/systemd/system/' + teku_vc_service_name, 'w') as service_file:
-        service_file.write(teku_vc_service_content)
-
-    # Reload configuration
-    log.info('Reloading service configurations...')
-    subprocess.run(['systemctl', 'daemon-reload'])
-
-    return True"""
-    return False
+    return True

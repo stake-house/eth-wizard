@@ -157,11 +157,11 @@ def show_dashboard(context):
         if installed_version < available_version:
             execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
         
-        # If the next version is merge ready and we are not configured yet, we need to upgrade and
-        # configure the client
+            # If the next version is merge ready and we are not configured yet, we need to upgrade and
+            # configure the client
 
-        if is_available_exec_merge_ready and not execution_client_details['is_merge_configured']:
-            execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
+            if is_available_exec_merge_ready and not execution_client_details['is_merge_configured']:
+                execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
 
 
     # If the service is not installed or found, we need to reinstall the client
@@ -233,13 +233,13 @@ def show_dashboard(context):
         if installed_version < latest_version:
             consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
         
-        # If the next version is merge ready and we are not configured yet, we need to upgrade and
-        # configure the client
+            # If the next version is merge ready and we are not configured yet, we need to upgrade and
+            # configure the client
 
-        if is_latest_cons_merge_ready and (
-            not consensus_client_details['is_bn_merge_configured'] or
-            not consensus_client_details['is_vc_merge_configured']):
-            consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
+            if is_latest_cons_merge_ready and (
+                not consensus_client_details['is_bn_merge_configured'] or
+                not consensus_client_details['is_vc_merge_configured']):
+                consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
 
     # If the service is not installed or found, we need to reinstall the client
 

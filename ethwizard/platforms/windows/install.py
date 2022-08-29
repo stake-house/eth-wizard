@@ -2349,9 +2349,8 @@ Unable to create JWT token file in {jwt_token_path}
     eth1_endpoints = [local_eth1_endpoint] + eth1_fallbacks
     
     teku_arguments.append(f'{eth1_endpoints_flag}=' + ','.join(eth1_endpoints))
-    teku_arguments.append('--data-path=' + str(teku_datadir))
-    teku_arguments.append('--validator-keys=' + str(keys['validator_keys_path']) +
-        ';' + str(keys['validator_keys_path']))
+    teku_arguments.append(f'--data-path="{teku_datadir}"')
+    teku_arguments.append(f'--validator-keys="{keys["validator_keys_path"]}";"{keys["validator_keys_path"]}"')
     if consensus_checkpoint_url != '':
         base_url = urlbuilder.URIBuilder.from_uri(consensus_checkpoint_url)
         initial_state_url = base_url.add_path(BN_FINALIZED_STATE_URL).finalize().unsplit()
