@@ -993,11 +993,42 @@ Unable to create JWT token file in {jwt_token_path}
     
     geth_service_name = 'geth'
 
-    log.info('Adding JWT token configuration to Geth...')
-
+    has_jwt_config = False
     geth_arguments = client_details['exec']['argv']
-    geth_arguments.append('--authrpc.jwtsecret')
-    geth_arguments.append(f'"{jwt_token_path}"')
+
+    replaced_index = None
+    replaced_arg = None
+    replace_next = False
+
+    for index, arg in enumerate(geth_arguments):
+        if replace_next:
+            replaced_index = index
+            replaced_arg = f'"{jwt_token_path}"'
+            break
+        elif arg.lower().startswith('--authrpc.jwtsecret'):
+            has_jwt_config = True
+            if '=' in arg:
+                replaced_index = index
+                replaced_arg = f'--authrpc.jwtsecret="{jwt_token_path}"'
+                break
+            else:
+                replace_next = True
+
+    if not has_jwt_config:
+        log.info('Adding JWT token configuration to Geth...')
+
+        geth_arguments.append('--authrpc.jwtsecret')
+        geth_arguments.append(f'"{jwt_token_path}"')
+    else:
+        log.warn('Geth was already configured with a JWT token. We will try to update or make '
+            'sure the configuration is correct.')
+        
+        if replaced_index is None or replaced_arg is None:
+            log.error('No replacement found for JWT token argument.')
+            return False
+        
+        geth_arguments[replaced_index] = replaced_arg
+
 
     if not set_service_param(nssm_binary, geth_service_name, 'AppParameters', geth_arguments):
         return False
@@ -1219,21 +1250,23 @@ is no network issue when we try to connect to the Internet.
 
     return True
 
-def config_teku_merge(base_directory, nssm_binary):
+def config_teku_merge(base_directory, nssm_binary, client_details):
     # Configure Teku for the merge
     log.info('Configuring Teku for the merge...')
-    # TODO: Implemention
 
-    """fee_recipient_address = select_fee_recipient_address()
+    fee_recipient_address = select_fee_recipient_address()
     if not fee_recipient_address:
         log.error('No fee recipient address entered.')
         return False
+    
+    jwt_token_dir = base_directory.joinpath('var', 'lib', 'ethereum')
+    jwt_token_path = jwt_token_dir.joinpath('jwttoken')
 
     log.info('Creating JWT token file if needed...')
-    if not setup_jwt_token_file():
+    if not setup_jwt_token_file(base_directory):
         log.error(
 f'''
-Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
+Unable to create JWT token file in {jwt_token_path}
 '''
         )
 
@@ -1241,7 +1274,7 @@ Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
     
     # Configure the Teku beacon node
 
-    teku_bn_service_name = LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME
+    """teku_bn_service_name = LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME
     teku_bn_service_content = ''
 
     log.info('Adding JWT token configuration to Teku beacon node and '
