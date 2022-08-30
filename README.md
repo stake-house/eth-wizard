@@ -16,7 +16,7 @@ The eth-wizard should be stable enough to be used by everyone. It was never audi
 * Minimal
 * Mostly automated
 * For Ubuntu 20.04 or 22.04 using Lighthouse and Geth
-* For Windows 10 using Teku and Geth
+* For Windows 10 or 11 using Teku and Geth
 * No prerequisite needed
 * Internally simple to read, understand and modify
 * Interruptible and resumable
@@ -30,16 +30,16 @@ The eth-wizard should be stable enough to be used by everyone. It was never audi
 You can use something like this in a terminal, to start the wizard:
 
 ```
-wget https://github.com/stake-house/eth-wizard/releases/download/v0.9.0/ethwizard-0.9.0.pyz && sudo python3 ethwizard-0.9.0.pyz
+wget https://github.com/stake-house/eth-wizard/releases/download/v0.9.1/ethwizard-0.9.1.pyz && sudo python3 ethwizard-0.9.1.pyz
 ```
 
-### On Windows 10
+### On Windows 10 on 11
 
 Please note that some antivirus software might detect the wizard binary as a threat and delete it or prevent its execution.
 
-Download and run [the wizard binary](https://github.com/stake-house/eth-wizard/releases/download/v0.9.0/ethwizard-0.9.0.exe)
+Download and run [the wizard binary](https://github.com/stake-house/eth-wizard/releases/download/v0.9.1/ethwizard-0.9.1.exe)
 
-As an alternative, you can download and install [a recent version of Python](https://www.python.org/downloads/) (make sure to select the option for file associations which is included in the default *Install Now* option), download [the latest pyz bundle](https://github.com/stake-house/eth-wizard/releases/download/v0.9.0/ethwizard-0.9.0.pyz) and double-click on it. This alternative is less likely to trigger your antivirus software.
+As an alternative, you can download and install [a recent version of Python](https://www.python.org/downloads/) (make sure to select the option for file associations which is included in the default *Install Now* option), download [the latest pyz bundle](https://github.com/stake-house/eth-wizard/releases/download/v0.9.1/ethwizard-0.9.1.pyz) and double-click on it. This alternative is less likely to trigger your antivirus software.
 
 ## Demonstration
 
