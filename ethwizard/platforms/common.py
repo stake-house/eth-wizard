@@ -360,7 +360,7 @@ def select_consensus_checkpoint_provider(network, log):
     # Prompt the user for consensus checkpoint provider (weak subjectivity checkpoint)
     
     buttons = [
-        ('Community', 1)
+        ('Community', 1),
         ('Custom', 2),
         ('Skip', 3),
         ('Quit', False)
