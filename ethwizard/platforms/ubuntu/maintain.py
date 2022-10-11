@@ -32,6 +32,7 @@ from ethwizard.constants import (
     CTX_SELECTED_EXECUTION_CLIENT,
     CTX_SELECTED_CONSENSUS_CLIENT,
     CTX_SELECTED_NETWORK,
+    NETWORK_GOERLI,
     EXECUTION_CLIENT_GETH,
     CONSENSUS_CLIENT_LIGHTHOUSE,
     WIZARD_COMPLETED_STEP_ID,
@@ -1152,6 +1153,7 @@ def use_default_client(context):
 
     selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
     selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
+    selected_network = CTX_SELECTED_NETWORK
 
     updated_context = False
 
@@ -1161,6 +1163,10 @@ def use_default_client(context):
     
     if selected_consensus_client not in context:
         context[selected_consensus_client] = CONSENSUS_CLIENT_LIGHTHOUSE
+        updated_context = True
+    
+    if selected_network in context and context[selected_consensus_client] == 'prater':
+        context[selected_consensus_client] = NETWORK_GOERLI
         updated_context = True
 
     if updated_context:

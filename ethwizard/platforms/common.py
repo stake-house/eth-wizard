@@ -50,6 +50,9 @@ from prompt_toolkit.widgets import (
     ValidationToolbar,
 )
 
+from yaml import safe_load
+from secrets import choice
+
 
 @dataclass
 class Step():
@@ -139,7 +142,7 @@ def select_network(log):
 
     network_queue_info = {
         NETWORK_MAINNET: unknown_joining_queue,
-        NETWORK_PRATER: unknown_joining_queue
+        NETWORK_GOERLI: unknown_joining_queue
     }
 
     headers = {
@@ -211,7 +214,7 @@ For which network would you like to perform this installation?
         ),
         values=[
             (NETWORK_MAINNET, f'{NETWORK_LABEL[NETWORK_MAINNET]} {network_queue_info[NETWORK_MAINNET]}'),
-            (NETWORK_PRATER, f'{NETWORK_LABEL[NETWORK_PRATER]} {network_queue_info[NETWORK_PRATER]}')
+            (NETWORK_GOERLI, f'{NETWORK_LABEL[NETWORK_GOERLI]} {network_queue_info[NETWORK_GOERLI]}')
         ],
         ok_text='Use this',
         cancel_text='Quit'
@@ -355,28 +358,13 @@ should also be different from the one you choose for execution node.
 
 def select_consensus_checkpoint_provider(network, log):
     # Prompt the user for consensus checkpoint provider (weak subjectivity checkpoint)
-
-    infura_bn_domain = INFURA_BEACON_NODE_DOMAINS[network]
-
-    ef_endpoint = EF_DEVOPS_CHECKPOINT_EP.get(network, False)
-    ef_text = ''
     
     buttons = [
-        ('Infura', 1),
+        ('Community', 1)
         ('Custom', 2),
         ('Skip', 3),
         ('Quit', False)
     ]
-
-    if ef_endpoint:
-        buttons.insert(0, ('EF', 4))
-
-        ef_text = (
-f'''
-The Ethereum Foundation (EF) is offering a free and public endpoint for
-<b>{NETWORK_LABEL[network]}</b>. We recommend using it.
-'''
-        ).strip() + '\n\n'
 
     initial_state_url = None
 
@@ -390,9 +378,8 @@ Having a consensus checkpoint provider is highly recommended for your
 beacon node. It makes it possible to get a fully synced beacon in just a
 few minutes compared to having to wait hours or days.
 
-{ef_text}An easy way to get a provider is to create a free account on Infura.
-
-https://infura.io/
+We can select a random community checkpoint sync endpoint for you from
+https://eth-clients.github.io/checkpoint-sync-endpoints/ .
 
 If you have access to a custom beacon node, you can enter your own URL to
 that beacon node with the custom option. That beacon node should be on the
@@ -404,72 +391,64 @@ Do you want add a consensus checkpoint provider?
             ).run()
         
         if not result:
+            # Quit
             return result
         
-        if result == 4:
-            return ef_endpoint
         elif result == 3:
+            # Skip
             return ''
         elif result == 1:
-            valid_url = False
-            infura_credentials = None
-            input_canceled = False
+            # Community
 
-            while not valid_url:
-                not_valid_msg = ''
-                initial_state_url = None
-                if infura_credentials is not None:
-                    not_valid_msg = (
-'''
+            # Download YAML file with all the endpoints
+            checkpoint_yaml_file = COMMUNITY_CHECKPOINT_SYNC_YAML[network]
+            checkpoint_endpoints = []
 
-<style bg="red" fg="black">Your last input were <b>not valid credentials</b>. Please make sure to enter
-valid credentials from Infura.</style>'''
-                    )
+            try:
+                response = httpx.get(checkpoint_yaml_file, follow_redirects=True)
 
-                infura_credentials = input_dialog(
-                    title='Consensus checkpoint provider using Infura',
-                    text=(HTML(
-f'''
-Please enter your Infura ETH 2 project's credentials from:
+                if response.status_code != 200:
+                    log.error(f'Checkpoint YAML file returned an unexpected status code from {checkpoint_yaml_file}: {response.status_code}')
+                    return False
 
-https://infura.io/
+                checkpoint_endpoints = safe_load(response.text)
+                
+            except httpx.RequestError as exception:
+                log.error(f'Exception during request to download checkpoint YAML file from {checkpoint_yaml_file}: {exception}')
+                return False
 
-Once you are logged into your Infura account, click on <b>DASHBOARD</b> button in
-the top right corner. Click on the <b>ETH 2</b> button in the left column menu.
-Click on <b>CREATE NEW PROJECT</b> button. Give it a name. You should see your
-project settings, a <b>PROJECT ID</b> and a <b>PROJECT SECRET</b> in the <b>KEYS</b> section.
-Enter those values separated by a colon in this format:
-
-&lt;PROJECT ID&gt;:&lt;PROJECT SECRET&gt;
-
-* Press the tab key to switch between the controls below{not_valid_msg}
-'''             ))).run()
-
-                if not infura_credentials:
-                    input_canceled = True
-                    break
+            if len(checkpoint_endpoints) <= 0:
+                log.error(f'No endpoint found in checkpoint YAML file from {checkpoint_yaml_file}')
+                return False
             
-                if ':' not in infura_credentials:
+            log.info(f'{len(checkpoint_endpoints)} checkpoint sync endpoints to choose from.')
+
+            is_invalid = True
+
+            # Select a random endpoint from the YAML file
+            while is_invalid:
+                if len(checkpoint_endpoints) <= 0:
+                    log.error(f'No suitable checkpoint sync endpoint left to choose from.')
+                    return False
+                endpoint_details = choice(checkpoint_endpoints)
+                checkpoint_endpoints.remove(endpoint_details)
+
+                endpoint_name = endpoint_details.get('name', UNKNOWN_VALUE)
+                endpoint_url = endpoint_details.get('endpoint', '')
+
+                log.info(f'Random endpoint selected: {endpoint_name} at {endpoint_url}')
+
+                if endpoint_url == '':
+                    log.error(f'Endpoint does not have an URL. Skipping.')
                     continue
 
-                credentials = infura_credentials.split(':')
-                username = credentials[0]
-                password = credentials[1]
-
-                initial_state_url = urlbuilder.URIBuilder(
-                    ).add_scheme('https'
-                    ).add_host(infura_bn_domain
-                    ).add_credentials(username, password
-                    ).finalize(
-                    ).unsplit()
-                
-                valid_url = beacon_node_url_validator(network, initial_state_url, log)
-
-            if input_canceled:
-                # User clicked the cancel button
-                continue
+                # Test if the endpoint works, select another one if not
+                is_invalid = not beacon_node_url_validator(network, endpoint_url, log)
+                if not is_invalid:
+                    initial_state_url = endpoint_url
 
         elif result == 2:
+            # Custom
             valid_url = False
             entered_url = None
             input_canceled = False

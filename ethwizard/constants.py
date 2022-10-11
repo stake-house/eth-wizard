@@ -11,11 +11,11 @@ WINDOWS_EXPORTER_LATEST_RELEASE = '/repos/prometheus-community/windows_exporter/
 ETH2_DEPOSIT_CLI_LATEST_RELEASE = '/repos/ethereum/staking-deposit-cli/releases/latest'
 
 NETWORK_MAINNET = 'mainnet'
-NETWORK_PRATER = 'prater'
+NETWORK_GOERLI = 'goerli'
 
 NETWORK_LABEL = {
   NETWORK_MAINNET: 'Mainnet',
-  NETWORK_PRATER: 'Goerli'
+  NETWORK_GOERLI: 'Goerli'
 }
 
 DEFAULT_GETH_PORT = 30303
@@ -28,7 +28,7 @@ STAKEHOUSE_PORT_CHECKER_URL = 'https://port-checker.vercel.app/api/checker'
 
 MIN_AVAILABLE_DISK_SPACE_GB = {
     NETWORK_MAINNET: 1700.0,
-    NETWORK_PRATER: 300.0
+    NETWORK_GOERLI: 300.0
 }
 
 MIN_SUSTAINED_K_READ_IOPS = 3.0
@@ -119,21 +119,17 @@ CHOCOLATEY_DEFAULT_BIN_PATH = r'C:\ProgramData\chocolatey\bin'
 
 LAUNCHPAD_URLS = {
     NETWORK_MAINNET: 'https://launchpad.ethereum.org',
-    NETWORK_PRATER: 'https://goerli.launchpad.ethereum.org'
+    NETWORK_GOERLI: 'https://goerli.launchpad.ethereum.org'
 }
 
 BEACONCHA_IN_URLS = {
     NETWORK_MAINNET: 'https://beaconcha.in',
-    NETWORK_PRATER: 'https://prater.beaconcha.in'
+    NETWORK_GOERLI: 'https://goerli.beaconcha.in'
 }
 
-INFURA_BEACON_NODE_DOMAINS = {
-    NETWORK_MAINNET: 'eth2-beacon-mainnet.infura.io',
-    NETWORK_PRATER: 'eth2-beacon-prater.infura.io'
-}
-
-EF_DEVOPS_CHECKPOINT_EP = {
-  NETWORK_PRATER: 'https://goerli.checkpoint-sync.ethdevops.io'
+COMMUNITY_CHECKPOINT_SYNC_YAML = {
+    NETWORK_MAINNET: 'https://raw.githubusercontent.com/eth-clients/checkpoint-sync-endpoints/main/endpoints/mainnet.yaml',
+    NETWORK_GOERLI: 'https://raw.githubusercontent.com/eth-clients/checkpoint-sync-endpoints/main/endpoints/goerli.yaml'
 }
 
 VERY_LARGE_VERSION_NUMBER = '500.0.0'
@@ -144,7 +140,7 @@ MIN_CLIENT_VERSION_FOR_MERGE = {
     CONSENSUS_CLIENT_LIGHTHOUSE: '3.0.0',
     CONSENSUS_CLIENT_TEKU: '22.8.1'
   },
-  NETWORK_PRATER: {
+  NETWORK_GOERLI: {
     EXECUTION_CLIENT_GETH: '1.10.21',
     CONSENSUS_CLIENT_LIGHTHOUSE: '2.4.0',
     CONSENSUS_CLIENT_TEKU: '22.7.0'
@@ -163,27 +159,27 @@ BN_SYNCING_EP = '/eth/v1/node/syncing'
 
 BN_CHAIN_IDS = {
     NETWORK_MAINNET: 1,
-    NETWORK_PRATER: 5
+    NETWORK_GOERLI: 5
 }
 
 BN_DEPOSIT_CONTRACTS = {
     NETWORK_MAINNET: '0x00000000219ab540356cbb839cbe05303d7705fa',
-    NETWORK_PRATER: '0xff50ed3d0ec03ac01d4c79aad74928bff48a7b2b'
+    NETWORK_GOERLI: '0xff50ed3d0ec03ac01d4c79aad74928bff48a7b2b'
 }
 
 NETWORK_CURRENCY = {
     NETWORK_MAINNET: 'ETH',
-    NETWORK_PRATER: 'GöETH',
+    NETWORK_GOERLI: 'GöETH',
 }
 
 ETH1_NETWORK_NAME = {
     NETWORK_MAINNET: 'Mainnet',
-    NETWORK_PRATER: 'Görli'
+    NETWORK_GOERLI: 'Görli'
 }
 
 ETH1_NETWORK_CHAINID = {
     NETWORK_MAINNET: 1,
-    NETWORK_PRATER: 5
+    NETWORK_GOERLI: 5
 }
 
 BEACONCHA_VALIDATOR_DEPOSITS_API_URL = '/api/v1/validator/{indexOrPubkey}/deposits'
@@ -193,7 +189,7 @@ ETHEREUM_APT_SOURCE_URL = 'http://ppa.launchpad.net/ethereum/ethereum/ubuntu'
 
 GETH_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Go Ethereum Client - Geth (Mainnet)',
-    NETWORK_PRATER: 'Go Ethereum Client - Geth (Görli)'
+    NETWORK_GOERLI: 'Go Ethereum Client - Geth (Görli)'
 }
 
 GNUPG_DOWNLOAD_URL = 'https://www.gnupg.org/download/'
@@ -210,7 +206,7 @@ GETH_BUILDS_BASE_URL = 'https://gethstore.blob.core.windows.net/builds/'
 GETH_WINDOWS_PGP_KEY_ID = '9417309ED2A67EAC'
 GETH_ARGUMENTS = {
     NETWORK_MAINNET: ['--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof'],
-    NETWORK_PRATER: ['--goerli', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof']
+    NETWORK_GOERLI: ['--goerli', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof']
 }
 
 GETH_SYSTEMD_SERVICE_NAME = 'geth.service'
@@ -232,12 +228,12 @@ ADOPTIUM_17_API_PARAMS = {
 
 TEKU_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Teku Ethereum Client (Mainnet)',
-    NETWORK_PRATER: 'Teku Ethereum Client (Görli)'
+    NETWORK_GOERLI: 'Teku Ethereum Client (Görli)'
 }
 
 TEKU_ARGUMENTS = {
     NETWORK_MAINNET: ['--network=mainnet', '--metrics-enabled', '--rest-api-enabled', '--log-color-enabled=false'],
-    NETWORK_PRATER: ['--network=prater', '--metrics-enabled', '--rest-api-enabled', '--log-color-enabled=false']
+    NETWORK_GOERLI: ['--network=goerli', '--metrics-enabled', '--rest-api-enabled', '--log-color-enabled=false']
 }
 
 PROMETHEUS_CONFIG_WINDOWS = (
@@ -41630,7 +41626,7 @@ ExecStart=geth --syncmode=snap --http --datadir /var/lib/goethereum --metrics --
 [Install]
 WantedBy=default.target
 '''),
-    NETWORK_PRATER: (
+    NETWORK_GOERLI: (
 '''
 [Unit]
 Description=Go Ethereum Client - Geth (Görli)
@@ -41670,7 +41666,7 @@ ExecStart={LIGHTHOUSE_INSTALLED_PATH} bn --network mainnet --datadir /var/lib/li
 [Install]
 WantedBy=multi-user.target
 '''),
-    NETWORK_PRATER: (
+    NETWORK_GOERLI: (
 f'''
 [Unit]
 Description=Lighthouse Ethereum Client Beacon Node (Görli)
@@ -41683,7 +41679,7 @@ User=lighthousebeacon
 Group=lighthousebeacon
 Restart=always
 RestartSec=5
-ExecStart={LIGHTHOUSE_INSTALLED_PATH} bn --network prater --datadir /var/lib/lighthouse --staking --validator-monitor-auto --metrics{{addparams}}
+ExecStart={LIGHTHOUSE_INSTALLED_PATH} bn --network goerli --datadir /var/lib/lighthouse --staking --validator-monitor-auto --metrics{{addparams}}
 
 [Install]
 WantedBy=multi-user.target
@@ -41709,7 +41705,7 @@ ExecStart={LIGHTHOUSE_INSTALLED_PATH} vc --network mainnet --datadir /var/lib/li
 [Install]
 WantedBy=multi-user.target
 '''),
-    NETWORK_PRATER: (
+    NETWORK_GOERLI: (
 f'''
 [Unit]
 Description=Lighthouse Ethereum Client Validator Client (Görli)
@@ -41722,7 +41718,7 @@ Group=lighthousevalidator
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart={LIGHTHOUSE_INSTALLED_PATH} vc --network prater --datadir /var/lib/lighthouse --metrics{{addparams}}
+ExecStart={LIGHTHOUSE_INSTALLED_PATH} vc --network goerli --datadir /var/lib/lighthouse --metrics{{addparams}}
 
 [Install]
 WantedBy=multi-user.target

@@ -674,6 +674,10 @@ def use_default_client(context):
     if selected_consensus_client not in context:
         context[selected_consensus_client] = CONSENSUS_CLIENT_TEKU
         updated_context = True
+    
+    if selected_network in context and context[selected_consensus_client] == 'prater':
+        context[selected_consensus_client] = NETWORK_GOERLI
+        updated_context = True
 
     if updated_context:
         if not save_state(WIZARD_COMPLETED_STEP_ID, context):
