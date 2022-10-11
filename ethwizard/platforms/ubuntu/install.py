@@ -194,18 +194,15 @@ def installation_steps():
     def detect_merge_ready_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
-        selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
         merge_ready_network = CTX_MERGE_READY_NETWORK
 
         if not (
-            test_context_variable(context, selected_network, log) and
-            test_context_variable(context, selected_execution_client, log)
+            test_context_variable(context, selected_network, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
 
-        context[merge_ready_network] = detect_merge_ready(context[selected_network],
-            context[selected_execution_client])
+        context[merge_ready_network] = detect_merge_ready(context[selected_network])
         if not context[merge_ready_network]:
             # User asked to quit or error
             del context[merge_ready_network]
@@ -1605,7 +1602,7 @@ Connected Peers: {result['exe_connected_peers']}
 
     return True
 
-def detect_merge_ready(network, execution_client):
+def detect_merge_ready(network):
     is_merge_ready = True
 
     # All networks are merge ready now.
