@@ -529,11 +529,11 @@ def installation_steps():
         select_network_step,
         test_system_step,
         select_custom_ports_step,
-        install_geth_step,
         detect_merge_ready_step,
         select_consensus_checkpoint_url_step,
         select_eth1_fallbacks_step,
         install_lighthouse_step,
+        install_geth_step,
         test_open_ports_step,
         obtain_keys_step,
         select_fee_recipient_address_step,
@@ -1606,45 +1606,9 @@ Connected Peers: {result['exe_connected_peers']}
     return True
 
 def detect_merge_ready(network, execution_client):
-    is_merge_ready = False
+    is_merge_ready = True
 
-    # Check if geth is already installed and get its version
-    geth_found = False
-    geth_version = 'unknown'
-
-    try:
-        process_result = subprocess.run([
-            'geth', 'version'
-            ], capture_output=True, text=True)
-        geth_found = True
-
-        process_output = process_result.stdout
-        result = re.search(r'Version: (.*?)\n', process_output)
-        if result:
-            geth_version = result.group(1).strip()
-
-    except FileNotFoundError:
-        pass
-
-    if not geth_found:
-        log.error('Could not find Geth binary. Cannot detect if this is a merge ready network.')
-
-        return False
-    
-    if geth_version == 'unknown':
-        log.error('Could not parse Geth version. Cannot detect if this is a merge ready network.')
-
-        return False
-
-    # Check if merge ready
-    result = re.search(r'([^-]+)', geth_version)
-    if result:
-        cleaned_geth_version = parse_version(result.group(1).strip())
-        target_geth_version = parse_version(
-            MIN_CLIENT_VERSION_FOR_MERGE[network][EXECUTION_CLIENT_GETH])
-        
-        if cleaned_geth_version >= target_geth_version:
-            is_merge_ready = True
+    # All networks are merge ready now.
 
     return {'result': is_merge_ready}
 
