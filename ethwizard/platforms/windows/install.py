@@ -1561,9 +1561,14 @@ Syncing: Unknown (Starting: Unknown, Current: Unknown, Highest: Unknown)
 Connected Peers: Unknown
 '''
         ).strip(),
+        with_skip=True,
         run_callback=verifying_callback
     ).run()
     
+    if result.get('skipping', False):
+        log.warning('Skipping Geth verification.')
+        return True
+
     if not result:
         log.warning('Geth verification was cancelled.')
         return False
