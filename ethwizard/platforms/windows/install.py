@@ -288,19 +288,17 @@ def installation_steps(*args, **kwargs):
         # Context variables
         selected_directory = CTX_SELECTED_DIRECTORY
         selected_network = CTX_SELECTED_NETWORK
-        selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
         merge_ready_network = CTX_MERGE_READY_NETWORK
 
         if not (
             test_context_variable(context, selected_directory, log) and
             test_context_variable(context, selected_network, log) and
-            test_context_variable(context, selected_execution_client, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
 
         context[merge_ready_network] = detect_merge_ready(context[selected_directory],
-            context[selected_network], context[selected_execution_client])
+            context[selected_network])
         if not context[merge_ready_network]:
             # User asked to quit or error
             del context[merge_ready_network]
@@ -1849,51 +1847,10 @@ Do you want to skip installing the JRE?
     
     return True
 
-def detect_merge_ready(base_directory, network, execution_client):
-    is_merge_ready = False
+def detect_merge_ready(base_directory, network):
+    is_merge_ready = True
 
-    base_directory = Path(base_directory)
-
-    # Check if geth is already installed and get its version
-    geth_path = base_directory.joinpath('bin', 'geth.exe')
-
-    geth_found = False
-    geth_version = 'unknown'
-
-    if geth_path.is_file():
-        try:
-            process_result = subprocess.run([
-                str(geth_path), 'version'
-                ], capture_output=True, text=True, encoding='utf8')
-            geth_found = True
-
-            process_output = process_result.stdout
-            result = re.search(r'Version: (.*?)\n', process_output)
-            if result:
-                geth_version = result.group(1).strip()
-
-        except FileNotFoundError:
-            pass
-
-    if not geth_found:
-        log.error('Could not find Geth binary. Cannot detect if this is a merge ready network.')
-
-        return False
-    
-    if geth_version == 'unknown':
-        log.error('Could not parse Geth version. Cannot detect if this is a merge ready network.')
-
-        return False
-
-    # Check if merge ready
-    result = re.search(r'([^-]+)', geth_version)
-    if result:
-        cleaned_geth_version = parse_version(result.group(1).strip())
-        target_geth_version = parse_version(
-            MIN_CLIENT_VERSION_FOR_MERGE[network][EXECUTION_CLIENT_GETH])
-        
-        if cleaned_geth_version >= target_geth_version:
-            is_merge_ready = True
+    # All networks are merge ready now.
 
     return {'result': is_merge_ready}
 
