@@ -292,7 +292,7 @@ def installation_steps(*args, **kwargs):
 
         if not (
             test_context_variable(context, selected_directory, log) and
-            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, selected_network, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
