@@ -750,7 +750,7 @@ def perform_maintenance(execution_client, execution_client_details, consensus_cl
             subprocess.run(['systemctl', 'start', GETH_SYSTEMD_SERVICE_NAME])
 
         elif execution_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
-            log.warn('TODO: Reinstalling client is to be implemented.')
+            log.warning('TODO: Reinstalling client is to be implemented.')
     else:
         log.error(f'Unknown execution client {execution_client}.')
         return False
@@ -795,7 +795,7 @@ def perform_maintenance(execution_client, execution_client_details, consensus_cl
                 LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME])
 
         elif consensus_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
-            log.warn('TODO: Reinstalling client is to be implemented.')
+            log.warning('TODO: Reinstalling client is to be implemented.')
     else:
         log.error(f'Unknown consensus client {consensus_client}.')
         return False
@@ -912,7 +912,7 @@ def upgrade_lighthouse():
 
     use_optimized_binary = is_adx_supported()
     if not use_optimized_binary:
-        log.warn('CPU does not support ADX instructions. '
+        log.warning('CPU does not support ADX instructions. '
             'Using the portable version for Lighthouse.')
         archive_filename_comp = 'x86_64-unknown-linux-gnu-portable.tar.gz'
     

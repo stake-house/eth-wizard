@@ -3353,7 +3353,7 @@ def initiate_deposit(base_directory, network, keys):
     deposit_file_path = base_directory.joinpath('var', 'lib', 'eth', 'deposit',
         'deposit_data.json')
     if not deposit_file_path.is_file():
-        log.warn('No deposit file found. We will assume that the deposit was already performed.')
+        log.warning('No deposit file found. We will assume that the deposit was already performed.')
 
         return True
 
@@ -3820,7 +3820,7 @@ When you are done with the deposit(s), click the "I'm done" button below.
     validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
     if type(validator_deposits) is not list and not validator_deposits:
-        log.warn('Unable to get validator(s) deposits from beaconcha.in')
+        log.warning('Unable to get validator(s) deposits from beaconcha.in')
         validator_deposits = []
     
     skipping_deposit_check = False
@@ -3865,7 +3865,7 @@ deposit(s).
         validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
         if type(validator_deposits) is not list and not validator_deposits:
-            log.warn('Unable to get validator(s) deposits from beaconcha.in')
+            log.warning('Unable to get validator(s) deposits from beaconcha.in')
             validator_deposits = []
     
     # Check if all the deposit(s) were done for each validator
@@ -3908,14 +3908,14 @@ deposit(s).
         validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
         if type(validator_deposits) is not list and not validator_deposits:
-            log.warn('Unable to get validator(s) deposits from beaconcha.in')
+            log.warning('Unable to get validator(s) deposits from beaconcha.in')
             validator_deposits = []
 
     # Clean up deposit data file
     if not skipping_deposit_check:
         deposit_file_path.unlink()
     else:
-        log.warn(
+        log.warning(
 f'''
 We could not verify that your deposit was completed. Make sure to keep a copy of your deposit file in
 {deposit_file_path}

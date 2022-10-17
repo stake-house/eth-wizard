@@ -148,7 +148,7 @@ def is_adx_supported():
                 return 'adx' in cpuflags
             line = cpuinfo_file.readline()
         
-        log.warn('No CPU flags found in /proc/cpuinfo. '
+        log.warning('No CPU flags found in /proc/cpuinfo. '
             'Could not find if ADX instructions are supported.')
 
     return False

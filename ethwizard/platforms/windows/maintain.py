@@ -733,7 +733,7 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
             subprocess.run([str(nssm_binary), 'start', geth_service_name])
 
         elif execution_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
-            log.warn('TODO: Reinstalling client is to be implemented.')
+            log.warning('TODO: Reinstalling client is to be implemented.')
     else:
         log.error(f'Unknown execution client {execution_client}.')
         return False
@@ -776,7 +776,7 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
             subprocess.run([str(nssm_binary), 'start', teku_service_name])
 
         elif consensus_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
-            log.warn('TODO: Reinstalling client is to be implemented.')
+            log.warning('TODO: Reinstalling client is to be implemented.')
     else:
         log.error(f'Unknown consensus client {consensus_client}.')
         return False
@@ -1024,7 +1024,7 @@ Unable to create JWT token file in {jwt_token_path}
         geth_arguments.append('--authrpc.jwtsecret')
         geth_arguments.append(f'"{jwt_token_path}"')
     else:
-        log.warn('Geth was already configured with a JWT token. We will try to update or make '
+        log.warning('Geth was already configured with a JWT token. We will try to update or make '
             'sure the configuration is correct.')
         
         if replaced_index is None or replaced_arg is None:
@@ -1306,7 +1306,7 @@ Unable to create JWT token file in {jwt_token_path}
 
         teku_arguments.append(f'--ee-jwt-secret-file="{jwt_token_path}"')
     else:
-        log.warn('Teku was already configured with a JWT token. We will try to update or make '
+        log.warning('Teku was already configured with a JWT token. We will try to update or make '
             'sure the configuration is correct.')
         
         if replaced_index is None or replaced_arg is None:
@@ -1341,7 +1341,7 @@ Unable to create JWT token file in {jwt_token_path}
 
         teku_arguments.append(f'--validators-proposer-default-fee-recipient={fee_recipient_address}')
     else:
-        log.warn('Teku was already configured with a fee recipient address. We will try to update '
+        log.warning('Teku was already configured with a fee recipient address. We will try to update '
             'or make sure the configuration is correct.')
         
         if replaced_index is None or replaced_arg is None:
@@ -1376,7 +1376,7 @@ Unable to create JWT token file in {jwt_token_path}
 
         teku_arguments.append(f'--ee-endpoint=http://127.0.0.1:8551')
     else:
-        log.warn('Teku was already configured with an execution endpoint. We will try to update '
+        log.warning('Teku was already configured with an execution endpoint. We will try to update '
             'or make sure the configuration is correct.')
         
         if replaced_index is None or replaced_arg is None:

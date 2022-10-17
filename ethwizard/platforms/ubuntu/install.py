@@ -1769,7 +1769,7 @@ Do you want to skip installing the lighthouse binary?
 
         use_optimized_binary = is_adx_supported()
         if not use_optimized_binary:
-            log.warn('CPU does not support ADX instructions. '
+            log.warning('CPU does not support ADX instructions. '
                 'Using the portable version for Lighthouse.')
             archive_filename_comp = 'x86_64-unknown-linux-gnu-portable.tar.gz'
         
@@ -3207,7 +3207,7 @@ def initiate_deposit(network, keys):
 
     # Check if we have the deposit data file
     if keys['deposit_data_path'] is None:
-        log.warn('No deposit file found. We will assume that the deposit was already performed.')
+        log.warning('No deposit file found. We will assume that the deposit was already performed.')
 
         return True
 
@@ -3685,7 +3685,7 @@ When you are done with the deposit(s), click the "I'm done" button below.
     validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
     if type(validator_deposits) is not list and not validator_deposits:
-        log.warn('Unable to get validator(s) deposits from beaconcha.in')
+        log.warning('Unable to get validator(s) deposits from beaconcha.in')
         validator_deposits = []
 
     skipping_deposit_check = False
@@ -3730,7 +3730,7 @@ deposit(s).
         validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
         if type(validator_deposits) is not list and not validator_deposits:
-            log.warn('Unable to get validator(s) deposits from beaconcha.in')
+            log.warning('Unable to get validator(s) deposits from beaconcha.in')
             validator_deposits = []
     
     # Check if all the deposit(s) were done for each validator
@@ -3773,14 +3773,14 @@ deposit(s).
         validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
         if type(validator_deposits) is not list and not validator_deposits:
-            log.warn('Unable to get validator(s) deposits from beaconcha.in')
+            log.warning('Unable to get validator(s) deposits from beaconcha.in')
             validator_deposits = []
 
     # Clean up deposit data file
     if not skipping_deposit_check:
         deposit_file_copy_path.unlink()
     else:
-        log.warn(
+        log.warning(
 f'''
 We could not verify that your deposit was completed. Make sure to keep a copy of your deposit file in
 {deposit_file_copy_path}
