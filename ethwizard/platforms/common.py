@@ -813,7 +813,9 @@ def progress_log_dialog(
     title: AnyFormattedText = "",
     text: AnyFormattedText = "",
     wait_text: str = "Wait",
+    skip_text: str = "Skip",
     quit_text: str = "Quit",
+    with_skip: bool = False,
     status_text: AnyFormattedText = "",
     run_callback: Callable[[Callable[[int], None], Callable[[str], None],
         Callable[[str], None], Callable[[dict], None], Callable[[], bool]], None] = (
@@ -830,6 +832,15 @@ def progress_log_dialog(
     def wait_handler() -> None:
         pass
 
+    def skip_handler() -> None:
+        app = get_app()
+        app.result = {
+            'skipping': True
+        }
+        if not app.exited:
+            app.exited = True
+            app.exit(result=app.result)
+
     def quit_handler() -> None:
         app = get_app()
         if not app.exited:
@@ -838,6 +849,12 @@ def progress_log_dialog(
 
     wait_button = Button(text=wait_text, handler=wait_handler)
     quit_button = Button(text=quit_text, handler=quit_handler)
+
+    if not with_skip:
+        buttons = [wait_button, quit_button]
+    else:
+        skip_button = Button(text=skip_text, handler=skip_handler)
+        buttons = [wait_button, skip_button, quit_button]
 
     progressbar = ProgressBar()
     text_area = TextArea(
@@ -859,7 +876,7 @@ def progress_log_dialog(
                 progressbar,
             ]
         ),
-        buttons=[wait_button, quit_button],
+        buttons=buttons,
         with_background=True,
     )
     app = _create_app(dialog, style)
