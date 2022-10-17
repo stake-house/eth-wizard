@@ -3820,10 +3820,12 @@ When you are done with the deposit(s), click the "I'm done" button below.
     validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
     if type(validator_deposits) is not list and not validator_deposits:
-        log.error('Unable to get validator(s) deposits from beaconcha.in')
-        return False
+        log.warn('Unable to get validator(s) deposits from beaconcha.in')
+        validator_deposits = []
+    
+    skipping_deposit_check = False
 
-    while len(validator_deposits) == 0:
+    while not skipping_deposit_check and len(validator_deposits) == 0:
         # beaconcha.in does not see any validator with the public keys we generated
 
         result = button_dialog(
@@ -3848,21 +3850,26 @@ deposit(s).
 '''     ),
             buttons=[
                 ('I\'m done', True),
+                ('Skip', 1),
                 ('Quit', False)
             ]
         ).run()
 
         if not result:
             return result
+        
+        if result == 1:
+            skipping_deposit_check = True
+            break
 
         validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
         if type(validator_deposits) is not list and not validator_deposits:
-            log.error('Unable to get validator(s) deposits from beaconcha.in')
-            return False
+            log.warn('Unable to get validator(s) deposits from beaconcha.in')
+            validator_deposits = []
     
     # Check if all the deposit(s) were done for each validator
-    while len(validator_deposits) < len(public_keys):
+    while not skipping_deposit_check and len(validator_deposits) < len(public_keys):
 
         result = button_dialog(
             title='Missing deposit(s)',
@@ -3886,21 +3893,33 @@ deposit(s).
 '''     ),
             buttons=[
                 ('I\'m done', True),
+                ('Skip', 1),
                 ('Quit', False)
             ]
         ).run()
 
         if not result:
             return result
+        
+        if result == 1:
+            skipping_deposit_check = True
+            break
 
         validator_deposits = get_bc_validator_deposits(network, public_keys, log)
 
         if type(validator_deposits) is not list and not validator_deposits:
-            log.error('Unable to get validator(s) deposits from beaconcha.in')
-            return False
+            log.warn('Unable to get validator(s) deposits from beaconcha.in')
+            validator_deposits = []
 
     # Clean up deposit data file
-    deposit_file_path.unlink()
+    if not skipping_deposit_check:
+        deposit_file_path.unlink()
+    else:
+        log.warn(
+f'''
+We could not verify that your deposit was completed. Make sure to keep a copy of your deposit file in
+{deposit_file_path}
+'''.strip())
     
     return True
 
