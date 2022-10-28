@@ -170,8 +170,14 @@ def select_network(log):
                 response_json and
                 'data' in response_json and
                 'beaconchain_entering' in response_json['data']):
+
                 validators_entering = int(response_json['data']['beaconchain_entering'])
-                waiting_td = timedelta(days=validators_entering / 900.0)
+                active_validators = int(response_json['data'].get('validatorscount', 1))
+
+                churn_limit = max(MIN_PER_EPOCH_CHURN_LIMIT, active_validators // CHURN_LIMIT_QUOTIENT)
+                churn_limit_per_day = churn_limit * EPOCHS_PER_DAY
+
+                waiting_td = timedelta(days=validators_entering / churn_limit_per_day)
 
                 queue_info = (
                     f'({validators_entering} validators waiting to join '
