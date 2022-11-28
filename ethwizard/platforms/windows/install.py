@@ -1105,19 +1105,18 @@ Do you want to skip installing the geth binary?
                 process_result = subprocess.run(command_line)
         
         if process_result.returncode != 0:
-            log.error(
+            log.warning(
 f'''
 We failed to download the Geth Windows Builder PGP key to verify the geth
-archive after {retry_count} retries.
+archive after {retry_count} retries. We will skip signature verification.
 '''
             )
-            return False
-        
-        process_result = subprocess.run([
-            str(gpg_binary_path), '--verify', str(geth_archive_sig_path)])
-        if process_result.returncode != 0:
-            log.error('The geth archive signature is wrong. We\'ll stop here to protect you.')
-            return False
+        else:
+            process_result = subprocess.run([
+                str(gpg_binary_path), '--verify', str(geth_archive_sig_path)])
+            if process_result.returncode != 0:
+                log.error('The geth archive signature is wrong. We\'ll stop here to protect you.')
+                return False
         
         # Remove download leftovers
         geth_archive_sig_path.unlink()        
