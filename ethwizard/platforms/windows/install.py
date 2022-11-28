@@ -2971,7 +2971,7 @@ Would you like to import your keys or generate them here?
                         continue
 
                     target_path = keys_path.joinpath(entry.name)
-                    os.rename(entry.path, target_path)
+                    shutil.copyfile(entry.path, target_path)
 
             # Verify the generated keys
             imported_keys = search_for_generated_keys(keys_path)
@@ -3251,13 +3251,13 @@ Do you want to skip installing the staking-deposit-cli binary?
             actual_keys = generated_keys
             obtained_keys = True
     
-    # Move deposit data file outside of keys directory
+    # Copy deposit data file outside of keys directory
     if deposit_data_directory.is_dir():
         shutil.rmtree(deposit_data_directory)
     deposit_data_directory.mkdir(parents=True, exist_ok=True)
     
     if actual_keys['deposit_data_path'] is not None:
-        os.rename(actual_keys['deposit_data_path'], target_deposit_data_path)
+        shutil.copyfile(actual_keys['deposit_data_path'], target_deposit_data_path)
 
     # Generate password files
     keystore_password = input_dialog(
