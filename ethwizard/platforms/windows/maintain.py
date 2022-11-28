@@ -66,7 +66,8 @@ from ethwizard.constants import (
     GETH_STORE_BUILDS_URL,
     GETH_BUILDS_BASE_URL,
     PGP_KEY_SERVERS,
-    GETH_WINDOWS_PGP_KEY_ID
+    GETH_WINDOWS_PGP_KEY_ID,
+    NETWORK_GOERLI
 )
 
 def enter_maintenance(context):
@@ -664,6 +665,7 @@ def use_default_client(context):
 
     selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
     selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
+    selected_network = CTX_SELECTED_NETWORK
 
     updated_context = False
 
