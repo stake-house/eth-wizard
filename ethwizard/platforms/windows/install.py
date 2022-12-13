@@ -1636,6 +1636,14 @@ def create_service(nssm_binary, service_name, binary_path, binary_args, paramete
             f'Return code {process_result.returncode}')
         return False
 
+    # Set the correct timeout values for shutdown
+    if not set_service_param(nssm_binary, service_name, 'AppStopMethodConsole', '180000'):
+        return False
+    if not set_service_param(nssm_binary, service_name, 'AppStopMethodWindow', '180000'):
+        return False
+    if not set_service_param(nssm_binary, service_name, 'AppStopMethodThreads', '180000'):
+        return False
+
     # Set all the other parameters
     if parameters is not None:
         for param, value in parameters.items():
