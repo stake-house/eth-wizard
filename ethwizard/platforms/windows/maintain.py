@@ -823,7 +823,7 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
         elif consensus_client_details['next_step'] == MAINTENANCE_IMPROVE_TIMEOUT:
             log.info('Configuring Teku service to have a 180 seconds timeout on shutdown...')
 
-            if not set_service_param(nssm_binary, teku_service_name, 'AppStopMethodConsole', '180000'):
+            if not set_service_param(nssm_binary, teku_service_name, 'AppStopMethodConsole', '1500'):
                 return False
             if not set_service_param(nssm_binary, teku_service_name, 'AppStopMethodWindow', '180000'):
                 return False

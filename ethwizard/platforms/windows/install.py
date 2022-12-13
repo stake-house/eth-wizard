@@ -2343,7 +2343,8 @@ Unable to create JWT token file in {jwt_token_path}
             'JAVA_HOME=' + str(java_home),
             'JAVA_OPTS=-Xmx4g',
             'TEKU_OPTS=-XX:HeapDumpPath=' + str(heap_dump_path)
-        ]
+        ],
+        'AppStopMethodConsole': '1500'
     }
 
     if not create_service(nssm_binary, teku_service_name, teku_batch_file, teku_arguments,
