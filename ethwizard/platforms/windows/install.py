@@ -194,6 +194,7 @@ def installation_steps(*args, **kwargs):
         selected_network = CTX_SELECTED_NETWORK
         selected_ports = CTX_SELECTED_PORTS
         selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
+        execution_improved_service_timeout = CTX_EXECUTION_IMPROVED_SERVICE_TIMEOUT
 
         if not (
             test_context_variable(context, selected_directory, log) and
@@ -209,6 +210,7 @@ def installation_steps(*args, **kwargs):
             quit_app()
 
         context[selected_execution_client] = EXECUTION_CLIENT_GETH
+        context[execution_improved_service_timeout] = True
 
         return context
     
@@ -397,6 +399,7 @@ def installation_steps(*args, **kwargs):
         selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
         selected_fee_recipient_address = CTX_SELECTED_FEE_RECIPIENT_ADDRESS
         public_keys = CTX_PUBLIC_KEYS
+        consensus_improved_service_timeout = CTX_CONSENSUS_IMPROVED_SERVICE_TIMEOUT
 
         if not (
             test_context_variable(context, selected_directory, log) and
@@ -423,6 +426,7 @@ def installation_steps(*args, **kwargs):
             quit_app()
         
         context[selected_consensus_client] = CONSENSUS_CLIENT_TEKU
+        context[consensus_improved_service_timeout] = True
 
         return context
     
