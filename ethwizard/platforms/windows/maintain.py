@@ -57,6 +57,7 @@ from ethwizard.constants import (
     MAINTENANCE_UPGRADE_CLIENT,
     MAINTENANCE_UPGRADE_CLIENT_MERGE,
     MAINTENANCE_REINSTALL_CLIENT,
+    MAINTENANCE_IMPROVE_TIMEOUT,
     WINDOWS_SERVICE_RUNNING,
     BN_VERSION_EP,
     GITHUB_REST_API_URL,
@@ -67,7 +68,9 @@ from ethwizard.constants import (
     GETH_BUILDS_BASE_URL,
     PGP_KEY_SERVERS,
     GETH_WINDOWS_PGP_KEY_ID,
-    NETWORK_GOERLI
+    NETWORK_GOERLI,
+    CTX_EXECUTION_IMPROVED_SERVICE_TIMEOUT,
+    CTX_CONSENSUS_IMPROVED_SERVICE_TIMEOUT
 )
 
 def enter_maintenance(context):
@@ -79,7 +82,7 @@ def enter_maintenance(context):
     if context is None:
         log.error('Missing context.')
 
-    context = use_default_client(context)
+    context = use_default_values(context)
 
     if context is None:
         log.error('Missing context.')
@@ -93,11 +96,15 @@ def show_dashboard(context):
     selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
     selected_network = CTX_SELECTED_NETWORK
     selected_directory = CTX_SELECTED_DIRECTORY
+    execution_improved_service_timeout = CTX_EXECUTION_IMPROVED_SERVICE_TIMEOUT
+    consensus_improved_service_timeout = CTX_CONSENSUS_IMPROVED_SERVICE_TIMEOUT
 
     current_execution_client = context[selected_execution_client]
     current_consensus_client = context[selected_consensus_client]
     current_network = context[selected_network]
     current_directory = context[selected_directory]
+    current_execution_improved_service_timeout = context[execution_improved_service_timeout]
+    current_consensus_improved_service_timeout = context[consensus_improved_service_timeout]
 
     # Get execution client details
 
@@ -164,6 +171,10 @@ def show_dashboard(context):
 
             if is_latest_exec_merge_ready and not execution_client_details['is_merge_configured']:
                 execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
+
+    # If the service do not have improved shutdown timeout, we need to improve it
+    if not current_execution_improved_service_timeout:
+        execution_client_details['next_step'] = MAINTENANCE_IMPROVE_TIMEOUT
 
     # If the service is not installed or found, we need to reinstall the client
 
@@ -243,6 +254,10 @@ def show_dashboard(context):
                 not consensus_client_details['is_vc_merge_configured']):
                 consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
 
+    # If the service do not have improved shutdown timeout, we need to improve it
+    if not current_consensus_improved_service_timeout:
+        consensus_client_details['next_step'] = MAINTENANCE_IMPROVE_TIMEOUT
+
     # If the service is not installed or found, we need to reinstall the client
 
     if (not consensus_client_details['bn_service']['found'] or
@@ -267,6 +282,7 @@ def show_dashboard(context):
         MAINTENANCE_CONFIG_CLIENT_MERGE: 'Client needs to be configured for the merge.',
         MAINTENANCE_START_SERVICE: 'Service needs to be started.',
         MAINTENANCE_REINSTALL_CLIENT: 'Client needs to be reinstalled.',
+        MAINTENANCE_IMPROVE_TIMEOUT: 'Improve service shutdown timeout',
     }
 
     buttons = [
@@ -320,8 +336,9 @@ Versions legend - I: Installed, R: Running, L: Latest
         return False
     
     if result == 1:
-        if perform_maintenance(current_directory, current_execution_client,
-            execution_client_details, current_consensus_client, consensus_client_details):
+        maintenance_result = perform_maintenance(current_directory, current_execution_client,
+            execution_client_details, current_consensus_client, consensus_client_details, context)
+        if maintenance_result:
             return show_dashboard(context)
         else:
             log.error('We could not perform all the maintenance tasks.')
@@ -660,12 +677,14 @@ def get_teku_latest_version():
 
     return latest_version
 
-def use_default_client(context):
-    # Set the default clients in context if they are not provided
+def use_default_values(context):
+    # Set the default values in context if they are not provided
 
     selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
     selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
     selected_network = CTX_SELECTED_NETWORK
+    execution_improved_service_timeout = CTX_EXECUTION_IMPROVED_SERVICE_TIMEOUT
+    consensus_improved_service_timeout = CTX_CONSENSUS_IMPROVED_SERVICE_TIMEOUT
 
     updated_context = False
 
@@ -680,6 +699,14 @@ def use_default_client(context):
     if selected_network in context and context[selected_consensus_client] == 'prater':
         context[selected_consensus_client] = NETWORK_GOERLI
         updated_context = True
+    
+    if execution_improved_service_timeout not in context:
+        context[execution_improved_service_timeout] = False
+        updated_context = True
+    
+    if consensus_improved_service_timeout not in context:
+        context[consensus_improved_service_timeout] = False
+        updated_context = True
 
     if updated_context:
         if not save_state(WIZARD_COMPLETED_STEP_ID, context):
@@ -688,7 +715,7 @@ def use_default_client(context):
     return context
 
 def perform_maintenance(base_directory, execution_client, execution_client_details,
-    consensus_client, consensus_client_details):
+    consensus_client, consensus_client_details, context):
     # Perform all the maintenance tasks
 
     base_directory = Path(base_directory)
@@ -696,6 +723,8 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
     nssm_binary = get_nssm_binary()
     if not nssm_binary:
         return False
+    
+    updated_context = False
 
     if execution_client == EXECUTION_CLIENT_GETH:
         # Geth maintenance tasks
@@ -733,6 +762,17 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
             log.info('Starting Geth service...')
 
             subprocess.run([str(nssm_binary), 'start', geth_service_name])
+
+        elif execution_client_details['next_step'] == MAINTENANCE_IMPROVE_TIMEOUT:
+            log.info('Configuring Geth service to have a 180 seconds timeout on shutdown...')
+
+            set_service_param(nssm_binary, geth_service_name, 'AppStopMethodConsole', '180000')
+            set_service_param(nssm_binary, geth_service_name, 'AppStopMethodWindow', '180000')
+            set_service_param(nssm_binary, geth_service_name, 'AppStopMethodThreads', '180000')
+            
+            execution_improved_service_timeout = CTX_EXECUTION_IMPROVED_SERVICE_TIMEOUT
+            context[execution_improved_service_timeout] = True
+            updated_context = True
 
         elif execution_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
             log.warning('TODO: Reinstalling client is to be implemented.')
@@ -776,6 +816,17 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
             log.info('Starting Teku service...')
 
             subprocess.run([str(nssm_binary), 'start', teku_service_name])
+        
+        elif consensus_client_details['next_step'] == MAINTENANCE_IMPROVE_TIMEOUT:
+            log.info('Configuring Teku service to have a 180 seconds timeout on shutdown...')
+
+            set_service_param(nssm_binary, teku_service_name, 'AppStopMethodConsole', '180000')
+            set_service_param(nssm_binary, teku_service_name, 'AppStopMethodWindow', '180000')
+            set_service_param(nssm_binary, teku_service_name, 'AppStopMethodThreads', '180000')
+            
+            consensus_improved_service_timeout = CTX_CONSENSUS_IMPROVED_SERVICE_TIMEOUT
+            context[consensus_improved_service_timeout] = True
+            updated_context = True
 
         elif consensus_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
             log.warning('TODO: Reinstalling client is to be implemented.')
@@ -783,7 +834,11 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
         log.error(f'Unknown consensus client {consensus_client}.')
         return False
 
-    return True
+    if updated_context:
+        if not save_state(WIZARD_COMPLETED_STEP_ID, context):
+            return False
+
+    return context
 
 def upgrade_geth(base_directory, nssm_binary):
     # Upgrade the Geth client

@@ -75,6 +75,8 @@ CTX_OBTAINED_KEYS = 'obtained_keys'
 CTX_SELECTED_FEE_RECIPIENT_ADDRESS = 'selected_fee_recipient_address'
 CTX_PUBLIC_KEYS = 'public_keys'
 CTX_MERGE_READY_NETWORK = 'merge_ready_network'
+CTX_EXECUTION_IMPROVED_SERVICE_TIMEOUT = 'execution_improved_service_timeout'
+CTX_CONSENSUS_IMPROVED_SERVICE_TIMEOUT = 'consensus_improved_service_timeout'
 
 EXECUTION_CLIENT_GETH = 'Geth'
 
@@ -116,6 +118,7 @@ MAINTENANCE_UPGRADE_CLIENT_MERGE = 'upgrade_client_merge'
 MAINTENANCE_CONFIG_CLIENT_MERGE = 'config_client_merge'
 MAINTENANCE_CHECK_AGAIN_SOON = 'check_again_soon'
 MAINTENANCE_REINSTALL_CLIENT = 'reinstall_client'
+MAINTENANCE_IMPROVE_TIMEOUT = 'improve_timeout'
 
 UNKNOWN_VALUE = 'Unknown'
 
