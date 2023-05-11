@@ -832,6 +832,9 @@ def test_internet_speed():
         subprocess.run([
             'useradd', '--no-create-home', '--shell', '/bin/false', 'ethwizardnopriv'])
 
+    subprocess.run([
+        'chown', 'ethwizardnopriv:ethwizardnopriv', script_path])
+
     process_result = subprocess.run([
         'sudo', '-u', 'ethwizardnopriv', '-g', 'ethwizardnopriv', 'python3', script_path, '--secure', '--json'
         ], capture_output=True, text=True)
