@@ -1206,7 +1206,7 @@ Do you want to skip installing the MEV-Boost binary?
                         return False
 
                     archive_filename = binary_asset['file_name']
-                    archive_url = http_stream.url
+                    archive_url = binary_asset['file_url']
                     log.info(f'Downloading {archive_filename} from {archive_url} ...')
 
                     for data in http_stream.iter_bytes():
@@ -1228,7 +1228,7 @@ Do you want to skip installing the MEV-Boost binary?
                         return False
                     
                     archive_filename = checksums_asset['file_name']
-                    archive_url = http_stream.url
+                    archive_url = checksums_asset['file_url']
                     log.info(f'Downloading {archive_filename} from {archive_url} ...')
 
                     for data in http_stream.iter_bytes():
