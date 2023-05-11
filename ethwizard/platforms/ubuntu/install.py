@@ -1223,7 +1223,7 @@ Do you want to skip installing the MEV-Boost binary?
         with open(checksums_path, 'r') as checksums_file:
             for line in checksums_file:
                 result = re.search(r'(?P<hash>[a-fA-F0-9]+)\s+' +
-                    re.escape(binary_asset['file_name']), process_output)
+                    re.escape(binary_asset['file_name']), line)
                 if result:
                     hash_found = True
                     checksum = result.group('hash').lower()

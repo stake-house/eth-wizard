@@ -8,3 +8,4 @@ defusedxml
 python-dateutil
 beautifulsoup4
 pyyaml
+rfc3986
