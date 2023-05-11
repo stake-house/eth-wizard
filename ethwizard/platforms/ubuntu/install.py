@@ -803,7 +803,7 @@ def test_internet_speed():
     download_path = Path(Path.home(), 'ethwizard', 'downloads')
     download_path.mkdir(parents=True, exist_ok=True)
 
-    script_path = Path(download_path, 'speedtest-cli')
+    script_path = Path(download_path, 'speedtest-cli.py')
 
     try:
         with open(script_path, 'wb') as binary_file:
@@ -818,9 +818,7 @@ def test_internet_speed():
         log.error(f'Exception while downloading speedtest-cli script. {exception}')
         return False
     
-    # Run speedtest script
-    log.info('Running speedtest to test internet speed...')
-
+    # Setup to run the speedtest script with an unprivileged user
     ethwizardnopriv_user_exists = False
     process_result = subprocess.run([
         'id', '-u', 'ethwizardnopriv'
@@ -832,14 +830,22 @@ def test_internet_speed():
         subprocess.run([
             'useradd', '--no-create-home', '--shell', '/bin/false', 'ethwizardnopriv'])
 
+    tmp_script_path = Path('/tmp', 'speedtest-cli.py')
+
     subprocess.run([
-        'chown', 'ethwizardnopriv:ethwizardnopriv', script_path])
+        'cp', script_path, tmp_script_path])
+    subprocess.run([
+        'chown', 'ethwizardnopriv:ethwizardnopriv', tmp_script_path])
+
+    # Run speedtest script
+    log.info('Running speedtest to test internet speed...')
 
     process_result = subprocess.run([
-        'sudo', '-u', 'ethwizardnopriv', '-g', 'ethwizardnopriv', 'python3', script_path, '--secure', '--json'
+        'sudo', '-u', 'ethwizardnopriv', '-g', 'ethwizardnopriv', 'python3', tmp_script_path, '--secure', '--json'
         ], capture_output=True, text=True)
 
     # Remove download leftovers
+    tmp_script_path.unlink()
     script_path.unlink()
 
     if process_result.returncode != 0:
