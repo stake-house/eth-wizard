@@ -191,6 +191,33 @@ def installation_steps():
         exc_function=install_geth_function
     )
 
+    def install_mevboost_function(step, context, step_sequence):
+        # Context variables
+        selected_network = CTX_SELECTED_NETWORK
+        mevboost_installed = CTX_MEVBOOST_INSTALLED
+
+        if not (
+            test_context_variable(context, selected_network, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_app()
+
+        installed_value = install_mevboost(context[selected_network])
+
+        if not installed_value:
+            # User asked to quit or error
+            quit_app()
+        
+        context[mevboost_installed] = installed_value.get('installed', False)
+        
+        return context
+    
+    install_mevboost_step = Step(
+        step_id=INSTALL_MEVBOOST_STEP_ID,
+        display_name='MEV-Boost installation',
+        exc_function=install_mevboost_function
+    )
+
     def detect_merge_ready_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
@@ -529,6 +556,7 @@ def installation_steps():
         detect_merge_ready_step,
         select_consensus_checkpoint_url_step,
         select_eth1_fallbacks_step,
+        install_mevboost_step,
         install_lighthouse_step,
         install_geth_step,
         test_open_ports_step,
@@ -949,6 +977,385 @@ enough</b></style> to be a fully working validator. Here are your results:
     ).run()
 
     return result
+
+def install_mevboost(network):
+    # Install mev-boost for the selected network
+
+    installed_value = {
+        'installed': False
+    }
+
+    # Check for existing systemd service
+    mevboost_service_exists = False
+    mevboost_service_name = MEVBOOST_SYSTEMD_SERVICE_NAME
+
+    service_details = get_systemd_service_details(mevboost_service_name)
+
+    if service_details['LoadState'] == 'loaded':
+        mevboost_service_exists = True
+    
+    if mevboost_service_exists:
+        result = button_dialog(
+            title='MEV-Boost service found',
+            text=(
+f'''
+The MEV-Boost service seems to have already been created. Here are some
+details found:
+
+Description: {service_details['Description']}
+States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+UnitFilePreset: {service_details['UnitFilePreset']}
+ExecStart: {service_details['ExecStart']}
+ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
+FragmentPath: {service_details['FragmentPath']}
+
+Do you want to skip installing MEV-Boost and its service?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            installed_value['installed'] = True
+            return installed_value
+        
+        # User wants to proceed, make sure the mev-boost service is stopped first
+        subprocess.run([
+            'systemctl', 'stop', mevboost_service_name])
+    
+    result = button_dialog(
+        title='MEV-Boost installation',
+        text=(
+'''
+You can decide to install MEV-Boost to obtain additional rewards. This is
+entirely optional. However, if you want to maximize your profits, you
+should consider installing it.
+
+You can learn more on https://ethereum.org/en/developers/docs/mev/ and on
+https://writings.flashbots.net/why-run-mevboost/ .
+
+It will download the official binary from GitHub and extract it for easy
+use. It will be configured with a few options in the next steps.
+
+Once installed locally, it will create a systemd service that will
+automatically start MEV-Boost on reboot or if it crashes.
+'''     ),
+        buttons=[
+            ('Install', 1),
+            ('Skip', 2),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+    
+    if result == 2:
+        return installed_value
+    
+    # Check if mev-boost is already installed
+    mevboost_found = False
+    mevboost_version = 'unknown'
+    mevboost_location = 'unknown'
+
+    try:
+        process_result = subprocess.run([
+            'mev-boost', '--version'
+            ], capture_output=True, text=True)
+        mevboost_found = True
+
+        process_output = process_result.stdout
+        result = re.search(r'mev-boost v?(.*?)\n', process_output)
+        if result:
+            mevboost_version = result.group(1).strip()
+        
+        process_result = subprocess.run([
+            'whereis', 'mev-boost'
+            ], capture_output=True, text=True)
+
+        process_output = process_result.stdout
+        result = re.search(r'mev-boost: (.*?)\n', process_output)
+        if result:
+            mevboost_location = result.group(1).strip()
+
+    except FileNotFoundError:
+        pass
+    
+    install_mevboost_binary = True
+
+    if mevboost_found:
+        result = button_dialog(
+            title='MEV-Boost binary found',
+            text=(
+f'''
+The MEV-Boost binary seems to have already been installed. Here are some
+details found:
+
+Version: {mevboost_version}
+Location: {mevboost_location}
+
+Do you want to skip installing the MEV-Boost binary?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        install_mevboost_binary = (result == 2)
+
+    if install_mevboost_binary:
+        # Getting latest mev-boost release files
+        mevboost_gh_release_url = GITHUB_REST_API_URL + MEVBOOST_LATEST_RELEASE
+        headers = {'Accept': GITHUB_API_VERSION}
+        try:
+            response = httpx.get(mevboost_gh_release_url, headers=headers,
+                follow_redirects=True)
+        except httpx.RequestError as exception:
+            log.error(f'Exception while downloading MEV-Boost binary. {exception}')
+            return False
+
+        if response.status_code != 200:
+            log.error(f'HTTP error while downloading MEV-Boost binary. '
+                f'Status code {response.status_code}')
+            return False
+        
+        release_json = response.json()
+
+        if 'assets' not in release_json:
+            log.error('No assets in Github release for MEV-Boost.')
+            return False
+        
+        binary_asset = None
+        checksums_asset = None
+
+        archive_filename_comp = 'linux_amd64.tar.gz'
+        checksums_filename = 'checksums.txt'
+
+        for asset in release_json['assets']:
+            if 'name' not in asset:
+                continue
+            if 'browser_download_url' not in asset:
+                continue
+        
+            file_name = asset['name']
+            file_url = asset['browser_download_url']
+
+            if file_name.endswith(archive_filename_comp):
+                binary_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+            elif file_name == checksums_filename:
+                checksums_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+
+        if binary_asset is None or checksums_asset is None:
+            log.error('Could not find binary or checksums asset in Github release.')
+            return False
+        else:
+            archive_filename = binary_asset['file_name']
+            log.info(f'Found {archive_filename} asset in Github release.')
+        
+        # Downloading latest MEV-Boost release files
+        download_path = Path(Path.home(), 'ethwizard', 'downloads')
+        download_path.mkdir(parents=True, exist_ok=True)
+
+        binary_path = Path(download_path, binary_asset['file_name'])
+        binary_hash = hashlib.sha256()
+
+        try:
+            with open(binary_path, 'wb') as binary_file:
+                with httpx.stream('GET', binary_asset['file_url'],
+                    follow_redirects=True) as http_stream:
+                    if http_stream.status_code != 200:
+                        log.error(f'HTTP error while downloading MEV-Boost binary from Github. '
+                            f'Status code {http_stream.status_code}')
+                        return False
+
+                    archive_filename = binary_asset['file_name']
+                    archive_url = http_stream.url
+                    log.info(f'Downloading {archive_filename} from {archive_url} ...')
+
+                    for data in http_stream.iter_bytes():
+                        binary_file.write(data)
+                        binary_hash.update(data)
+        except httpx.RequestError as exception:
+            log.error(f'Exception while downloading MEV-Boost binary from Github. {exception}')
+            return False
+        
+        checksums_path = Path(download_path, checksums_asset['file_name'])
+
+        try:
+            with open(checksums_path, 'wb') as checksums_file:
+                with httpx.stream('GET', checksums_asset['file_url'],
+                    follow_redirects=True) as http_stream:
+                    if http_stream.status_code != 200:
+                        log.error(f'HTTP error while downloading MEV-Boost checksums from Github. '
+                            f'Status code {http_stream.status_code}')
+                        return False
+                    
+                    archive_filename = checksums_asset['file_name']
+                    archive_url = http_stream.url
+                    log.info(f'Downloading {archive_filename} from {archive_url} ...')
+
+                    for data in http_stream.iter_bytes():
+                        checksums_file.write(data)
+        except httpx.RequestError as exception:
+            log.error(f'Exception while downloading MEV-Boost checksums from Github. {exception}')
+            return False
+
+        # Verify checksum
+
+        hash_found = False
+        with open(checksums_path, 'r') as checksums_file:
+            for line in checksums_file:
+                result = re.search(r'(?P<hash>[a-fA-F0-9]+)\s+' +
+                    re.escape(binary_asset['file_name']), process_output)
+                if result:
+                    hash_found = True
+                    checksum = result.group('hash').lower()
+
+                    binary_hexdigest = binary_hash.hexdigest().lower()
+
+                    if checksum != binary_hexdigest:
+                        # SHA256 checksum failed
+                        log.error(f'SHA256 checksum failed on MEV-Boost binary from '
+                            f'Github. Expected {checksum} but we got {binary_hexdigest}. We will '
+                            f'stop here to protect you.')
+                        return False
+                    
+                    log.info('Good SHA256 checksum for MEV-Boost binary.')
+
+                    break
+        
+        if not hash_found:
+            archive_filename = binary_asset['file_name']
+            log.error(f'We could not find the SHA256 checksum for MEV-Boost binary '
+                f'({archive_filename}) in the {checksums_filename} file. We will stop here to '
+                f'protect you.')
+            return False
+        
+        # Extracting the MEV-Boost binary archive
+        subprocess.run([
+            'tar', 'xvf', binary_path, '--directory', MEVBOOST_INSTALLED_DIRECTORY])
+        
+        # Remove download leftovers
+        binary_path.unlink()
+        checksums_path.unlink()
+
+        # Get MEV-Boost version
+        try:
+            process_result = subprocess.run([
+            'mev-boost', '--version'
+            ], capture_output=True, text=True)
+            mevboost_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'mev-boost v?(.*?)\n', process_output)
+            if result:
+                mevboost_version = result.group(1).strip()
+        except FileNotFoundError:
+            pass
+
+    mevboost_user_exists = False
+    process_result = subprocess.run([
+        'id', '-u', 'mevboost'
+    ])
+    mevboost_user_exists = (process_result.returncode == 0)
+
+    # Setup MEV-Boost user
+    if not mevboost_user_exists:
+        subprocess.run([
+            'useradd', '--no-create-home', '--shell', '/bin/false', 'mevboost'])
+
+    addparams = []
+    
+    # Setup MEV-Boost systemd service
+    addparams.append('-min-bid 0.05')
+    
+    addparams_string = ''
+    if len(addparams) > 0:
+        addparams_string = ' \\\n    ' + ' \\\n    '.join(addparams)
+
+    with open('/etc/systemd/system/' + mevboost_service_name, 'w') as service_file:
+        service_file.write(MEVBOOST_SERVICE_DEFINITION[network].format(addparams=addparams_string))
+    subprocess.run([
+        'systemctl', 'daemon-reload'])
+    subprocess.run([
+        'systemctl', 'start', mevboost_service_name])
+    subprocess.run([
+        'systemctl', 'enable', mevboost_service_name])
+    
+    # Wait a little before checking for MEV-Boost
+    delay = 6
+    log.info(f'We are giving MEV-Boost {delay} seconds to start before testing it.')
+    time.sleep(delay)
+
+    # Verify proper MEV-Boost service installation
+    service_details = get_systemd_service_details(mevboost_service_name)
+
+    if not (
+        service_details['LoadState'] == 'loaded' and
+        service_details['ActiveState'] == 'active' and
+        service_details['SubState'] == 'running'
+    ):
+
+        result = button_dialog(
+            title='MEV-Boost service not running properly',
+            text=(
+f'''
+The MEV-Boost service we just created seems to have issues. Here are some
+details found:
+
+Description: {service_details['Description']}
+States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+UnitFilePreset: {service_details['UnitFilePreset']}
+ExecStart: {service_details['ExecStart']}
+ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
+FragmentPath: {service_details['FragmentPath']}
+
+We cannot proceed if the MEV-Boost service cannot be started properly.
+Make sure to check the logs and fix any issue found there. You can see
+the logs with:
+
+$ sudo journalctl -ru {mevboost_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your MEV-Boost service logs, type the following command:
+
+$ sudo journalctl -ru {mevboost_service_name}
+'''
+        )
+
+        return False
+    
+    log.info(
+f'''
+MEV-Boost is installed and working properly.
+''' )
+    time.sleep(5)
+
+    installed_value['installed'] = True
+    return installed_value
 
 def install_geth(network, ports):
     # Install geth for the selected network
@@ -2816,8 +3223,10 @@ Do you want to skip installing the staking-deposit-cli binary?
                         # SHA256 checksum failed
                         log.error(f'SHA256 checksum failed on staking-deposit-cli binary from '
                             f'Github. Expected {checksum} but we got {binary_hexdigest}. We will '
-                            f'stop here to protect you')
+                            f'stop here to protect you.')
                         return False
+                    
+                    log.info('Good SHA256 checksum for staking-deposit-cli binary.')
             
             # Extracting the staking-deposit-cli binary archive
             eth2_deposit_cli_path.mkdir(parents=True, exist_ok=True)

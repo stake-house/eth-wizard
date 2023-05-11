@@ -3,6 +3,7 @@ GITHUB_API_VERSION = 'application/vnd.github.v3+json'
 
 GETH_LATEST_RELEASE = '/repos/ethereum/go-ethereum/releases/latest'
 LIGHTHOUSE_LATEST_RELEASE = '/repos/sigp/lighthouse/releases/latest'
+MEVBOOST_LATEST_RELEASE = '/repos/flashbots/mev-boost/releases/latest'
 LIGHTHOUSE_PRIME_PGP_KEY_ID = '15E66D941F697E28F49381F426416DC3F30674B0'
 TEKU_LATEST_RELEASE = '/repos/ConsenSys/teku/releases/latest'
 PROMETHEUS_LATEST_RELEASE = '/repos/prometheus/prometheus/releases/latest'
@@ -69,6 +70,7 @@ CTX_AVAILABLE_RAM_TESTED = 'available_ram_tested'
 CTX_INTERNET_SPEED_TESTED = 'internet_speed_tested'
 CTX_SELECTED_NETWORK = 'selected_network'
 CTX_SELECTED_PORTS = 'selected_ports'
+CTX_MEVBOOST_INSTALLED = 'mevboost_installed'
 CTX_SELECTED_ETH1_FALLBACKS = 'selected_eth1_fallbacks'
 CTX_SELECTED_CONSENSUS_CHECKPOINT_URL = 'selected_consensus_checkpoint_url'
 CTX_OBTAINED_KEYS = 'obtained_keys'
@@ -90,6 +92,7 @@ SELECT_CUSTOM_PORTS_STEP_ID = 'select_custom_ports_step'
 CREATE_FIREWALL_RULE_STEP_ID = 'create_firewall_rule_step'
 INSTALL_CHOCOLATEY_STEP_ID = 'install_chocolatey_step'
 INSTALL_NSSM_STEP_ID = 'install_nssm_step'
+INSTALL_MEVBOOST_STEP_ID = 'install_mevboost_step'
 INSTALL_GETH_STEP_ID = 'install_geth_step'
 DETECT_MERGE_READY_STEP_ID = 'detect_merge_ready_step'
 INSTALL_TEKU_STEP_ID = 'install_teku_step'
@@ -217,6 +220,9 @@ GETH_ARGUMENTS = {
 }
 
 GETH_SYSTEMD_SERVICE_NAME = 'geth.service'
+
+MEVBOOST_SYSTEMD_SERVICE_NAME = 'mevboost.service'
+MEVBOOST_INSTALLED_DIRECTORY = '/usr/local/bin'
 
 LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME = 'lighthousebeacon.service'
 LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME = 'lighthousevalidator.service'
@@ -41611,6 +41617,49 @@ r'''
 }
 '''
 )
+
+MEVBOOST_SERVICE_DEFINITION = {
+    NETWORK_MAINNET: (
+'''
+[Unit]
+Description=mev-boost (Mainnet)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=mevboost
+Group=mevboost
+Restart=always
+RestartSec=5
+ExecStart=mev-boost \\
+    -mainnet \\
+    -relay-check{addparams}
+
+[Install]
+WantedBy=multi-user.target
+'''),
+    NETWORK_GOERLI: (
+'''
+[Unit]
+Description=mev-boost (Goerli)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=mevboost
+Group=mevboost
+Restart=always
+RestartSec=5
+ExecStart=mev-boost \\
+    -goerli \\
+    -relay-check{addparams}
+
+[Install]
+WantedBy=multi-user.target
+''')
+}
 
 
 GETH_SERVICE_DEFINITION = {
