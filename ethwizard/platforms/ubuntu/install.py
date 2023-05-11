@@ -821,8 +821,19 @@ def test_internet_speed():
     # Run speedtest script
     log.info('Running speedtest to test internet speed...')
 
+    ethwizardnopriv_user_exists = False
     process_result = subprocess.run([
-        'python3', script_path, '--secure', '--json'
+        'id', '-u', 'ethwizardnopriv'
+    ])
+    ethwizardnopriv_user_exists = (process_result.returncode == 0)
+
+    # Setup MEV-Boost user
+    if not mevboost_user_exists:
+        subprocess.run([
+            'useradd', '--no-create-home', '--shell', '/bin/false', 'ethwizardnopriv'])
+
+    process_result = subprocess.run([
+        'sudo', '-u', 'ethwizardnopriv', '-g', 'ethwizardnopriv', 'python3', script_path, '--secure', '--json'
         ], capture_output=True, text=True)
 
     # Remove download leftovers
