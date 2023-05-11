@@ -827,8 +827,8 @@ def test_internet_speed():
     ])
     ethwizardnopriv_user_exists = (process_result.returncode == 0)
 
-    # Setup MEV-Boost user
-    if not mevboost_user_exists:
+    # Setup ethwizardnopriv user
+    if not ethwizardnopriv_user_exists:
         subprocess.run([
             'useradd', '--no-create-home', '--shell', '/bin/false', 'ethwizardnopriv'])
 
