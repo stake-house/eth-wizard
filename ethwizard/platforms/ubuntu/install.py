@@ -1308,6 +1308,9 @@ We recommend you set that min-bid value to 0.05 ETH. This seems like a
 good compromise between getting those high MEV rewards and delegating all
 block building production and the centralization that comes with it.
 
+You can learn more on about this on
+https://writings.flashbots.net/the-cost-of-resilience/ .
+
 What minimum bid value do you want to use with MEV-Boost?
 '''     ),
         buttons=[
