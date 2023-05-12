@@ -224,6 +224,29 @@ GETH_SYSTEMD_SERVICE_NAME = 'geth.service'
 MEVBOOST_SYSTEMD_SERVICE_NAME = 'mevboost.service'
 MEVBOOST_INSTALLED_DIRECTORY = '/usr/local/bin'
 
+ETHSTAKER_RELAY_LIST_URL = 'https://raw.githubusercontent.com/eth-educators/ethstaker-guides/main/MEV-relay-list.md'
+
+RELAY_BUNDLES = {
+  NETWORK_MAINNET: {
+    'Uncensored': [
+      'https://0xa7ab7a996c8584251c8f925da3170bdfd6ebc75d50f5ddc4050a6fdc77f2a3b5fce2cc750d0865e05d7228af97d69561@agnostic-relay.net',
+      'https://0xa1559ace749633b997cb3fdacffb890aeebdb0f5a3b6aaa7eeeaf1a38af0a8fe88b9e4b1f61f236d2e64d95733327a62@relay.ultrasound.money'
+    ],
+    'OFAC': [
+      'https://0xac6e77dfe25ecd6110b8e780608cce0dab71fdd5ebea22a16c0205200f2f8e2e3ad3b71d3499c54ad14d6c21b41a37ae@boost-relay.flashbots.net',
+      'https://0x9000009807ed12c1f08bf4e81c6da3ba8e3fc3d953898ce0102433094e5f22f21102ec057841fcb81978ed1ea0fa8246@builder-relay-mainnet.blocknative.com',
+      'https://0xb0b07cd0abef743db4260b0ed50619cf6ad4d82064cb4fbec9d3ec530f7c5e6793d9f286c4e082c0244ffb9f2658fe88@bloxroute.regulated.blxrbdn.com'
+    ]
+  },
+  NETWORK_GOERLI: {
+    'Some': [
+      'https://0xafa4c6985aa049fb79dd37010438cfebeb0f2bd42b115b89dd678dab0670c1de38da0c4e9138c9290a398ecd9a0b3110@builder-relay-goerli.flashbots.net',
+      'https://0x821f2a65afb70e7f2e820a925a9b4c80a159620582c1766b1b09729fec178b11ea22abb3a51f07b288be815a1a2ff516@bloxroute.max-profit.builder.goerli.blxrbdn.com',
+      'https://0xb1559beef7b5ba3127485bbbb090362d9f497ba64e177ee2c8e7db74746306efad687f2cf8574e38d70067d40ef136dc@relay-stag.ultrasound.money'
+    ]
+  }
+}
+
 LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME = 'lighthousebeacon.service'
 LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME = 'lighthousevalidator.service'
 LIGHTHOUSE_INSTALLED_DIRECTORY = '/usr/local/bin'

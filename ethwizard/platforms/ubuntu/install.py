@@ -1372,6 +1372,76 @@ MEV-Boost.
         min_bid_value = f'{min_bid:.6f}'.rstrip('0').rstrip('.')
         addparams.append(f'-min-bid {min_bid_value}')
 
+    # Obtain relays list from EthStaker
+
+    try:
+        response = httpx.get(ETHSTAKER_RELAY_LIST_URL, follow_redirects=True)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while obtaining EthStaker MEV relay list from '
+            f'{ETHSTAKER_RELAY_LIST_URL}. {exception}')
+        return False
+
+    if response.status_code != 200:
+        log.error(f'HTTP error while obtaining EthStaker MEV relay list from '
+            f'{ETHSTAKER_RELAY_LIST_URL}. Status code {response.status_code}')
+        return False
+    
+    raw_list_content = response.text
+
+    relay_list = []
+    current_network = NETWORK_MAINNET
+    found_first = False
+
+    relay_url_to_item = {}
+    relay_name_to_item = {}
+
+    for line in raw_list_content.splitlines():
+        result = re.search(r'\|\s*\[(?P<name>[^\]]+)\].+\|\s*\`(?P<url>http?s\://0x[^\`]+)\`\s*\|\s*', line)
+        if result:
+            found_first = True
+
+            relay_name = result.group('name').strip()
+            relay_url = result.group('url').strip()
+
+            if current_network == network:
+                item = {
+                    'name': relay_name,
+                    'url': relay_url
+                }
+                relay_list.append(item)
+                relay_url_to_item[relay_url] = item
+                relay_name_to_item[relay_name] = item
+        
+        if found_first and line.strip() == '':
+            found_first = False
+            if current_network == NETWORK_MAINNET:
+                current_network = NETWORK_GOERLI
+            else:
+                current_network = 'unknown'
+    
+    if len(relay_list) == 0:
+        log.error(f'Could not find any relay in EthStaker MEV relay list from '
+            f'{ETHSTAKER_RELAY_LIST_URL}.')
+        return False
+    
+    relay_bundles = RELAY_BUNDLES[network]
+
+    bundles_description = {}
+
+    for key in relay_bundles.keys():
+        description = 'unknown'
+        names = []
+
+        for url in relay_bundles[key]:
+            if url in relay_url_to_item:
+                item = relay_url_to_item[url]
+                names.append(item['name'])
+        
+        if len(names) > 0:
+            description = ', '.join(names)
+        
+        bundles_description[key] = description
+
     # TODO: Select MEV relays
 
     mevboost_user_exists = False
