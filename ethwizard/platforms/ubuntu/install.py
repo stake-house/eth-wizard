@@ -1290,6 +1290,87 @@ Do you want to skip installing the MEV-Boost binary?
         except FileNotFoundError:
             pass
 
+    addparams = []
+
+    # Select a min-bid value
+
+    min_bid = 0
+
+    result = button_dialog(
+        title='MEV-Boost min-bid',
+        text=(
+'''
+You can set a minimum bid value. If no bid from the builder network
+delivers at least this value, MEV-Boost will not return a bid to the
+beacon node, making it fall back to local block production.
+
+We recommend you set that min-bid value to 0.05 ETH. This seems like a
+good compromise between getting those high MEV rewards and delegating all
+block building production and the centralization that comes with it.
+
+What minimum bid value do you want to use with MEV-Boost?
+'''     ),
+        buttons=[
+            ('0.05', 1),
+            ('Custom', 2),
+            ('None', 3),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+    
+    if result == 1:
+        min_bid = 0.05
+    
+    if result == 2:
+
+        # Custom min-bid
+
+        valid_number = False
+        entered_number = None
+        input_canceled = False
+
+        while not valid_number:
+            not_valid_msg = ''
+            if entered_number is not None:
+                not_valid_msg = (
+'''
+
+<style bg="red" fg="black">Your last input was <b>not a valid float number</b>. Please make sure to enter
+a valid float number.</style>'''
+                )
+
+            entered_number = input_dialog(
+                title='Custom MEV-Boost min-bid',
+                text=(HTML(
+f'''
+Please enter an ETH amount to be used as your minimum bid value with
+MEV-Boost.
+
+* Press the tab key to switch between the controls below{not_valid_msg}
+'''             ))).run()
+
+            if not entered_number:
+                input_canceled = True
+                break
+
+            try:
+                min_bid = float(entered_number)
+                valid_number = True
+            except ValueError:
+                pass
+
+        if input_canceled:
+            return False
+
+    if min_bid > 0:
+        min_bid_value = f'{min_bid:.6f}'.rstrip('0').rstrip('.')
+        addparams.append(f'-min-bid {min_bid_value}')
+
+    # TODO: Select MEV relays
+
     mevboost_user_exists = False
     process_result = subprocess.run([
         'id', '-u', 'mevboost'
@@ -1297,15 +1378,13 @@ Do you want to skip installing the MEV-Boost binary?
     mevboost_user_exists = (process_result.returncode == 0)
 
     # Setup MEV-Boost user
+
     if not mevboost_user_exists:
         subprocess.run([
             'useradd', '--no-create-home', '--shell', '/bin/false', 'mevboost'])
-
-    addparams = []
     
     # Setup MEV-Boost systemd service
-    addparams.append('-min-bid 0.05')
-    
+
     addparams_string = ''
     if len(addparams) > 0:
         addparams_string = ' \\\n    ' + ' \\\n    '.join(addparams)
