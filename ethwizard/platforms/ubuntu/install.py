@@ -552,9 +552,9 @@ def installation_steps():
     return [
         select_network_step,
         test_system_step,
+        install_mevboost_step,
         select_custom_ports_step,
         detect_merge_ready_step,
-        install_mevboost_step,
         select_consensus_checkpoint_url_step,
         select_eth1_fallbacks_step,
         install_lighthouse_step,
