@@ -44,7 +44,12 @@ from ethwizard.platforms.ubuntu.common import (
 )
 
 from prompt_toolkit.formatted_text import HTML
-from prompt_toolkit.shortcuts import button_dialog, radiolist_dialog, input_dialog
+from prompt_toolkit.shortcuts import (
+    button_dialog,
+    radiolist_dialog,
+    input_dialog,
+    checkboxlist_dialog
+)
 
 def installation_steps():
 
@@ -1487,9 +1492,27 @@ Which relays do you want to use?
         for relay in relay_bundles[result]:
             addparams.append(f'-relay {relay}')
     elif result == 1:
-        # TODO: Custom relay selection
+        # Custom relay selection
 
-        pass
+        values = [(key, key) for key in relay_name_to_item.keys()]
+
+        result = checkboxlist_dialog(
+            title='MEV-Boost relays selection',
+            text=(
+'''
+Here are the relays from https://ethstaker.cc/mev-relay-list . You should
+consider only selecting relays which you trust. You need to select at
+least 1 relay.
+
+* Press the tab key to switch between the controls below
+'''
+            ),
+            values=values,
+            ok_text='Use these relays',
+            cancel_text='Quit'
+        ).run()
+
+        breakpoint()
 
     mevboost_user_exists = False
     process_result = subprocess.run([
