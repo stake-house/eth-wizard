@@ -1516,7 +1516,7 @@ least 1 relay.
                 cancel_text='Quit'
             ).run()
 
-            if not result:
+            if result is None:
                 return result
             
             selected_relays = result
