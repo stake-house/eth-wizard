@@ -1496,23 +1496,34 @@ Which relays do you want to use?
 
         values = [(key, key) for key in relay_name_to_item.keys()]
 
-        result = checkboxlist_dialog(
-            title='MEV-Boost relays selection',
-            text=(
-'''
+        selected_relays = []
+
+        while len(selected_relays) < 1:
+
+            result = checkboxlist_dialog(
+                title='MEV-Boost relays selection',
+                text=(
+f'''
 Here are the relays from https://ethstaker.cc/mev-relay-list . You should
 consider only selecting relays which you trust. You need to select at
-least 1 relay.
+least 1 relay.{err_message}
 
 * Press the tab key to switch between the controls below
 '''
-            ),
-            values=values,
-            ok_text='Use these relays',
-            cancel_text='Quit'
-        ).run()
+                ),
+                values=values,
+                ok_text='Use these',
+                cancel_text='Quit'
+            ).run()
 
-        breakpoint()
+            if not result:
+                return result
+            
+            selected_relays = result
+        
+        for key in selected_relays:
+            relay = relay_name_to_item[key]['url']
+            addparams.append(f'-relay {relay}')
 
     mevboost_user_exists = False
     process_result = subprocess.run([
