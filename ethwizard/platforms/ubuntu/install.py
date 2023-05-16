@@ -1442,7 +1442,48 @@ MEV-Boost.
         
         bundles_description[key] = description
 
-    # TODO: Select MEV relays
+    # Select MEV relays
+
+    bundles_text = '\n'.join(
+        f'{key}: {description}' for (key, description) in bundles_description.items())
+    
+    buttons = [(key, key) for key in bundles_description.keys()]
+
+    buttons.extend([
+        ('Custom', 1),
+        ('Quit', False)
+    ])
+
+    result = button_dialog(
+        title='MEV-Boost relays',
+        text=(
+f'''
+When running MEV-Boost, you need to trust a set of relays to provide bids
+and blocks to include when your validator is selected as the block
+proposer.
+
+Selecting your relays can be an important decision for some stakers. You
+should do your own diligence when selecting which relay you want to use.
+There is a good list on https://ethstaker.cc/mev-relay-list .
+
+We are suggesting these bundles if you don't know which one to choose:
+{bundles_text}
+
+Which relays do you want to use?
+'''     ),
+        buttons=buttons
+    ).run()
+
+    if not result:
+        return result
+    
+    if result in relay_bundles:
+        for relay in relay_bundles[result]:
+            addparams.append(f'-relay {relay}')
+    elif result == 1:
+        # TODO: Custom relay selection
+
+        pass
 
     mevboost_user_exists = False
     process_result = subprocess.run([
