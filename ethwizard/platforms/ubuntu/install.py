@@ -1503,10 +1503,10 @@ Which relays do you want to use?
             result = checkboxlist_dialog(
                 title='MEV-Boost relays selection',
                 text=(
-f'''
+'''
 Here are the relays from https://ethstaker.cc/mev-relay-list . You should
 consider only selecting relays which you trust. You need to select at
-least 1 relay.{err_message}
+least 1 relay.
 
 * Press the tab key to switch between the controls below
 '''
