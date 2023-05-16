@@ -717,8 +717,8 @@ Headers: {headers}
 JSON payload: {json.dumps(request_json)}
 Response: {json.dumps(response_json)}
 
-Make sure you enter your endpoint correctly and that it's a working eth1
-endpoint.
+Make sure you enter your endpoint correctly and that it's a working
+execution endpoint.
 '''         ),
                 buttons=[
                     ('Retry', False)
