@@ -324,18 +324,21 @@ def installation_steps():
         selected_eth1_fallbacks = CTX_SELECTED_ETH1_FALLBACKS
         selected_consensus_checkpoint_url = CTX_SELECTED_CONSENSUS_CHECKPOINT_URL
         selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
+        mevboost_installed = CTX_MEVBOOST_INSTALLED
 
         if not (
             test_context_variable(context, selected_network, log) and
             test_context_variable(context, selected_ports, log) and
             test_context_variable(context, selected_eth1_fallbacks, log) and
-            test_context_variable(context, selected_consensus_checkpoint_url, log)
+            test_context_variable(context, selected_consensus_checkpoint_url, log) and
+            test_context_variable(context, mevboost_installed, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
         
         if not install_lighthouse(context[selected_network], context[selected_eth1_fallbacks],
-            context[selected_consensus_checkpoint_url], context[selected_ports]):
+            context[selected_consensus_checkpoint_url], context[selected_ports],
+            context[mevboost_installed]):
             # User asked to quit or error
             quit_app()
         
@@ -440,18 +443,21 @@ def installation_steps():
         obtained_keys = CTX_OBTAINED_KEYS       
         selected_fee_recipient_address = CTX_SELECTED_FEE_RECIPIENT_ADDRESS
         public_keys = CTX_PUBLIC_KEYS
+        mevboost_installed = CTX_MEVBOOST_INSTALLED
 
         if not (
             test_context_variable(context, selected_network, log) and
             test_context_variable(context, obtained_keys, log) and
-            test_context_variable(context, selected_fee_recipient_address, log)
+            test_context_variable(context, selected_fee_recipient_address, log) and
+            test_context_variable(context, mevboost_installed, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
         
         
         context[public_keys] = install_lighthouse_validator(context[selected_network],
-            context[obtained_keys], context[selected_fee_recipient_address])
+            context[obtained_keys], context[selected_fee_recipient_address],
+            context[mevboost_installed])
 
         if type(context[public_keys]) is not list and not context[public_keys]:
             # User asked to quit
@@ -2234,7 +2240,8 @@ def detect_merge_ready(network):
 
     return {'result': is_merge_ready}
 
-def install_lighthouse(network, eth1_fallbacks, consensus_checkpoint_url, ports):
+def install_lighthouse(network, eth1_fallbacks, consensus_checkpoint_url, ports,
+    mevboost_installed):
     # Install Lighthouse for the selected network
 
     # Check for existing systemd service
@@ -2637,6 +2644,9 @@ Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
     
     if consensus_checkpoint_url != '':
         addparams.append(f'--checkpoint-sync-url "{consensus_checkpoint_url}"')
+
+    if mevboost_installed:
+        addparams.append(f'--builder http://127.0.0.1:18550')
 
     addparams_string = ''
     if len(addparams) > 0:
@@ -3477,7 +3487,7 @@ Do you want to skip installing the staking-deposit-cli binary?
 
     return actual_keys
 
-def install_lighthouse_validator(network, keys, fee_recipient_address):
+def install_lighthouse_validator(network, keys, fee_recipient_address, mevboost_installed):
     # Import keystore(s) and configure the Lighthouse validator client
     # Returns a list of public keys when done
 
@@ -3704,6 +3714,9 @@ We found {len(public_keys)} key(s) imported into the lighthouse validator client
     if merge_ready:
         addparams.append(f'--suggested-fee-recipient {fee_recipient_address}')
     
+    if mevboost_installed:
+        addparams.append(f'--builder-proposals')
+
     addparams_string = ''
     if len(addparams) > 0:
         addparams_string = ' ' + ' '.join(addparams)
