@@ -271,10 +271,10 @@ def show_dashboard(context):
 
         mevboost_details['next_step'] = MAINTENANCE_DO_NOTHING
 
-        installed_version = execution_client_details['versions']['installed']
+        installed_version = mevboost_details['versions']['installed']
         if installed_version != UNKNOWN_VALUE:
             installed_version = parse_version(installed_version)
-        latest_version = execution_client_details['versions']['latest']
+        latest_version = mevboost_details['versions']['latest']
         if latest_version != UNKNOWN_VALUE:
             latest_version = parse_version(latest_version)
         
