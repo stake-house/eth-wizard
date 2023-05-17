@@ -14,7 +14,8 @@ from pathlib import Path
 from ethwizard.platforms.common import (
     select_fee_recipient_address,
     get_geth_running_version,
-    get_geth_latest_version
+    get_geth_latest_version,
+    get_mevboost_latest_version
 )
 
 from ethwizard.platforms.ubuntu.common import (
@@ -32,6 +33,7 @@ from ethwizard.constants import (
     CTX_SELECTED_EXECUTION_CLIENT,
     CTX_SELECTED_CONSENSUS_CLIENT,
     CTX_SELECTED_NETWORK,
+    CTX_MEVBOOST_INSTALLED,
     NETWORK_GOERLI,
     EXECUTION_CLIENT_GETH,
     CONSENSUS_CLIENT_LIGHTHOUSE,
@@ -39,6 +41,7 @@ from ethwizard.constants import (
     UNKNOWN_VALUE,
     GITHUB_REST_API_URL,
     GITHUB_API_VERSION,
+    MEVBOOST_SYSTEMD_SERVICE_NAME,
     GETH_SYSTEMD_SERVICE_NAME,
     MIN_CLIENT_VERSION_FOR_MERGE,
     LINUX_JWT_TOKEN_FILE_PATH,
@@ -84,10 +87,12 @@ def show_dashboard(context):
     selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
     selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
     selected_network = CTX_SELECTED_NETWORK
+    mevboost_installed = CTX_MEVBOOST_INSTALLED
 
     current_execution_client = context[selected_execution_client]
     current_consensus_client = context[selected_consensus_client]
     current_network = context[selected_network]
+    current_mevboost_installed = context[mevboost_installed]
 
     # Get execution client details
 
@@ -248,6 +253,32 @@ def show_dashboard(context):
         not consensus_client_details['vc_service']['found']):
         consensus_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
 
+    # Get MEV-Boost details
+
+    if current_mevboost_installed:
+
+        mevboost_details = get_mevboost_details()
+        if not mevboost_details:
+            log.error('Unable to get MEV-Boost details.')
+            return False
+
+        # TODO: Find out if we need to do maintenance for MEV-Boost
+
+        mevboost_details['next_step'] = MAINTENANCE_DO_NOTHING
+
+        '''installed_version = execution_client_details['versions']['installed']
+        if installed_version != UNKNOWN_VALUE:
+            installed_version = parse_version(installed_version)
+        running_version = execution_client_details['versions']['running']
+        if running_version != UNKNOWN_VALUE:
+            running_version = parse_version(running_version)
+        available_version = execution_client_details['versions']['available']
+        if available_version != UNKNOWN_VALUE:
+            available_version = parse_version(available_version)
+        latest_version = execution_client_details['versions']['latest']
+        if latest_version != UNKNOWN_VALUE:
+            latest_version = parse_version(latest_version)'''
+
     # We only need to do maintenance if either the execution or the consensus client needs
     # maintenance.
 
@@ -371,6 +402,77 @@ def parse_exec_start(exec_start_struct):
         'path': path,
         'argv': argv
     }
+
+def get_mevboost_details():
+
+    details = {
+        'service': {
+            'found': False,
+            'load': UNKNOWN_VALUE,
+            'active': UNKNOWN_VALUE,
+            'sub': UNKNOWN_VALUE,
+            'running': UNKNOWN_VALUE
+        },
+        'versions': {
+            'installed': UNKNOWN_VALUE,
+            'latest': UNKNOWN_VALUE
+        },
+        'exec': {
+            'path': UNKNOWN_VALUE,
+            'argv': []
+        }
+    }
+
+    # Check for existing systemd service
+    mevboost_service_exists = False
+    mevboost_service_name = MEVBOOST_SYSTEMD_SERVICE_NAME
+
+    service_details = get_systemd_service_details(mevboost_service_name)
+
+    if service_details['LoadState'] == 'loaded':
+        mevboost_service_exists = True
+    
+    if not mevboost_service_exists:
+        return details
+    
+    details['service']['found'] = True
+    details['service']['load'] = service_details['LoadState']
+    details['service']['active'] = service_details['ActiveState']
+    details['service']['sub'] = service_details['SubState']
+    details['service']['running'] = is_service_running(service_details)
+
+    details['versions']['installed'] = get_mevboost_installed_version()
+    details['versions']['latest'] = get_mevboost_latest_version(log)
+
+    if 'ExecStart' in service_details:
+        details['exec'] = parse_exec_start(service_details['ExecStart'])
+
+    return details
+
+def get_mevboost_installed_version():
+    # Get the installed version for MEV-Boost
+
+    log.info('Getting MEV-Boost installed version...')
+
+    process_result = subprocess.run(['mev-boost', '--version'], capture_output=True,
+        text=True)
+    
+    if process_result.returncode != 0:
+        log.error(f'Unexpected return code from mev-boost. Return code: '
+            f'{process_result.returncode}')
+        return UNKNOWN_VALUE
+    
+    process_output = process_result.stdout
+    result = re.search(r'mev-boost v?(?P<version>.*?)\n', process_output)
+    if not result:
+        log.error(f'Cannot parse {process_output} for MEV-Boost installed version.')
+        return UNKNOWN_VALUE
+    
+    installed_version = result.group('version')
+
+    log.info(f'MEV-Boost installed version is {installed_version}')
+
+    return installed_version
 
 def get_execution_client_details(execution_client):
     # Get the details for the current execution client
@@ -1154,6 +1256,7 @@ def use_default_client(context):
     selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
     selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
     selected_network = CTX_SELECTED_NETWORK
+    mevboost_installed = CTX_MEVBOOST_INSTALLED
 
     updated_context = False
 
@@ -1163,6 +1266,10 @@ def use_default_client(context):
     
     if selected_consensus_client not in context:
         context[selected_consensus_client] = CONSENSUS_CLIENT_LIGHTHOUSE
+        updated_context = True
+    
+    if mevboost_installed not in context:
+        context[mevboost_installed] = False
         updated_context = True
     
     if selected_network in context and context[selected_consensus_client] == 'prater':
