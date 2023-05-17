@@ -255,6 +255,8 @@ def show_dashboard(context):
 
     # Get MEV-Boost details
 
+    mevboost_details = None
+
     if current_mevboost_installed:
 
         mevboost_details = get_mevboost_details()
@@ -262,29 +264,40 @@ def show_dashboard(context):
             log.error('Unable to get MEV-Boost details.')
             return False
 
-        # TODO: Find out if we need to do maintenance for MEV-Boost
+        # Find out if we need to do maintenance for MEV-Boost
 
         mevboost_details['next_step'] = MAINTENANCE_DO_NOTHING
 
-        '''installed_version = execution_client_details['versions']['installed']
+        installed_version = execution_client_details['versions']['installed']
         if installed_version != UNKNOWN_VALUE:
             installed_version = parse_version(installed_version)
-        running_version = execution_client_details['versions']['running']
-        if running_version != UNKNOWN_VALUE:
-            running_version = parse_version(running_version)
-        available_version = execution_client_details['versions']['available']
-        if available_version != UNKNOWN_VALUE:
-            available_version = parse_version(available_version)
         latest_version = execution_client_details['versions']['latest']
         if latest_version != UNKNOWN_VALUE:
-            latest_version = parse_version(latest_version)'''
+            latest_version = parse_version(latest_version)
+        
+        # If the service is not running, we need to start it
 
-    # We only need to do maintenance if either the execution or the consensus client needs
-    # maintenance.
+        if not mevboost_details['service']['running']:
+            mevboost_details['next_step'] = MAINTENANCE_START_SERVICE
+
+        # If the installed version is older than the available one, we need to upgrade the client
+
+        if is_version(installed_version) and is_version(latest_version):
+            if installed_version < latest_version:
+                mevboost_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
+
+        # If the service is not installed or found, we need to reinstall the client
+
+        if not mevboost_details['service']['found']:
+            mevboost_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
+
+    # We only need to do maintenance if one of clients or MEV-Boost needs maintenance.
 
     maintenance_needed = (
         execution_client_details['next_step'] != MAINTENANCE_DO_NOTHING or
-        consensus_client_details['next_step'] != MAINTENANCE_DO_NOTHING)
+        consensus_client_details['next_step'] != MAINTENANCE_DO_NOTHING or
+        (mevboost_details is not None and mevboost_details['next_step'] != MAINTENANCE_DO_NOTHING)
+        )
 
     # Build the dashboard with the details we have
 
@@ -327,6 +340,14 @@ def show_dashboard(context):
         f'Running services - Beacon node: {consensus_client_details["bn_service"]["running"]}, Validator client: {consensus_client_details["vc_service"]["running"]}\n'
         f'<b>Maintenance task</b>: {maintenance_tasks_description.get(consensus_client_details["next_step"], UNKNOWN_VALUE)}')
 
+    mb_section = ''
+
+    if current_mevboost_installed:
+        mb_section = (f'\n\n<b>MEV-Boost</b> details (I: {mevboost_details["versions"]["installed"]}, '
+            f'L: {mevboost_details["versions"]["latest"]})\n'
+            f'Service is running: {mevboost_details["service"]["running"]}\n'
+            f'<b>Maintenance task</b>: {maintenance_tasks_description.get(mevboost_details["next_step"], UNKNOWN_VALUE)}')
+
     result = button_dialog(
         title='Maintenance Dashboard',
         text=(HTML(
@@ -335,7 +356,7 @@ Here are some details about your Ethereum clients.
 
 {ec_section}
 
-{cc_section}
+{cc_section}{mb_section}
 
 {maintenance_message}
 
