@@ -23,7 +23,7 @@ from ethwizard.utils.CompactFIPS202 import Keccak_256
 from asyncio import get_event_loop
 
 from prompt_toolkit.formatted_text import HTML
-from prompt_toolkit.shortcuts import radiolist_dialog, button_dialog, input_dialog
+from prompt_toolkit.shortcuts import radiolist_dialog, button_dialog, input_dialog, checkboxlist_dialog
 from prompt_toolkit.shortcuts.dialogs import _return_none, _create_app
 
 from typing import Optional, Callable, List
@@ -1608,3 +1608,237 @@ def get_mevboost_latest_version(log):
     log.info(f'MEV-Boost latest version is {latest_version}')
 
     return latest_version
+
+def select_mev_min_bid(log):
+    # Select an MEV min-bid value
+
+    min_bid = 0
+
+    result = button_dialog(
+        title='MEV-Boost min-bid',
+        text=(
+'''
+You can set a minimum bid value. If no bid from the builder network
+delivers at least this value, MEV-Boost will not return a bid to the
+beacon node, making it fall back to local block production.
+
+We recommend you set that min-bid value to 0.05 ETH. This seems like a
+good compromise between getting those high MEV rewards and delegating all
+block building production and the centralization that comes with it.
+
+You can learn more on about this on
+https://writings.flashbots.net/the-cost-of-resilience/ .
+
+What minimum bid value do you want to use with MEV-Boost?
+'''     ),
+        buttons=[
+            ('0.05', 1),
+            ('Custom', 2),
+            ('None', 3),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+    
+    if result == 1:
+        min_bid = 0.05
+    
+    if result == 2:
+
+        # Custom min-bid
+
+        valid_number = False
+        entered_number = None
+        input_canceled = False
+
+        while not valid_number:
+            not_valid_msg = ''
+            if entered_number is not None:
+                not_valid_msg = (
+'''
+
+<style bg="red" fg="black">Your last input was <b>not a valid float number</b>. Please make sure to enter
+a valid float number.</style>'''
+                )
+
+            entered_number = input_dialog(
+                title='Custom MEV-Boost min-bid',
+                text=(HTML(
+f'''
+Please enter an ETH amount to be used as your minimum bid value with
+MEV-Boost.
+
+* Press the tab key to switch between the controls below{not_valid_msg}
+'''             ))).run()
+
+            if not entered_number:
+                input_canceled = True
+                break
+
+            try:
+                min_bid = float(entered_number)
+                valid_number = True
+            except ValueError:
+                pass
+
+        if input_canceled:
+            return False
+    
+    log.info(f'MEV-Boost min-bid value {min_bid} ETH selected.')
+
+    return min_bid
+
+def select_mev_relays(network, log):
+    # Select MEV relays
+
+    return_list = []
+
+    # Obtain relays list from EthStaker
+
+    try:
+        response = httpx.get(ETHSTAKER_RELAY_LIST_URL, follow_redirects=True)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while obtaining EthStaker MEV relay list from '
+            f'{ETHSTAKER_RELAY_LIST_URL}. {exception}')
+        return False
+
+    if response.status_code != 200:
+        log.error(f'HTTP error while obtaining EthStaker MEV relay list from '
+            f'{ETHSTAKER_RELAY_LIST_URL}. Status code {response.status_code}')
+        return False
+    
+    raw_list_content = response.text
+
+    relay_list = []
+    current_network = NETWORK_MAINNET
+    found_first = False
+
+    relay_url_to_item = {}
+    relay_name_to_item = {}
+
+    for line in raw_list_content.splitlines():
+        result = re.search(r'\|\s*\[(?P<name>[^\]]+)\].+\|\s*\`(?P<url>http?s\://0x[^\`]+)\`\s*\|\s*', line)
+        if result:
+            found_first = True
+
+            relay_name = result.group('name').strip()
+            relay_url = result.group('url').strip()
+
+            if current_network == network:
+                item = {
+                    'name': relay_name,
+                    'url': relay_url
+                }
+                relay_list.append(item)
+                relay_url_to_item[relay_url] = item
+                relay_name_to_item[relay_name] = item
+        
+        if found_first and line.strip() == '':
+            found_first = False
+            if current_network == NETWORK_MAINNET:
+                current_network = NETWORK_GOERLI
+            else:
+                current_network = 'unknown'
+    
+    if len(relay_list) == 0:
+        log.error(f'Could not find any relay in EthStaker MEV relay list from '
+            f'{ETHSTAKER_RELAY_LIST_URL}.')
+        return False
+    
+    relay_bundles = RELAY_BUNDLES[network]
+
+    bundles_description = {}
+
+    for key in relay_bundles.keys():
+        description = 'unknown'
+        names = []
+
+        for url in relay_bundles[key]:
+            if url in relay_url_to_item:
+                item = relay_url_to_item[url]
+                names.append(item['name'])
+        
+        if len(names) > 0:
+            description = ', '.join(names)
+        
+        bundles_description[key] = description
+
+    # Select MEV relays
+
+    bundles_text = '\n'.join(
+        f'{key}: {description}' for (key, description) in bundles_description.items())
+    
+    buttons = [(key, key) for key in bundles_description.keys()]
+
+    buttons.extend([
+        ('Custom', 1),
+        ('Quit', False)
+    ])
+
+    result = button_dialog(
+        title='MEV-Boost relays',
+        text=(
+f'''
+When running MEV-Boost, you need to trust a set of relays to provide bids
+and blocks to include when your validator is selected as the block
+proposer.
+
+Selecting your relays can be an important decision for some stakers. You
+should do your own diligence when selecting which relay you want to use.
+There is a good list on https://ethstaker.cc/mev-relay-list .
+
+We are suggesting these bundles if you don't know which one to choose:
+{bundles_text}
+
+Which relays do you want to use?
+'''     ),
+        buttons=buttons
+    ).run()
+
+    if not result:
+        return result
+    
+    if result in relay_bundles:
+        for relay in relay_bundles[result]:
+            return_list.append(relay)
+    elif result == 1:
+        # Custom relay selection
+
+        values = [(key, key) for key in relay_name_to_item.keys()]
+
+        selected_relays = []
+
+        while len(selected_relays) < 1:
+
+            result = checkboxlist_dialog(
+                title='MEV-Boost relays selection',
+                text=(
+'''
+Here are the relays from https://ethstaker.cc/mev-relay-list . You should
+consider only selecting relays which you trust. You need to select at
+least 1 relay.
+
+* Press the tab key to switch between the controls below
+'''
+                ),
+                values=values,
+                ok_text='Use these',
+                cancel_text='Quit'
+            ).run()
+
+            if result is None:
+                return result
+            
+            selected_relays = result
+        
+        for key in selected_relays:
+            relay = relay_name_to_item[key]['url']
+            return_list.append(relay)
+    
+    log.info(f'MEV-Boost {len(return_list)} relays selected.')
+    for relay in return_list:
+        log.info(f'Selected relay: {relay}')
+
+    return return_list
