@@ -26,6 +26,7 @@ from ethwizard.platforms.common import (
     search_for_generated_keys,
     select_keys_directory,
     select_fee_recipient_address,
+    select_withdrawal_address,
     get_bc_validator_deposits,
     test_open_ports,
     show_whats_next,
@@ -3499,11 +3500,20 @@ Do you want to skip installing the staking-deposit-cli binary?
         # Clean potential leftover keys
         if validator_keys_path.is_dir():
             shutil.rmtree(validator_keys_path)
+
+        command = [eth2_deposit_cli_binary, 'new-mnemonic', '--chain', network]
+
+        # Ask for withdrawal address
+        withdrawal_address = select_withdrawal_address(log)
+        if withdrawal_address is None:
+            return False
         
+        if withdrawal_address != '':
+            command.extend(['--execution_address', withdrawal_address])
+
         # Launch staking-deposit-cli
-        subprocess.run([
-            eth2_deposit_cli_binary, 'new-mnemonic', '--chain', network],
-            cwd=eth2_deposit_cli_path)
+        log.info('Generating keys with staking-deposit-cli binary...')
+        subprocess.run(command, cwd=eth2_deposit_cli_path)
 
         # Clean up staking-deposit-cli binary
         eth2_deposit_cli_binary.unlink()
