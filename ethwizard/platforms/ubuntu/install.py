@@ -1400,7 +1400,7 @@ $ sudo journalctl -ru {mevboost_service_name}
     
     log.info(
 f'''
-MEV-Boost is installed and working properly.
+MEV-Boost version {mevboost_version} is installed and working properly.
 ''' )
     time.sleep(5)
 

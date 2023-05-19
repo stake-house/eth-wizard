@@ -224,6 +224,16 @@ GETH_SYSTEMD_SERVICE_NAME = 'geth.service'
 MEVBOOST_SYSTEMD_SERVICE_NAME = 'mevboost.service'
 MEVBOOST_INSTALLED_DIRECTORY = '/usr/local/bin'
 
+MEVBOOST_ARGUMENTS = {
+    NETWORK_MAINNET: ['-mainnet', '-relay-check'],
+    NETWORK_GOERLI: ['--goerli', '-relay-check']
+}
+
+MEVBOOST_SERVICE_DISPLAY_NAME = {
+    NETWORK_MAINNET: 'MEV-Boost (Mainnet)',
+    NETWORK_GOERLI: 'MEV-Boost (Goerli)'
+}
+
 ETHSTAKER_RELAY_LIST_URL = 'https://raw.githubusercontent.com/eth-educators/ethstaker-guides/main/MEV-relay-list.md'
 
 RELAY_BUNDLES = {
@@ -41645,7 +41655,7 @@ MEVBOOST_SERVICE_DEFINITION = {
     NETWORK_MAINNET: (
 '''
 [Unit]
-Description=mev-boost (Mainnet)
+Description=MEV-Boost (Mainnet)
 Wants=network-online.target
 After=network-online.target
 
@@ -41665,7 +41675,7 @@ WantedBy=multi-user.target
     NETWORK_GOERLI: (
 '''
 [Unit]
-Description=mev-boost (Goerli)
+Description=MEV-Boost (Goerli)
 Wants=network-online.target
 After=network-online.target
 
