@@ -584,7 +584,7 @@ def get_teku_installed_version(base_directory):
             teku_found = True
 
             process_output = process_result.stdout
-            result = re.search(r'teku/(?P<version>[^/]+)', process_output)
+            result = re.search(r'teku/v?(?P<version>[^/]+)', process_output)
             if result:
                 teku_version = result.group('version').strip()
             else:
