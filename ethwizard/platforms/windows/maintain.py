@@ -64,6 +64,7 @@ from ethwizard.constants import (
     BN_VERSION_EP,
     GITHUB_REST_API_URL,
     GITHUB_API_VERSION,
+    MEVBOOST_LATEST_RELEASE,
     TEKU_LATEST_RELEASE,
     GETH_STORE_BUILDS_PARAMS,
     GETH_STORE_BUILDS_URL,
@@ -977,11 +978,195 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
         log.error(f'Unknown consensus client {consensus_client}.')
         return False
 
+    if mevboost_details is not None:
+
+        mevboost_service_name = 'mevboost'
+
+        if mevboost_details['next_step'] == MAINTENANCE_RESTART_SERVICE:
+            log.info('Restarting MEV-Boost service...')
+
+            subprocess.run([str(nssm_binary), 'restart', mevboost_service_name])
+
+        elif mevboost_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT:
+            if not upgrade_mevboost(base_directory, nssm_binary):
+                log.error('We could not upgrade MEV-Boost.')
+                return False
+
+        elif mevboost_details['next_step'] == MAINTENANCE_START_SERVICE:
+            log.info('Starting MEV-Boost service...')
+
+            subprocess.run([str(nssm_binary), 'start', mevboost_service_name])
+
+        elif mevboost_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
+            log.warning('TODO: Reinstalling MEV-Boost is to be implemented.')
+
     if updated_context:
         if not save_state(WIZARD_COMPLETED_STEP_ID, context):
             return False
 
     return context
+
+def upgrade_mevboost(base_directory, nssm_binary):
+    # Upgrade MEV-Boost
+    log.info('Upgrading MEV-Boost...')
+
+    # Getting latest mev-boost release files
+    mevboost_gh_release_url = GITHUB_REST_API_URL + MEVBOOST_LATEST_RELEASE
+    headers = {'Accept': GITHUB_API_VERSION}
+    try:
+        response = httpx.get(mevboost_gh_release_url, headers=headers,
+            follow_redirects=True)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading MEV-Boost binary. {exception}')
+        return False
+
+    if response.status_code != 200:
+        log.error(f'HTTP error while downloading MEV-Boost binary. '
+            f'Status code {response.status_code}')
+        return False
+    
+    release_json = response.json()
+
+    if 'assets' not in release_json:
+        log.error('No assets in Github release for MEV-Boost.')
+        return False
+    
+    binary_asset = None
+    checksums_asset = None
+
+    archive_filename_comp = 'windows_amd64.tar.gz'
+    checksums_filename = 'checksums.txt'
+
+    for asset in release_json['assets']:
+        if 'name' not in asset:
+            continue
+        if 'browser_download_url' not in asset:
+            continue
+    
+        file_name = asset['name']
+        file_url = asset['browser_download_url']
+
+        if file_name.endswith(archive_filename_comp):
+            binary_asset = {
+                'file_name': file_name,
+                'file_url': file_url
+            }
+        elif file_name == checksums_filename:
+            checksums_asset = {
+                'file_name': file_name,
+                'file_url': file_url
+            }
+
+    if binary_asset is None or checksums_asset is None:
+        log.error('Could not find binary or checksums asset in Github release.')
+        return False
+    else:
+        archive_filename = binary_asset['file_name']
+        log.info(f'Found {archive_filename} asset in Github release.')
+    
+    # Downloading latest MEV-Boost release files
+    download_path = base_directory.joinpath('downloads')
+    download_path.mkdir(parents=True, exist_ok=True)
+
+    binary_path = download_path.joinpath(binary_asset['file_name'])
+    if binary_path.is_file():
+        binary_path.unlink()
+
+    binary_hash = hashlib.sha256()
+
+    try:
+        with open(binary_path, 'wb') as binary_file:
+            with httpx.stream('GET', binary_asset['file_url'],
+                follow_redirects=True) as http_stream:
+                if http_stream.status_code != 200:
+                    log.error(f'HTTP error while downloading MEV-Boost binary from Github. '
+                        f'Status code {http_stream.status_code}')
+                    return False
+
+                archive_filename = binary_asset['file_name']
+                archive_url = binary_asset['file_url']
+                log.info(f'Downloading {archive_filename} from {archive_url} ...')
+
+                for data in http_stream.iter_bytes():
+                    binary_file.write(data)
+                    binary_hash.update(data)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading MEV-Boost binary from Github. {exception}')
+        return False
+    
+    checksums_path = download_path.joinpath(checksums_asset['file_name'])
+    if checksums_path.is_file():
+        checksums_path.unlink()
+
+    try:
+        with open(checksums_path, 'wb') as checksums_file:
+            with httpx.stream('GET', checksums_asset['file_url'],
+                follow_redirects=True) as http_stream:
+                if http_stream.status_code != 200:
+                    log.error(f'HTTP error while downloading MEV-Boost checksums from Github. '
+                        f'Status code {http_stream.status_code}')
+                    return False
+                
+                archive_filename = checksums_asset['file_name']
+                archive_url = checksums_asset['file_url']
+                log.info(f'Downloading {archive_filename} from {archive_url} ...')
+
+                for data in http_stream.iter_bytes():
+                    checksums_file.write(data)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading MEV-Boost checksums from Github. {exception}')
+        return False
+
+    # Verify checksum
+
+    hash_found = False
+    with open(checksums_path, 'r') as checksums_file:
+        for line in checksums_file:
+            result = re.search(r'(?P<hash>[a-fA-F0-9]+)\s+' +
+                re.escape(binary_asset['file_name']), line)
+            if result:
+                hash_found = True
+                checksum = result.group('hash').lower()
+
+                binary_hexdigest = binary_hash.hexdigest().lower()
+
+                if checksum != binary_hexdigest:
+                    # SHA256 checksum failed
+                    log.error(f'SHA256 checksum failed on MEV-Boost binary from '
+                        f'Github. Expected {checksum} but we got {binary_hexdigest}. We will '
+                        f'stop here to protect you.')
+                    return False
+                
+                log.info('Good SHA256 checksum for MEV-Boost binary.')
+
+                break
+    
+    if not hash_found:
+        archive_filename = binary_asset['file_name']
+        log.error(f'We could not find the SHA256 checksum for MEV-Boost binary '
+            f'({archive_filename}) in the {checksums_filename} file. We will stop here to '
+            f'protect you.')
+        return False
+    
+    # Extracting the MEV-Boost binary archive
+    bin_path = base_directory.joinpath('bin')
+    bin_path.mkdir(parents=True, exist_ok=True)
+
+    mevboost_service_name = 'mevboost'
+
+    log.info('Stoping MEV-Boost service...')
+    subprocess.run([str(nssm_binary), 'stop', mevboost_service_name])
+
+    subprocess.run(['tar', 'xvf', str(binary_path), '--directory', str(bin_path)])
+    
+    # Remove download leftovers
+    binary_path.unlink()
+    checksums_path.unlink()
+
+    log.info('Starting MEV-Boost service...')
+    subprocess.run([str(nssm_binary), 'start', mevboost_service_name])
+
+    return True
 
 def upgrade_geth(base_directory, nssm_binary):
     # Upgrade the Geth client
