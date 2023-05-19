@@ -2776,7 +2776,7 @@ Unable to create JWT token file in {jwt_token_path}
 
     if mevboost_installed:
         teku_arguments.append('--validators-builder-registration-default-enabled=true')
-        teku_arguments.append('--builder-endpoint=http://127.0.0.1:18550')
+        teku_arguments.append('--builder-endpoint="http://127.0.0.1:18550"')
 
     parameters = {
         'DisplayName': TEKU_SERVICE_DISPLAY_NAME[network],
