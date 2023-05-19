@@ -984,7 +984,7 @@ automatically start MEV-Boost on reboot or if it crashes.
             mevboost_found = True
 
             process_output = process_result.stdout
-            result = re.search(r'mev-boost v?(.*?)\n', process_output)
+            result = re.search(r'mev-boost v?(\S+)', process_output)
             if result:
                 mevboost_version = result.group(1).strip()
 
@@ -1175,7 +1175,7 @@ Do you want to skip installing the MEV-Boost binary?
             mevboost_found = True
 
             process_output = process_result.stdout
-            result = re.search(r'mev-boost v?(.*?)\n', process_output)
+            result = re.search(r'mev-boost v?(\S+)', process_output)
             if result:
                 mevboost_version = result.group(1).strip()
         except FileNotFoundError:

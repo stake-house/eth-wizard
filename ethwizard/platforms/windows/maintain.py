@@ -25,7 +25,8 @@ from prompt_toolkit.shortcuts import button_dialog
 from ethwizard.platforms.common import (
     select_fee_recipient_address,
     get_geth_running_version,
-    get_geth_latest_version
+    get_geth_latest_version,
+    get_mevboost_latest_version
 )
 
 from ethwizard.platforms.windows.common import (
@@ -44,6 +45,7 @@ from ethwizard.constants import (
     CTX_SELECTED_EXECUTION_CLIENT,
     CTX_SELECTED_CONSENSUS_CLIENT,
     CTX_SELECTED_NETWORK,
+    CTX_MEVBOOST_INSTALLED,
     CTX_SELECTED_DIRECTORY,
     EXECUTION_CLIENT_GETH,
     CONSENSUS_CLIENT_TEKU,
@@ -98,6 +100,7 @@ def show_dashboard(context):
     selected_directory = CTX_SELECTED_DIRECTORY
     execution_improved_service_timeout = CTX_EXECUTION_IMPROVED_SERVICE_TIMEOUT
     consensus_improved_service_timeout = CTX_CONSENSUS_IMPROVED_SERVICE_TIMEOUT
+    mevboost_installed = CTX_MEVBOOST_INSTALLED
 
     current_execution_client = context[selected_execution_client]
     current_consensus_client = context[selected_consensus_client]
@@ -105,6 +108,7 @@ def show_dashboard(context):
     current_directory = context[selected_directory]
     current_execution_improved_service_timeout = context[execution_improved_service_timeout]
     current_consensus_improved_service_timeout = context[consensus_improved_service_timeout]
+    current_mevboost_installed = context[mevboost_installed]
 
     # Get execution client details
 
@@ -264,12 +268,51 @@ def show_dashboard(context):
         not consensus_client_details['vc_service']['found']):
         consensus_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
 
-    # We only need to do maintenance if either the execution or the consensus client needs
-    # maintenance.
+    # Get MEV-Boost details
+
+    mevboost_details = None
+
+    if current_mevboost_installed:
+
+        mevboost_details = get_mevboost_details(current_directory)
+        if not mevboost_details:
+            log.error('Unable to get MEV-Boost details.')
+            return False
+
+        # Find out if we need to do maintenance for MEV-Boost
+
+        mevboost_details['next_step'] = MAINTENANCE_DO_NOTHING
+
+        installed_version = mevboost_details['versions']['installed']
+        if installed_version != UNKNOWN_VALUE:
+            installed_version = parse_version(installed_version)
+        latest_version = mevboost_details['versions']['latest']
+        if latest_version != UNKNOWN_VALUE:
+            latest_version = parse_version(latest_version)
+        
+        # If the service is not running, we need to start it
+
+        if not mevboost_details['service']['running']:
+            mevboost_details['next_step'] = MAINTENANCE_START_SERVICE
+
+        # If the installed version is older than the available one, we need to upgrade the client
+
+        if is_version(installed_version) and is_version(latest_version):
+            if installed_version < latest_version:
+                mevboost_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
+
+        # If the service is not installed or found, we need to reinstall the client
+
+        if not mevboost_details['service']['found']:
+            mevboost_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
+
+    # We only need to do maintenance if one of clients or MEV-Boost needs maintenance.
 
     maintenance_needed = (
         execution_client_details['next_step'] != MAINTENANCE_DO_NOTHING or
-        consensus_client_details['next_step'] != MAINTENANCE_DO_NOTHING)
+        consensus_client_details['next_step'] != MAINTENANCE_DO_NOTHING or
+        (mevboost_details is not None and mevboost_details['next_step'] != MAINTENANCE_DO_NOTHING)
+        )
 
     # Build the dashboard with the details we have
 
@@ -315,6 +358,14 @@ def show_dashboard(context):
         f'{cc_services}'
         f'<b>Maintenance task</b>: {maintenance_tasks_description.get(consensus_client_details["next_step"], UNKNOWN_VALUE)}')
 
+    mb_section = ''
+
+    if current_mevboost_installed:
+        mb_section = (f'\n\n<b>MEV-Boost</b> details (I: {mevboost_details["versions"]["installed"]}, '
+            f'L: {mevboost_details["versions"]["latest"]})\n'
+            f'Service is running: {mevboost_details["service"]["running"]}\n'
+            f'<b>Maintenance task</b>: {maintenance_tasks_description.get(mevboost_details["next_step"], UNKNOWN_VALUE)}')
+
     result = button_dialog(
         title='Maintenance Dashboard',
         text=(HTML(
@@ -323,7 +374,7 @@ Here are some details about your Ethereum clients.
 
 {ec_section}
 
-{cc_section}
+{cc_section}{mb_section}
 
 {maintenance_message}
 
@@ -337,7 +388,8 @@ Versions legend - I: Installed, R: Running, L: Latest
     
     if result == 1:
         maintenance_result = perform_maintenance(current_directory, current_execution_client,
-            execution_client_details, current_consensus_client, consensus_client_details, context)
+            execution_client_details, current_consensus_client, consensus_client_details,
+            mevboost_details, context)
         if maintenance_result:
             return show_dashboard(context)
         else:
@@ -351,6 +403,86 @@ def is_version(value):
 def is_service_running(service_details):
     # Return true if this Windows service is running
     return service_details['status'] == WINDOWS_SERVICE_RUNNING
+
+def get_mevboost_details(base_directory):
+    # Get the details for MEV-Boost
+
+    base_directory = Path(base_directory)
+
+    nssm_binary = get_nssm_binary()
+    if not nssm_binary:
+        return False
+
+    details = {
+        'service': {
+            'found': False,
+            'status': UNKNOWN_VALUE,
+            'binary': UNKNOWN_VALUE,
+            'parameters': UNKNOWN_VALUE,
+            'running': UNKNOWN_VALUE
+        },
+        'versions': {
+            'installed': UNKNOWN_VALUE,
+            'latest': UNKNOWN_VALUE
+        },
+        'exec': {
+            'path': UNKNOWN_VALUE,
+            'argv': []
+        },
+    }
+    
+    # Check for existing service
+    mevboost_service_exists = False
+    mevboost_service_name = 'mevboost'
+
+    service_details = get_service_details(nssm_binary, mevboost_service_name)
+
+    if service_details is not None:
+        mevboost_service_exists = True
+    
+    if not mevboost_service_exists:
+        return details
+
+    details['service']['found'] = True
+    details['service']['status'] = service_details['status']
+    details['service']['binary'] = service_details['install']
+    details['service']['parameters'] = service_details['parameters']['AppParameters']
+    details['service']['running'] = is_service_running(service_details)
+
+    details['versions']['installed'] = get_mevboost_installed_version(base_directory)
+    details['versions']['latest'] = get_mevboost_latest_version(log)
+
+    details['exec']['path'] = service_details['install']
+    details['exec']['argv'] = shlex.split(service_details['parameters']['AppParameters'], posix=False)
+
+    return details
+
+def get_mevboost_installed_version(base_directory):
+    # Get the installed version for MEV-Boost
+
+    log.info('Getting MEV-Boost installed version...')
+
+    mevboost_path = base_directory.joinpath('bin', 'mev-boost.exe')
+
+    process_result = subprocess.run([mevboost_path, '--version'], capture_output=True,
+        text=True)
+    
+    if process_result.returncode != 0:
+        log.error(f'Unexpected return code from MEV-Boost. Return code: '
+            f'{process_result.returncode}')
+        return UNKNOWN_VALUE
+    
+    process_output = process_result.stdout
+    result = re.search(r'mev-boost v?(?P<version>\S+)', process_output)
+    if not result:
+        log.error(f'Cannot parse {process_output} for MEV-Boost installed version.')
+        return UNKNOWN_VALUE
+    
+    installed_version = result.group('version')
+
+    log.info(f'MEV-Boost installed version is {installed_version}')
+
+    return installed_version
 
 def get_execution_client_details(base_directory, execution_client):
     # Get the details for the current execution client
@@ -685,6 +817,7 @@ def use_default_values(context):
     selected_network = CTX_SELECTED_NETWORK
     execution_improved_service_timeout = CTX_EXECUTION_IMPROVED_SERVICE_TIMEOUT
     consensus_improved_service_timeout = CTX_CONSENSUS_IMPROVED_SERVICE_TIMEOUT
+    mevboost_installed = CTX_MEVBOOST_INSTALLED
 
     updated_context = False
 
@@ -694,6 +827,10 @@ def use_default_values(context):
     
     if selected_consensus_client not in context:
         context[selected_consensus_client] = CONSENSUS_CLIENT_TEKU
+        updated_context = True
+    
+    if mevboost_installed not in context:
+        context[mevboost_installed] = False
         updated_context = True
     
     if selected_network in context and context[selected_consensus_client] == 'prater':
@@ -715,7 +852,7 @@ def use_default_values(context):
     return context
 
 def perform_maintenance(base_directory, execution_client, execution_client_details,
-    consensus_client, consensus_client_details, context):
+    consensus_client, consensus_client_details, mevboost_details, context):
     # Perform all the maintenance tasks
 
     base_directory = Path(base_directory)
