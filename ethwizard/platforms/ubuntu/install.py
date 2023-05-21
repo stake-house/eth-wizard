@@ -3554,7 +3554,7 @@ The lighthouse validator client will not be able to start automatically
 if the keystore is imported with a password. Please try again.
 '''             ),
                 buttons=[
-                    ('Retry', 1)
+                    ('Retry', 1),
                     ('Quit', False)
                 ]
             ).run()
