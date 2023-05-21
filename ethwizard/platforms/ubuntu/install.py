@@ -4189,7 +4189,7 @@ Note that it can take a few minutes before beaconcha.in sees your
 deposit(s).
 '''     ),
             buttons=[
-                ('I\'m done', True),
+                ('I\'m done', 2),
                 ('Skip', 1),
                 ('Quit', False)
             ]
@@ -4232,7 +4232,7 @@ Note that it can take a few minutes before beaconcha.in sees your
 deposit(s).
 '''     ),
             buttons=[
-                ('I\'m done', True),
+                ('I\'m done', 2),
                 ('Skip', 1),
                 ('Quit', False)
             ]

@@ -4278,7 +4278,7 @@ Note that it can take a few minutes before beaconcha.in sees your
 deposit(s).
 '''     ),
             buttons=[
-                ('I\'m done', True),
+                ('I\'m done', 2),
                 ('Skip', 1),
                 ('Quit', False)
             ]
@@ -4286,7 +4286,7 @@ deposit(s).
 
         if not result:
             return result
-        
+
         if result == 1:
             skipping_deposit_check = True
             break
@@ -4321,7 +4321,7 @@ Note that it can take a few minutes before beaconcha.in sees your
 deposit(s).
 '''     ),
             buttons=[
-                ('I\'m done', True),
+                ('I\'m done', 2),
                 ('Skip', 1),
                 ('Quit', False)
             ]
