@@ -15,6 +15,8 @@ from pathlib import Path
 
 from packaging.version import parse as parse_version
 
+from yaml import safe_load
+
 from ethwizard.constants import *
 
 from ethwizard.platforms.common import (
@@ -3387,9 +3389,13 @@ client?
         subprocess.run([
             'systemctl', 'stop', lighthouse_vc_service_name])
 
-    result = button_dialog(
-        title='Lighthouse validator client installation',
-        text=(HTML(
+    passwordless_check = True
+
+    while passwordless_check:
+
+        result = button_dialog(
+            title='Lighthouse validator client installation',
+            text=(HTML(
 '''
 This next step will import your keystore(s) to be used with the Lighthouse
 validator client and it will configure the Lighthouse validator client.
@@ -3403,28 +3409,28 @@ Lighthouse validator client on reboot or if it crashes. The validator
 client will be started, it will connect to your beacon node and it will be
 ready to start validating once your validator(s) get activated.
 '''     )),
-        buttons=[
-            ('Configure', True),
-            ('Quit', False)
-        ]
-    ).run()
+            buttons=[
+                ('Configure', True),
+                ('Quit', False)
+            ]
+        ).run()
 
-    if not result:
-        return result
-    
-    # Check if lighthouse validators client user or directory already exists
-    lighthouse_datadir_vc = Path('/var/lib/lighthouse/validators')
-    if lighthouse_datadir_vc.exists() and lighthouse_datadir_vc.is_dir():
-        process_result = subprocess.run([
-            'du', '-sh', lighthouse_datadir_vc
-            ], capture_output=True, text=True)
+        if not result:
+            return result
         
-        process_output = process_result.stdout
-        lighthouse_datadir_vc_size = process_output.split('\t')[0]
+        # Check if lighthouse validators client user or directory already exists
+        lighthouse_datadir_vc = Path('/var/lib/lighthouse/validators')
+        if lighthouse_datadir_vc.exists() and lighthouse_datadir_vc.is_dir():
+            process_result = subprocess.run([
+                'du', '-sh', lighthouse_datadir_vc
+                ], capture_output=True, text=True)
+            
+            process_output = process_result.stdout
+            lighthouse_datadir_vc_size = process_output.split('\t')[0]
 
-        result = button_dialog(
-            title='Lighthouse validator client data directory found',
-            text=(
+            result = button_dialog(
+                title='Lighthouse validator client data directory found',
+                text=(
 f'''
 An existing lighthouse validator client data directory has been found. Here
 are some details found:
@@ -3435,76 +3441,128 @@ Size: {lighthouse_datadir_vc_size}
 Do you want to remove this directory first and start from nothing? Removing
 this directory will also remove any key imported previously.
 '''         ),
-            buttons=[
-                ('Remove', 1),
-                ('Keep', 2),
-                ('Quit', False)
-            ]
-        ).run()
+                buttons=[
+                    ('Remove', 1),
+                    ('Keep', 2),
+                    ('Quit', False)
+                ]
+            ).run()
 
-        if not result:
-            return result
-        
-        if result == 1:
-            shutil.rmtree(lighthouse_datadir_vc)
+            if not result:
+                return result
+            
+            if result == 1:
+                shutil.rmtree(lighthouse_datadir_vc)
 
-    lighthouse_vc_user_exists = False
-    process_result = subprocess.run([
-        'id', '-u', 'lighthousevalidator'
-    ])
-    lighthouse_vc_user_exists = (process_result.returncode == 0)
+        lighthouse_vc_user_exists = False
+        process_result = subprocess.run([
+            'id', '-u', 'lighthousevalidator'
+        ])
+        lighthouse_vc_user_exists = (process_result.returncode == 0)
 
-    # Setup Lighthouse validator client user and directory
-    if not lighthouse_vc_user_exists:
+        # Setup Lighthouse validator client user and directory
+        if not lighthouse_vc_user_exists:
+            subprocess.run([
+                'useradd', '--no-create-home', '--shell', '/bin/false', 'lighthousevalidator'])
         subprocess.run([
-            'useradd', '--no-create-home', '--shell', '/bin/false', 'lighthousevalidator'])
-    subprocess.run([
-        'mkdir', '-p', lighthouse_datadir_vc])
-    subprocess.run([
-        'chown', '-R', 'lighthousevalidator:lighthousevalidator', lighthouse_datadir_vc])
-    subprocess.run([
-        'chmod', '700', lighthouse_datadir_vc])
-    
-    # Import keystore(s) if we have some
-    if len(keys['keystore_paths']) > 0:
+            'mkdir', '-p', lighthouse_datadir_vc])
         subprocess.run([
-            LIGHTHOUSE_INSTALLED_PATH, '--network', network, 'account', 'validator', 'import',
-            '--directory', keys['validator_keys_path'], '--datadir', lighthouse_datadir])
-    else:
-        log.warning('No keystore files found to import. We\'ll guess they were already imported '
-            'for now.')
-        time.sleep(5)
-
-    # Check for correct keystore(s) import
-    public_keys = []
-
-    process_result = subprocess.run([
-        LIGHTHOUSE_INSTALLED_PATH, '--network', network, 'account', 'validator', 'list',
-        '--datadir', lighthouse_datadir
-        ], capture_output=True, text=True)
-    if process_result.returncode == 0:
-        process_output = process_result.stdout
-        public_keys = re.findall(r'0x[0-9a-f]{96}', process_output)
-        public_keys = list(map(lambda x: x.strip(), public_keys))
+            'chown', '-R', 'lighthousevalidator:lighthousevalidator', lighthouse_datadir_vc])
+        subprocess.run([
+            'chmod', '700', lighthouse_datadir_vc])
         
-    if len(public_keys) == 0:
-        # We have no key imported
+        # Import keystore(s) if we have some
+        if len(keys['keystore_paths']) > 0:
+            subprocess.run([
+                LIGHTHOUSE_INSTALLED_PATH, '--network', network, 'account', 'validator', 'import',
+                '--directory', keys['validator_keys_path'], '--datadir', lighthouse_datadir])
+        else:
+            log.warning('No keystore files found to import. We\'ll guess they were already imported '
+                'for now.')
+            time.sleep(5)
 
-        result = button_dialog(
-            title='No validator key imported',
-            text=(
+        # Check for correct keystore(s) import
+        public_keys = []
+
+        process_result = subprocess.run([
+            LIGHTHOUSE_INSTALLED_PATH, '--network', network, 'account', 'validator', 'list',
+            '--datadir', lighthouse_datadir
+            ], capture_output=True, text=True)
+        if process_result.returncode == 0:
+            process_output = process_result.stdout
+            public_keys = re.findall(r'0x[0-9a-f]{96}', process_output)
+            public_keys = list(map(lambda x: x.strip(), public_keys))
+            
+        if len(public_keys) == 0:
+            # We have no key imported
+
+            result = button_dialog(
+                title='No validator key imported',
+                text=(
 f'''
 It seems like no validator key has been imported.
 
 We cannot continue here without validator keys imported by the lighthouse
 validator client.
 '''             ),
-            buttons=[
-                ('Quit', False)
-            ]
-        ).run()
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
 
-        return False
+            return False
+
+        # Check for imported keystore without a password
+
+        vc_definitions_path = lighthouse_datadir_vc.joinpath('validator_definitions.yml')
+
+        if not vc_definitions_path.is_file():
+            log.error('No validator_definitions.yml found after importing keystores.')
+            return False
+
+        vc_validators = []
+
+        with open(vc_definitions_path, 'r') as vc_definitions_file:
+            vc_validators = safe_load(vc_definitions_file)
+        
+        passwordless_keystore = []
+
+        for vc_validator in vc_validators:
+            if (
+                'voting_keystore_password' not in vc_validator and
+                'voting_keystore_password_path' not in vc_validator
+            ):
+                passwordless_keystore.append(vc_validator['voting_public_key'])
+        
+        if len(passwordless_keystore) > 0:
+
+            # Remove imported validators
+            shutil.rmtree(lighthouse_datadir_vc)
+
+            plural = ''
+            if len(passwordless_keystore) > 1:
+                plural = 's'
+
+            result = button_dialog(
+                title='Keystore imported without a password',
+                text=(
+f'''
+It seems like {len(passwordless_keystore)} keystore{plural} were imported without a
+password.
+
+The lighthouse validator client will not be able to start automatically
+if the keystore is imported with a password. Please try again.
+'''             ),
+                buttons=[
+                    ('Retry', 1)
+                    ('Quit', False)
+                ]
+            ).run()
+
+            if not result:
+                return False
+        else:
+            passwordless_check = False
 
     # Clean up generated keys
     for keystore_path in keys['keystore_paths']:
