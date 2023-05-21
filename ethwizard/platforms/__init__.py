@@ -91,10 +91,12 @@ def has_su_perm(platform):
                 '$OutputEncoding = [console]::InputEncoding = '
                 '[console]::OutputEncoding = New-Object System.Text.UTF8Encoding;'
             )
+            change_cwd = f'Set-Location -Path "{os.getcwd()}";'
             target_command = (
                 encoding_change +
+                change_cwd +
                 pythonpath_env +
-                sys.executable + ' ' + " ".join(sys.argv)
+                '& "' + sys.executable + '" ' + " ".join(sys.argv)
             )
             encoded_command = base64.b64encode(codecs.encode(target_command, 'utf_16_le'))
             encoded_command = codecs.decode(encoded_command, 'ascii')

@@ -67,7 +67,7 @@ def include_requirements(target_path):
             if entry.name.endswith('.dist-info'):
                 shutil.rmtree(entry.path)
 
-def create_zipapp():
+def create_zipapp(for_windows=False):
     project_path = Path(os.getcwd())
     src_package_path = Path(project_path, 'ethwizard')
 
@@ -95,17 +95,26 @@ def create_zipapp():
     dist_path = Path(project_path, 'dist')
     dist_path.mkdir(parents=True, exist_ok=True)
 
-    bundle_name = f'ethwizard-{version}.pyz'
+    added_part = ''
+    if for_windows:
+        added_part = '-win'
+
+    bundle_name = f'ethwizard-{version}{added_part}.pyz'
     bundle_path = Path(dist_path, bundle_name)
     if bundle_path.is_file():
         bundle_path.unlink()
     
-    subprocess.run([
-        python_binary, '-m', 'zipapp', build_path, '-p', '/usr/bin/env python3',
-        '-c', '-o', bundle_path
-    ])
+    command = [
+        python_binary, '-m', 'zipapp', build_path, '-c', '-o', bundle_path
+    ]
+
+    if not for_windows:
+        command.extend(['-p', '/usr/bin/env python3'])
+
+    subprocess.run(command)
 
     return bundle_path
+
 
 class Bundle(Command):
     ''' Create a bundle for release
@@ -142,7 +151,25 @@ class Bundle(Command):
 
         # gpg --default-key 6EEC4CD326C4BBC79F51F55AE68A0CC47982CB5F --sign --armor --output ethwizard-0.7.2.exe.asc --detach-sig ethwizard-0.7.2.exe
 
-class BundleWin(Command):
+
+class BundleWinZip(Command):
+    ''' Create a Windows zipapp bundle for release
+    '''
+    description = 'create a Windows zipapp bundle for release'
+
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        bundle_path = create_zipapp(for_windows=True)
+
+
+class BundleWinExe(Command):
     ''' Create a Windows bundle for release
     '''
     description = 'create a Windows bundle for release'
@@ -309,6 +336,7 @@ if __name__ == "__main__":
         version=version,
         cmdclass={
             'bundle': Bundle,
-            'bundlewin': BundleWin
+            'bundlewinexe': BundleWinExe,
+            'bundlewinzip': BundleWinZip
         }
     )
