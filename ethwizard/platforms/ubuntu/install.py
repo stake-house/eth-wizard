@@ -3540,18 +3540,19 @@ validator client.
             shutil.rmtree(lighthouse_datadir_vc)
 
             plural = ''
+            verb_plural = 'was'
             if len(passwordless_keystore) > 1:
                 plural = 's'
+                verb_plural = 'were'
 
             result = button_dialog(
                 title='Keystore imported without a password',
                 text=(
 f'''
-It seems like {len(passwordless_keystore)} keystore{plural} were imported without a
-password.
+It seems like {len(passwordless_keystore)} keystore{plural} {verb_plural} imported without a password.
 
 The lighthouse validator client will not be able to start automatically
-if the keystore is imported with a password. Please try again.
+if the keystore is imported without a password. Please try again.
 '''             ),
                 buttons=[
                     ('Retry', 1),
