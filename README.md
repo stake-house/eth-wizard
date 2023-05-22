@@ -35,7 +35,7 @@ wget https://github.com/stake-house/eth-wizard/releases/download/v0.9.7/ethwizar
 
 Please note that some antivirus software might detect the wizard binary as a threat and delete it or prevent its execution.
 
-Download and run [the wizard binary](https://github.com/stake-house/eth-wizard/releases/download/v0.9.7/ethwizard-0.9.7.exe)
+Download and run [the ethwizard-0.9.7.exe binary](https://github.com/stake-house/eth-wizard/releases/download/v0.9.7/ethwizard-0.9.7.exe)
 
 As an alternative, you can download and install [a recent version of Python](https://www.python.org/downloads/), make sure to install py launcher (it should be part of the default options), download [the ethwizard-0.9.7-win.pyz bundle](https://github.com/stake-house/eth-wizard/releases/download/v0.9.7/ethwizard-0.9.7-win.pyz) and double-click on it. This alternative is less likely to trigger your antivirus software.
 
