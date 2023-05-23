@@ -84,6 +84,12 @@ EXECUTION_CLIENT_GETH = 'Geth'
 
 CONSENSUS_CLIENT_LIGHTHOUSE = 'Lighthouse'
 CONSENSUS_CLIENT_TEKU = 'Teku'
+CONSENSUS_CLIENT_NIMBUS = 'Nimbus'
+
+SUPPORTED_LINUX_CONSENSUS_CLIENTS = [
+  CONSENSUS_CLIENT_LIGHTHOUSE,
+  CONSENSUS_CLIENT_NIMBUS
+]
 
 SELECT_DIRECTORY_STEP_ID = 'select_directory_step'
 TEST_SYSTEM_STEP_ID = 'test_system_step'
@@ -110,6 +116,9 @@ INSTALL_CHRONY_STEP_ID = 'install_chrony_step'
 INITIATE_DEPOSIT_STEP_ID = 'initiate_deposit_step'
 SHOW_WHATS_NEXT_STEP_ID = 'show_whats_next_step'
 SHOW_PUBLIC_KEYS_STEP_ID = 'show_public_keys_step'
+SELECT_CONSENSUS_CLIENT_STEP_ID = 'select_consensus_client_step'
+INSTALL_CONSENSUS_STEP_ID = 'install_consensus_step'
+INSTALL_VALIDATOR_STEP_ID = 'install_validator_step'
 
 WIZARD_COMPLETED_STEP_ID = 'wizard_completed'
 

@@ -28,6 +28,7 @@ from ethwizard.platforms.common import (
     select_consensus_checkpoint_provider,
     progress_log_dialog,
     search_for_generated_keys,
+    select_consensus_client,
     select_keys_directory,
     select_fee_recipient_address,
     select_withdrawal_address,
@@ -322,7 +323,7 @@ def installation_steps():
         exc_function=select_consensus_checkpoint_url_function
     )
 
-    def install_lighthouse_function(step, context, step_sequence):
+    def install_consensus_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
         selected_ports = CTX_SELECTED_PORTS
@@ -336,25 +337,32 @@ def installation_steps():
             test_context_variable(context, selected_ports, log) and
             test_context_variable(context, selected_eth1_fallbacks, log) and
             test_context_variable(context, selected_consensus_checkpoint_url, log) and
-            test_context_variable(context, mevboost_installed, log)
+            test_context_variable(context, mevboost_installed, log) and
+            test_context_variable(context, selected_consensus_client, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
         
-        if not install_lighthouse(context[selected_network], context[selected_eth1_fallbacks],
-            context[selected_consensus_checkpoint_url], context[selected_ports],
-            context[mevboost_installed]):
-            # User asked to quit or error
-            quit_app()
-        
-        context[selected_consensus_client] = CONSENSUS_CLIENT_LIGHTHOUSE
+        consensus_client = context[selected_consensus_client]
+
+        if consensus_client == CONSENSUS_CLIENT_LIGHTHOUSE:
+
+            if not install_lighthouse(context[selected_network], context[selected_eth1_fallbacks],
+                context[selected_consensus_checkpoint_url], context[selected_ports],
+                context[mevboost_installed]):
+                # User asked to quit or error
+                quit_app()
+
+        elif consensus_client == CONSENSUS_CLIENT_NIMBUS:
+            # TODO: Install Nimbus
+            pass
 
         return context
     
-    install_lighthouse_step = Step(
-        step_id=INSTALL_LIGHTHOUSE_STEP_ID,
-        display_name='Lighthouse installation',
-        exc_function=install_lighthouse_function
+    install_consensus_step = Step(
+        step_id=INSTALL_CONSENSUS_STEP_ID,
+        display_name='Consensus client installation',
+        exc_function=install_consensus_function
     )
 
     def test_open_ports_function(step, context, step_sequence):
@@ -442,27 +450,36 @@ def installation_steps():
         exc_function=select_fee_recipient_address_function
     )
 
-    def install_lighthouse_validator_function(step, context, step_sequence):
+    def install_validator_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
         obtained_keys = CTX_OBTAINED_KEYS       
         selected_fee_recipient_address = CTX_SELECTED_FEE_RECIPIENT_ADDRESS
         public_keys = CTX_PUBLIC_KEYS
         mevboost_installed = CTX_MEVBOOST_INSTALLED
+        selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
 
         if not (
             test_context_variable(context, selected_network, log) and
             test_context_variable(context, obtained_keys, log) and
             test_context_variable(context, selected_fee_recipient_address, log) and
-            test_context_variable(context, mevboost_installed, log)
+            test_context_variable(context, mevboost_installed, log) and
+            test_context_variable(context, selected_consensus_client, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
         
-        
-        context[public_keys] = install_lighthouse_validator(context[selected_network],
-            context[obtained_keys], context[selected_fee_recipient_address],
-            context[mevboost_installed])
+        consensus_client = context[selected_consensus_client]
+
+        if consensus_client == CONSENSUS_CLIENT_LIGHTHOUSE:
+
+            context[public_keys] = install_lighthouse_validator(context[selected_network],
+                context[obtained_keys], context[selected_fee_recipient_address],
+                context[mevboost_installed])
+
+        elif consensus_client == CONSENSUS_CLIENT_NIMBUS:
+            # TODO: Install Nimbus validator client
+            pass
 
         if type(context[public_keys]) is not list and not context[public_keys]:
             # User asked to quit
@@ -473,10 +490,10 @@ def installation_steps():
 
         return context
     
-    install_lighthouse_validator_step = Step(
-        step_id=INSTALL_LIGHTHOUSE_VALIDATOR_STEP_ID,
-        display_name='Lighthouse validator client installation',
-        exc_function=install_lighthouse_validator_function
+    install_validator_step = Step(
+        step_id=INSTALL_VALIDATOR_STEP_ID,
+        display_name='Validator client installation',
+        exc_function=install_validator_function
     )
 
     def install_chrony_function(step, context, step_sequence):
@@ -560,6 +577,25 @@ def installation_steps():
         exc_function=show_public_keys_function
     )
 
+    def select_consensus_client_function(step, context, step_sequence):
+        # Context variables
+        selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
+
+        consensus_client = select_consensus_client(SUPPORTED_LINUX_CONSENSUS_CLIENTS)
+
+        if not consensus_client:
+            quit_app()
+        
+        context[selected_consensus_client] = consensus_client
+
+        return context
+    
+    select_consensus_client_step = Step(
+        step_id=SELECT_CONSENSUS_CLIENT_STEP_ID,
+        display_name='Select consensus client',
+        exc_function=select_consensus_client_function
+    )
+
     return [
         select_network_step,
         test_system_step,
@@ -568,12 +604,13 @@ def installation_steps():
         detect_merge_ready_step,
         select_consensus_checkpoint_url_step,
         select_eth1_fallbacks_step,
-        install_lighthouse_step,
+        select_consensus_client_step,
+        install_consensus_step,
         install_geth_step,
         test_open_ports_step,
         obtain_keys_step,
         select_fee_recipient_address_step,
-        install_lighthouse_validator_step,
+        install_validator_step,
         install_chrony_step,
         # TODO: Monitoring setup
         initiate_deposit_step,
@@ -2015,13 +2052,13 @@ Connected Peers: Unknown
         run_callback=verifying_callback
     ).run()
     
-    if result.get('skipping', False):
-        log.warning('Skipping Geth verification.')
-        return True
-
     if not result:
         log.warning('Geth verification was cancelled.')
         return False
+
+    if result.get('skipping', False):
+        log.warning('Skipping Geth verification.')
+        return True
 
     if not result['exe_is_working']:
         # We could not get a proper result from Geth
@@ -3390,6 +3427,8 @@ client?
             'systemctl', 'stop', lighthouse_vc_service_name])
 
     passwordless_check = True
+    lighthouse_datadir_vc = Path('/var/lib/lighthouse/validators')
+    public_keys = []
 
     while passwordless_check:
 
@@ -3419,7 +3458,6 @@ ready to start validating once your validator(s) get activated.
             return result
         
         # Check if lighthouse validators client user or directory already exists
-        lighthouse_datadir_vc = Path('/var/lib/lighthouse/validators')
         if lighthouse_datadir_vc.exists() and lighthouse_datadir_vc.is_dir():
             process_result = subprocess.run([
                 'du', '-sh', lighthouse_datadir_vc
@@ -3875,6 +3913,13 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
         return False
     
     is_fully_sync = False
+    syncing_status = {
+        'bn_is_fully_sync': False,
+        'bn_is_syncing': False,
+        'bn_head_slot': UNKNOWN_VALUE,
+        'bn_sync_distance': UNKNOWN_VALUE,
+        'bn_connected_peers': 0
+    }
 
     while not is_fully_sync:
 

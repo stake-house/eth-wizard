@@ -1842,3 +1842,30 @@ least 1 relay.
         log.info(f'Selected relay: {relay}')
 
     return return_list
+
+def select_consensus_client(consensus_clients_available):
+
+    result = radiolist_dialog(
+        title='Consensus client selection',
+        text=(
+'''
+This wizard supports installing and configuring software for various
+Ethereum consensus clients. We already selected a client at random, but
+can choose the client you want. We suggest you choose a minority client.
+You can see which clients are popular right now on
+https://clientdiversity.org/ .
+
+Which consensus client would you to use?
+
+* Press the tab key to switch between the controls below
+'''
+        ),
+        values=[
+            (x, x) for x in consensus_clients_available
+        ],
+        default=choice(consensus_clients_available),
+        ok_text='Use this',
+        cancel_text='Quit'
+    ).run()
+
+    return result
