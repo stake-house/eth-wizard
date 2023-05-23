@@ -1855,7 +1855,7 @@ can choose the client you want. We suggest you choose a minority client.
 You can see which clients are popular right now on
 https://clientdiversity.org/ .
 
-Which consensus client would you to use?
+Which consensus client would you like to use?
 
 * Press the tab key to switch between the controls below
 '''
