@@ -3396,7 +3396,7 @@ $ sudo journalctl -ru {nimbus_service_name}
 
         return False
 
-    # Verify proper Lighthouse beacon node installation and syncing
+    # Verify proper Nimbus beacon node installation and syncing
     keep_retrying = True
 
     retry_index = 0
@@ -3406,22 +3406,22 @@ $ sudo journalctl -ru {nimbus_service_name}
     last_exception = None
     last_status_code = None
 
-    local_lighthouse_bn_http_base = 'http://127.0.0.1:5052'
+    local_bn_http_base = 'http://127.0.0.1:5052'
     
-    lighthouse_bn_version_query = BN_VERSION_EP
-    lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_version_query
+    bn_version_query = BN_VERSION_EP
+    bn_query_url = local_bn_http_base + bn_version_query
     headers = {
         'accept': 'application/json'
     }
 
     while keep_retrying and retry_index < retry_count:
         try:
-            response = httpx.get(lighthouse_bn_query_url, headers=headers)
+            response = httpx.get(bn_query_url, headers=headers)
         except httpx.RequestError as exception:
             last_exception = exception
 
             log.error(f'Exception {exception} when trying to connect to the beacon node on '
-                f'{lighthouse_bn_query_url}')
+                f'{bn_query_url}')
 
             retry_index = retry_index + 1
             log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
@@ -3433,7 +3433,7 @@ $ sudo journalctl -ru {nimbus_service_name}
             last_status_code = response.status_code
 
             log.error(f'Error code {response.status_code} when trying to connect to the beacon '
-                f'node on {lighthouse_bn_query_url}')
+                f'node on {bn_query_url}')
             
             retry_index = retry_index + 1
             log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
@@ -3448,20 +3448,20 @@ $ sudo journalctl -ru {nimbus_service_name}
     if keep_retrying:
         if last_exception is not None:
             result = button_dialog(
-                title='Cannot connect to Lighthouse beacon node',
+                title='Cannot connect to Nimbus beacon node',
                 text=(
 f'''
-We could not connect to lighthouse beacon node HTTP server. Here are some
+We could not connect to Nimbus beacon node HTTP server. Here are some
 details for this last test we tried to perform:
 
-URL: {lighthouse_bn_query_url}
+URL: {bn_query_url}
 Method: GET
 Headers: {headers}
 Exception: {last_exception}
 
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
+We cannot proceed if the Nimbus beacon node HTTP server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs with:
 
 $ sudo journalctl -ru {nimbus_service_name}
 '''             ),
@@ -3472,28 +3472,27 @@ $ sudo journalctl -ru {nimbus_service_name}
 
             log.info(
 f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
+To examine your Nimbus service logs, type the following command:
 
 $ sudo journalctl -ru {nimbus_service_name}
 '''
             )
         elif last_status_code is not None:
             result = button_dialog(
-                title='Cannot connect to Lighthouse beacon node',
+                title='Cannot connect to Nimbus beacon node',
                 text=(
 f'''
-We could not connect to lighthouse beacon node HTTP server. Here are some
+We could not connect to Nimbus beacon node HTTP server. Here are some
 details for this last test we tried to perform:
 
-URL: {lighthouse_bn_query_url}
+URL: {bn_query_url}
 Method: GET
 Headers: {headers}
 Status code: {last_status_code}
 
-We cannot proceed if the lighthouse beacon node HTTP server is not
-responding properly. Make sure to check the logs and fix any issue found
-there. You can see the logs with:
+We cannot proceed if the Nimbus beacon node HTTP server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs with:
 
 $ sudo journalctl -ru {nimbus_service_name}
 '''             ),
@@ -3504,8 +3503,7 @@ $ sudo journalctl -ru {nimbus_service_name}
 
             log.info(
 f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
+To examine your Nimbus service logs, type the following command:
 
 $ sudo journalctl -ru {nimbus_service_name}
 '''
@@ -3513,7 +3511,7 @@ $ sudo journalctl -ru {nimbus_service_name}
         
         return False
 
-    # Verify proper Lighthouse beacon node syncing
+    # Verify proper Nimbus beacon node syncing
     def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
         bn_is_working = False
         bn_is_syncing = False
@@ -3585,40 +3583,40 @@ $ sudo journalctl -ru {nimbus_service_name}
 
             time.sleep(1)
             
-            lighthouse_bn_syncing_query = BN_SYNCING_EP
-            lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_syncing_query
+            bn_syncing_query = BN_SYNCING_EP
+            bn_query_url = local_bn_http_base + bn_syncing_query
             headers = {
                 'accept': 'application/json'
             }
             try:
-                response = httpx.get(lighthouse_bn_query_url, headers=headers)
+                response = httpx.get(bn_query_url, headers=headers)
             except httpx.RequestError as exception:
-                log_text(f'Exception: {exception} while querying Lighthouse beacon node.')
+                log_text(f'Exception: {exception} while querying Nimbus beacon node.')
                 continue
 
             if response.status_code != 200:
                 log_text(
-                    f'Status code: {response.status_code} while querying Lighthouse beacon node.')
+                    f'Status code: {response.status_code} while querying Nimbus beacon node.')
                 continue
         
             response_json = response.json()
             syncing_json = response_json
 
-            lighthouse_bn_peer_count_query = BN_PEER_COUNT_EP
-            lighthouse_bn_query_url = (
-                local_lighthouse_bn_http_base + lighthouse_bn_peer_count_query)
+            bn_peer_count_query = BN_PEER_COUNT_EP
+            bn_query_url = (
+                local_bn_http_base + bn_peer_count_query)
             headers = {
                 'accept': 'application/json'
             }
             try:
-                response = httpx.get(lighthouse_bn_query_url, headers=headers)
+                response = httpx.get(bn_query_url, headers=headers)
             except httpx.RequestError as exception:
-                log_text(f'Exception: {exception} while querying Lighthouse beacon node.')
+                log_text(f'Exception: {exception} while querying Nimbus beacon node.')
                 continue
 
             if response.status_code != 200:
                 log_text(
-                    f'Status code: {response.status_code} while querying Lighthouse beacon node.')
+                    f'Status code: {response.status_code} while querying Nimbus beacon node.')
                 continue
 
             response_json = response.json()
@@ -3691,10 +3689,10 @@ Connected Peers: {bn_connected_peers}
                 })
 
     result = progress_log_dialog(
-        title='Verifying proper Lighthouse beacon node service installation',
+        title='Verifying proper Nimbus service installation',
         text=(
 f'''
-We are waiting for Lighthouse beacon node to sync or find enough peers to
+We are waiting for Nimbus beacon node to sync or find enough peers to
 confirm that it is working properly.
 '''     ),
         status_text=(
@@ -3707,22 +3705,22 @@ Connected Peers: Unknown
     ).run()
     
     if not result:
-        log.warning('Lighthouse beacon node verification was cancelled.')
+        log.warning('Nimbus beacon node verification was cancelled.')
         return False
 
     if not result['bn_is_working']:
-        # We could not get a proper result from Lighthouse beacon node
+        # We could not get a proper result from Nimbus beacon node
         result = button_dialog(
-            title='Lighthouse beacon node verification interrupted',
+            title='Nimbus beacon node verification interrupted',
             text=(
 f'''
-We were interrupted before we could fully verify the lighthouse beacon node
+We were interrupted before we could fully verify the Nimbus beacon node
 installation. Here are some results for the last tests we performed:
 
 Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
 Connected Peers: {result['bn_connected_peers']}
 
-We cannot proceed if the lighthouse beacon node is not installed properly.
+We cannot proceed if the Nimbus beacon node is not installed properly.
 Make sure to check the logs and fix any issue found there. You can see the
 logs with:
 
@@ -3735,8 +3733,7 @@ $ sudo journalctl -ru {nimbus_service_name}
 
         log.info(
 f'''
-To examine your lighthouse beacon node service logs, type the following
-command:
+To examine your Nimbus service logs, type the following command:
 
 $ sudo journalctl -ru {nimbus_service_name}
 '''
