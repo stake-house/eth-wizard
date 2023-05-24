@@ -3177,9 +3177,6 @@ Do you want to skip installing the Nimbus binary?
             for entry in it:
                 if entry.name.startswith('.'):
                     continue
-                
-                if not entry.is_file():
-                    continue
 
                 if entry.is_dir():
                     if entry.name == 'build':
