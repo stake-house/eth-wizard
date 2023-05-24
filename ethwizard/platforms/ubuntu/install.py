@@ -363,8 +363,12 @@ def installation_steps():
                 quit_app()
 
         elif consensus_client == CONSENSUS_CLIENT_NIMBUS:
-            # TODO: Install Nimbus
-            pass
+
+            if not install_nimbus(context[selected_network], context[selected_eth1_fallbacks],
+                context[selected_consensus_checkpoint_url], context[selected_ports],
+                context[mevboost_installed]):
+                # User asked to quit or error
+                quit_app()
 
         return context
     
@@ -2957,6 +2961,265 @@ Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync di
 Connected Peers: {result['bn_connected_peers']}
 ''' )
     time.sleep(5)
+
+    return True
+
+def install_nimbus(network, eth1_fallbacks, consensus_checkpoint_url, ports,
+    mevboost_installed):
+    # Install Nimbus for the selected network
+
+    # Check for existing systemd service
+    nimbus_bn_service_exists = False
+    nimbus_bn_service_name = NIMBUS_BN_SYSTEMD_SERVICE_NAME
+
+    service_details = get_systemd_service_details(nimbus_bn_service_name)
+
+    if service_details['LoadState'] == 'loaded':
+        nimbus_bn_service_exists = True
+    
+    if nimbus_bn_service_exists:
+        result = button_dialog(
+            title='Nimbus beacon node service found',
+            text=(
+f'''
+The Nimbus beacon node service seems to have already been created. Here
+are some details found:
+
+Description: {service_details['Description']}
+States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+UnitFilePreset: {service_details['UnitFilePreset']}
+ExecStart: {service_details['ExecStart']}
+ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
+FragmentPath: {service_details['FragmentPath']}
+
+Do you want to skip installing Nimbus and its beacon node service?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            return True
+        
+        # User wants to proceed, make sure the Nimbus beacon node service is stopped first
+        subprocess.run([
+            'systemctl', 'stop', nimbus_bn_service_name])
+
+    result = button_dialog(
+        title='Nimbus installation',
+        text=(
+'''
+This next step will install Nimbus, an Ethereum consensus client that
+includes a beacon node and a validator client in the same process.
+
+It will download the official binary from GitHub and extract it for easy
+use.
+
+Once installed locally, it will create a systemd service that will
+automatically start the Nimbus on reboot or if it crashes. The client
+will be started and you will slowly start syncing with the Ethereum
+network. This syncing process can take a few hours or days even with good
+hardware and good internet.
+'''     ),
+        buttons=[
+            ('Install', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+    
+    # Check if Nimbus is already installed
+    nimbus_found = False
+    nimbus_version = 'unknown'
+    nimbus_location = 'unknown'
+
+    try:
+        process_result = subprocess.run([
+            'nimbus_beacon_node', '--version'
+            ], capture_output=True, text=True)
+        nimbus_found = True
+
+        process_output = process_result.stdout
+        result = re.search(r'Nimbus beacon node v?(?P<version>[^-]+)', process_output)
+        if result:
+            nimbus_version = result.group('version').strip()
+        
+        process_result = subprocess.run([
+            'whereis', 'nimbus_beacon_node'
+            ], capture_output=True, text=True)
+
+        process_output = process_result.stdout
+        result = re.search(r'nimbus_beacon_node: (.*?)\n', process_output)
+        if result:
+            nimbus_location = result.group(1).strip()
+
+    except FileNotFoundError:
+        pass
+    
+    install_nimbus_binary = True
+
+    if nimbus_found:
+        result = button_dialog(
+            title='Nimbus binary found',
+            text=(
+f'''
+The Nimbus binary seems to have already been installed. Here are some
+details found:
+
+Version: {nimbus_version}
+Location: {nimbus_location}
+
+Do you want to skip installing the Nimbus binary?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        install_nimbus_binary = (result == 2)
+    
+    if install_nimbus_binary:
+        # Getting latest Nimbus release files
+        nimbus_gh_release_url = GITHUB_REST_API_URL + NIMBUS_LATEST_RELEASE
+        headers = {'Accept': GITHUB_API_VERSION}
+        try:
+            response = httpx.get(nimbus_gh_release_url, headers=headers,
+                follow_redirects=True)
+        except httpx.RequestError as exception:
+            log.error(f'Exception while downloading Nimbus binary. {exception}')
+            return False
+
+        if response.status_code != 200:
+            log.error(f'HTTP error while downloading Nimbus binary. '
+                f'Status code {response.status_code}')
+            return False
+        
+        release_json = response.json()
+
+        if 'assets' not in release_json:
+            log.error('No assets in Github release for Nimbus.')
+            return False
+        
+        binary_asset = None
+
+        archive_filename_comp = 'nimbus-eth2_Linux_amd64'
+
+        for asset in release_json['assets']:
+            if 'name' not in asset:
+                continue
+            if 'browser_download_url' not in asset:
+                continue
+        
+            file_name = asset['name']
+            file_url = asset['browser_download_url']
+
+            if file_name.startswith(archive_filename_comp):
+                binary_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+
+        if binary_asset is None:
+            log.error('Could not find binary in Github release.')
+            return False
+        
+        # Downloading latest Nimbus release files
+        download_path = Path(Path.home(), 'ethwizard', 'downloads')
+        download_path.mkdir(parents=True, exist_ok=True)
+
+        binary_path = Path(download_path, binary_asset['file_name'])
+
+        try:
+            with open(binary_path, 'wb') as binary_file:
+                with httpx.stream('GET', binary_asset['file_url'],
+                    follow_redirects=True) as http_stream:
+                    if http_stream.status_code != 200:
+                        log.error(f'HTTP error while downloading Nimbus binary from Github. '
+                            f'Status code {http_stream.status_code}')
+                        return False
+                    for data in http_stream.iter_bytes():
+                        binary_file.write(data)
+        except httpx.RequestError as exception:
+            log.error(f'Exception while downloading Nimbus binary from Github. {exception}')
+            return False
+        
+        extract_directory = download_path.joinpath('nimbus')
+        if extract_directory.is_dir():
+            shutil.rmtree(extract_directory)
+        elif extract_directory.is_file():
+            os.unlink(extract_directory)
+        extract_directory.mkdir(parents=True, exist_ok=True)
+        
+        # Extracting the Lighthouse binary archive
+        subprocess.run([
+            'tar', 'xvf', binary_path, '--directory', extract_directory])
+        
+        # Remove download leftovers
+        binary_path.unlink()
+
+        # Find the Nimbus binaries and copy them in their installed location
+        build_path = None
+
+        with os.scandir(extract_directory) as it:
+            for entry in it:
+                if entry.name.startswith('.'):
+                    continue
+                
+                if not entry.is_file():
+                    continue
+
+                if entry.is_dir():
+                    if entry.name == 'build':
+                        build_path = entry.path
+                    else:
+                        build_path = os.path.join(entry.path, 'build')
+                    break
+        
+        if build_path is None:
+            log.error('Cannot find the correct directory in the extracted Nimbus archive.')
+            return False
+
+        src_nimbus_bn_path = Path(build_path, 'nimbus_beacon_node')
+        src_nimbus_vc_path = Path(build_path, 'nimbus_validator_client')
+
+        if not src_nimbus_bn_path.is_file() or not src_nimbus_vc_path.is_file():
+            log.error(f'Cannot find the Nimbus binaries in the extracted archive.')
+            return False
+        
+        subprocess.run(['cp', src_nimbus_bn_path, NIMBUS_INSTALLED_DIRECTORY])
+        subprocess.run(['cp', src_nimbus_vc_path, NIMBUS_INSTALLED_DIRECTORY])
+
+        # Remove extraction leftovers
+        shutil.rmtree(extract_directory)
+
+        # Get Nimbus version
+        try:
+            process_result = subprocess.run([
+                'nimbus_beacon_node', '--version'
+                ], capture_output=True, text=True)
+            nimbus_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'Nimbus beacon node v?(?P<version>[^-]+)', process_output)
+            if result:
+                nimbus_version = result.group('version').strip()
+        except FileNotFoundError:
+            pass
+
+    
 
     return True
 
