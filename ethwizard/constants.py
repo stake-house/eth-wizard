@@ -164,12 +164,14 @@ MIN_CLIENT_VERSION_FOR_MERGE = {
   NETWORK_MAINNET: {
     EXECUTION_CLIENT_GETH: '1.10.22',
     CONSENSUS_CLIENT_LIGHTHOUSE: '3.0.0',
-    CONSENSUS_CLIENT_TEKU: '22.8.1'
+    CONSENSUS_CLIENT_TEKU: '22.8.1',
+    CONSENSUS_CLIENT_NIMBUS: '22.9.0',
   },
   NETWORK_GOERLI: {
     EXECUTION_CLIENT_GETH: '1.10.21',
     CONSENSUS_CLIENT_LIGHTHOUSE: '2.4.0',
-    CONSENSUS_CLIENT_TEKU: '22.7.0'
+    CONSENSUS_CLIENT_TEKU: '22.7.0',
+    CONSENSUS_CLIENT_NIMBUS: '22.7.0',
   }
 }
 
@@ -278,8 +280,7 @@ LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME = 'lighthousevalidator.service'
 LIGHTHOUSE_INSTALLED_DIRECTORY = '/usr/local/bin'
 LIGHTHOUSE_INSTALLED_PATH = f'{LIGHTHOUSE_INSTALLED_DIRECTORY}/lighthouse'
 
-NIMBUS_BN_SYSTEMD_SERVICE_NAME = 'nimbusbeacon.service'
-NIMBUS_VC_SYSTEMD_SERVICE_NAME = 'nimbusbeaconvalidator.service'
+NIMBUS_SYSTEMD_SERVICE_NAME = 'nimbus.service'
 NIMBUS_INSTALLED_DIRECTORY = '/usr/local/bin'
 NIMBUS_INSTALLED_PATH = f'{NIMBUS_INSTALLED_DIRECTORY}/nimbus_beacon_node'
 NIMBUS_VC_INSTALLED_PATH = f'{NIMBUS_INSTALLED_DIRECTORY}/nimbus_validator_client'
@@ -41755,6 +41756,55 @@ ExecStart=geth --goerli --syncmode=snap --http --datadir /var/lib/goethereum --m
 
 [Install]
 WantedBy=default.target
+''')
+}
+
+NIMBUS_SERVICE_DEFINITION = {
+    NETWORK_MAINNET: (
+f'''
+[Unit]
+Description=Nimbus Ethereum Client (Mainnet)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=nimbus
+Group=nimbus
+Restart=always
+RestartSec=5
+ExecStart={NIMBUS_INSTALLED_PATH} \\
+    --network=mainnet \\
+    --data-dir=/var/lib/nimbus \\
+    --rest=true \\
+    --metrics=true \\
+    --enr-auto-update=true{{addparams}}
+
+[Install]
+WantedBy=multi-user.target
+'''),
+    NETWORK_GOERLI: (
+f'''
+[Unit]
+Description=Nimbus Ethereum Client (Görli)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=nimbus
+Group=nimbus
+Restart=always
+RestartSec=5
+ExecStart={NIMBUS_INSTALLED_PATH} \\
+    --network=goerli \\
+    --data-dir=/var/lib/nimbus \\
+    --rest=true \\
+    --metrics=true \\
+    --enr-auto-update=true{{addparams}}
+
+[Install]
+WantedBy=multi-user.target
 ''')
 }
 

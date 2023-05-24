@@ -2969,21 +2969,21 @@ def install_nimbus(network, eth1_fallbacks, consensus_checkpoint_url, ports,
     # Install Nimbus for the selected network
 
     # Check for existing systemd service
-    nimbus_bn_service_exists = False
-    nimbus_bn_service_name = NIMBUS_BN_SYSTEMD_SERVICE_NAME
+    nimbus_service_exists = False
+    nimbus_service_name = NIMBUS_SYSTEMD_SERVICE_NAME
 
-    service_details = get_systemd_service_details(nimbus_bn_service_name)
+    service_details = get_systemd_service_details(nimbus_service_name)
 
     if service_details['LoadState'] == 'loaded':
-        nimbus_bn_service_exists = True
+        nimbus_service_exists = True
     
-    if nimbus_bn_service_exists:
+    if nimbus_service_exists:
         result = button_dialog(
-            title='Nimbus beacon node service found',
+            title='Nimbus service found',
             text=(
 f'''
-The Nimbus beacon node service seems to have already been created. Here
-are some details found:
+The Nimbus service seems to have already been created. Here are some
+details found:
 
 Description: {service_details['Description']}
 States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
@@ -3009,7 +3009,7 @@ Do you want to skip installing Nimbus and its beacon node service?
         
         # User wants to proceed, make sure the Nimbus beacon node service is stopped first
         subprocess.run([
-            'systemctl', 'stop', nimbus_bn_service_name])
+            'systemctl', 'stop', nimbus_service_name])
 
     result = button_dialog(
         title='Nimbus installation',
@@ -3216,7 +3216,542 @@ Do you want to skip installing the Nimbus binary?
         except FileNotFoundError:
             pass
 
+    # Check if Nimbus user or directory already exists
+    nimbus_datadir = Path('/var/lib/nimbus')
+    if nimbus_datadir.exists() and nimbus_datadir.is_dir():
+        process_result = subprocess.run([
+            'du', '-sh', nimbus_datadir
+            ], capture_output=True, text=True)
+        
+        process_output = process_result.stdout
+        nimbus_datadir_size = process_output.split('\t')[0]
+
+        result = button_dialog(
+            title='Nimbus data directory found',
+            text=(
+f'''
+An existing Nimbus data directory has been found. Here are some details
+found:
+
+Location: {nimbus_datadir}
+Size: {nimbus_datadir_size}
+
+Do you want to remove this directory first and start from nothing?
+'''         ),
+            buttons=[
+                ('Remove', 1),
+                ('Keep', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            shutil.rmtree(nimbus_datadir)
+
+    nimbus_user_exists = False
+    nimbus_username = 'nimbus'
+    process_result = subprocess.run([
+        'id', '-u', nimbus_username
+    ])
+    nimbus_user_exists = (process_result.returncode == 0)
+
+    # Setup Lighthouse beacon node user and directory
+    if not nimbus_user_exists:
+        subprocess.run([
+            'useradd', '--no-create-home', '--shell', '/bin/false', nimbus_username])
+    subprocess.run([
+        'mkdir', '-p', nimbus_datadir])
+    subprocess.run([
+        'chown', '-R', f'{nimbus_username}:{nimbus_username}', nimbus_datadir])
+    subprocess.run([
+        'chmod', '700', nimbus_datadir])
+
+    addparams = []
+
+    # Check if merge ready
+    merge_ready = False
+
+    result = re.search(r'([^-]+)', nimbus_version)
+    if result:
+        cleaned_nimbus_version = parse_version(result.group(1).strip())
+        target_nimbus_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][CONSENSUS_CLIENT_NIMBUS])
+
+        if cleaned_nimbus_version >= target_nimbus_version:
+            merge_ready = True
+
+    if merge_ready:
+        if not setup_jwt_token_file():
+            log.error(
+f'''
+Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
+'''
+            )
+
+            return False
+
+        addparams.append(f'--jwt-secret={LINUX_JWT_TOKEN_FILE_PATH}')
+
+    # Setup Nimbus systemd service
+    service_definition = NIMBUS_SERVICE_DEFINITION[network]
+
+    local_eth1_endpoint = 'http://127.0.0.1:8545'
+    eth1_endpoints_flag = '--web3-url='
+    if merge_ready:
+        local_eth1_endpoint = 'http://127.0.0.1:8551'
+
+    addparams.append(f'{eth1_endpoints_flag}{local_eth1_endpoint}')
+
+    if ports['eth2_bn'] != DEFAULT_NIMBUS_BN_PORT:
+        addparams.append(f'--tcp-port={ports["eth2_bn"]}')
+        addparams.append(f'--udp-port={ports["eth2_bn"]}')
     
+    if consensus_checkpoint_url != '':
+        # Perform checkpoint sync with the trustedNodeSync command
+        log.info('Initializing Nimbus with a checkpoint sync endpoint.')
+        process_result = subprocess.run([
+            'sudo', '-u', nimbus_username, '-g', nimbus_username, NIMBUS_INSTALLED_PATH,
+            'trustedNodeSync',
+            f'--network={network}',
+            f'--data-dir={nimbus_datadir}',
+            f'--trusted-node-url={consensus_checkpoint_url}',
+            '--backfill=false'
+        ])
+        if process_result.returncode != 0:
+            log.error('Unable to initialize Nimbus with a checkpoint sync endpoint.')
+            return False
+
+    if mevboost_installed:
+        addparams.append('--payload-builder=true')
+        addparams.append('--payload-builder-url=http://127.0.0.1:18550')
+
+    addparams_string = ''
+    if len(addparams) > 0:
+        addparams_string = ' \\\n    ' + ' \\\n    '.join(addparams)
+
+    service_definition = service_definition.format(addparams=addparams_string)
+
+    with open('/etc/systemd/system/' + nimbus_service_name, 'w') as service_file:
+        service_file.write(service_definition)
+    subprocess.run([
+        'systemctl', 'daemon-reload'])
+    subprocess.run([
+        'systemctl', 'start', nimbus_service_name])
+    subprocess.run([
+        'systemctl', 'enable', nimbus_service_name])
+    
+    delay = 30
+    log.info(
+f'''
+We are giving Nimbus {delay} seconds to start before testing it.
+'''
+    )
+    time.sleep(delay)
+
+    # Check if the Lighthouse beacon node service is still running
+    service_details = get_systemd_service_details(nimbus_service_name)
+
+    if not (
+        service_details['LoadState'] == 'loaded' and
+        service_details['ActiveState'] == 'active' and
+        service_details['SubState'] == 'running'
+    ):
+
+        result = button_dialog(
+            title='Nimbus service not running properly',
+            text=(
+f'''
+The Nimbus service we just created seems to have issues.
+Here are some details found:
+
+Description: {service_details['Description']}
+States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+UnitFilePreset: {service_details['UnitFilePreset']}
+ExecStart: {service_details['ExecStart']}
+ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
+FragmentPath: {service_details['FragmentPath']}
+
+We cannot proceed if the lighthouse beacon node service cannot be started
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs with:
+
+$ sudo journalctl -ru {nimbus_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {nimbus_service_name}
+'''
+        )
+
+        return False
+
+    # Verify proper Lighthouse beacon node installation and syncing
+    keep_retrying = True
+
+    retry_index = 0
+    retry_count = 5
+    retry_delay = 30
+    retry_delay_increase = 15
+    last_exception = None
+    last_status_code = None
+
+    local_lighthouse_bn_http_base = 'http://127.0.0.1:5052'
+    
+    lighthouse_bn_version_query = BN_VERSION_EP
+    lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_version_query
+    headers = {
+        'accept': 'application/json'
+    }
+
+    while keep_retrying and retry_index < retry_count:
+        try:
+            response = httpx.get(lighthouse_bn_query_url, headers=headers)
+        except httpx.RequestError as exception:
+            last_exception = exception
+
+            log.error(f'Exception {exception} when trying to connect to the beacon node on '
+                f'{lighthouse_bn_query_url}')
+
+            retry_index = retry_index + 1
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            retry_delay = retry_delay + retry_delay_increase
+            continue
+
+        if response.status_code != 200:
+            last_status_code = response.status_code
+
+            log.error(f'Error code {response.status_code} when trying to connect to the beacon '
+                f'node on {lighthouse_bn_query_url}')
+            
+            retry_index = retry_index + 1
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            retry_delay = retry_delay + retry_delay_increase
+            continue
+
+        keep_retrying = False
+        last_exception = None
+        last_status_code = None
+    
+    if keep_retrying:
+        if last_exception is not None:
+            result = button_dialog(
+                title='Cannot connect to Lighthouse beacon node',
+                text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Exception: {last_exception}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {nimbus_service_name}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            log.info(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {nimbus_service_name}
+'''
+            )
+        elif last_status_code is not None:
+            result = button_dialog(
+                title='Cannot connect to Lighthouse beacon node',
+                text=(
+f'''
+We could not connect to lighthouse beacon node HTTP server. Here are some
+details for this last test we tried to perform:
+
+URL: {lighthouse_bn_query_url}
+Method: GET
+Headers: {headers}
+Status code: {last_status_code}
+
+We cannot proceed if the lighthouse beacon node HTTP server is not
+responding properly. Make sure to check the logs and fix any issue found
+there. You can see the logs with:
+
+$ sudo journalctl -ru {nimbus_service_name}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            log.info(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {nimbus_service_name}
+'''
+            )
+        
+        return False
+
+    # Verify proper Lighthouse beacon node syncing
+    def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
+        bn_is_working = False
+        bn_is_syncing = False
+        bn_has_few_peers = False
+        bn_connected_peers = 0
+        bn_head_slot = UNKNOWN_VALUE
+        bn_sync_distance = UNKNOWN_VALUE
+
+        set_result({
+            'bn_is_working': bn_is_working,
+            'bn_is_syncing': bn_is_syncing,
+            'bn_head_slot': bn_head_slot,
+            'bn_sync_distance': bn_sync_distance,
+            'bn_connected_peers': bn_connected_peers
+        })
+
+        set_percentage(10)
+
+        journalctl_cursor = None
+
+        while True:
+
+            if get_exited():
+                return {
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                }
+
+            # Output logs
+            command = []
+            first_display = True
+            if journalctl_cursor is None:
+                command = ['journalctl', '--no-pager', '--show-cursor', '-q', '-n', '25',
+                    '-o', 'cat', '-u', nimbus_service_name]
+            else:
+                command = ['journalctl', '--no-pager', '--show-cursor', '-q',
+                    '-o', 'cat', '--after-cursor=' + journalctl_cursor, '-u',
+                    nimbus_service_name]
+                first_display = False
+
+            process_result = subprocess.run(command, capture_output=True, text=True)
+
+            process_output = ''
+            if process_result.returncode == 0:
+                process_output = process_result.stdout
+            else:
+                log_text(f'Return code: {process_result.returncode} while calling journalctl.')
+
+            # Parse journalctl cursor and remove it from process_output
+            log_length = len(process_output)
+            if log_length > 0:
+                result = re.search(r'-- cursor: (?P<cursor>[^\n]+)', process_output)
+                if result:
+                    journalctl_cursor = result.group('cursor')
+                    process_output = (
+                        process_output[:result.start()] +
+                        process_output[result.end():])
+                    process_output = process_output.rstrip()
+            
+                    log_length = len(process_output)
+
+            if log_length > 0:
+                if not first_display and process_output[0] != '\n':
+                    process_output = '\n' + process_output
+                log_text(process_output)
+
+            time.sleep(1)
+            
+            lighthouse_bn_syncing_query = BN_SYNCING_EP
+            lighthouse_bn_query_url = local_lighthouse_bn_http_base + lighthouse_bn_syncing_query
+            headers = {
+                'accept': 'application/json'
+            }
+            try:
+                response = httpx.get(lighthouse_bn_query_url, headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Lighthouse beacon node.')
+                continue
+
+            if response.status_code != 200:
+                log_text(
+                    f'Status code: {response.status_code} while querying Lighthouse beacon node.')
+                continue
+        
+            response_json = response.json()
+            syncing_json = response_json
+
+            lighthouse_bn_peer_count_query = BN_PEER_COUNT_EP
+            lighthouse_bn_query_url = (
+                local_lighthouse_bn_http_base + lighthouse_bn_peer_count_query)
+            headers = {
+                'accept': 'application/json'
+            }
+            try:
+                response = httpx.get(lighthouse_bn_query_url, headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Lighthouse beacon node.')
+                continue
+
+            if response.status_code != 200:
+                log_text(
+                    f'Status code: {response.status_code} while querying Lighthouse beacon node.')
+                continue
+
+            response_json = response.json()
+            peer_count_json = response_json
+
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'is_syncing' in syncing_json['data']
+                ):
+                bn_is_syncing = bool(syncing_json['data']['is_syncing'])
+            else:
+                bn_is_syncing = False
+            
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'head_slot' in syncing_json['data']
+                ):
+                bn_head_slot = syncing_json['data']['head_slot']
+            else:
+                bn_head_slot = UNKNOWN_VALUE
+
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'sync_distance' in syncing_json['data']
+                ):
+                bn_sync_distance = syncing_json['data']['sync_distance']
+            else:
+                bn_sync_distance = UNKNOWN_VALUE
+
+            bn_connected_peers = 0
+            if (
+                peer_count_json and
+                'data' in peer_count_json and
+                'connected' in peer_count_json['data']
+                ):
+                bn_connected_peers = int(peer_count_json['data']['connected'])
+            
+            bn_has_few_peers = bn_connected_peers >= BN_MIN_FEW_PEERS
+
+            if bn_is_syncing or bn_has_few_peers:
+                set_percentage(100)
+            else:
+                set_percentage(10 + round(min(bn_connected_peers / BN_MIN_FEW_PEERS, 1.0) * 90.0))
+
+            change_status((
+f'''
+Syncing: {bn_is_syncing} (Head slot: {bn_head_slot}, Sync distance: {bn_sync_distance})
+Connected Peers: {bn_connected_peers}
+'''         ).strip())
+
+            if bn_is_syncing or bn_has_few_peers:
+                bn_is_working = True
+                return {
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                }
+            else:
+                set_result({
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                })
+
+    result = progress_log_dialog(
+        title='Verifying proper Lighthouse beacon node service installation',
+        text=(
+f'''
+We are waiting for Lighthouse beacon node to sync or find enough peers to
+confirm that it is working properly.
+'''     ),
+        status_text=(
+'''
+Syncing: Unknown (Head slot: Unknown, Sync distance: Unknown)
+Connected Peers: Unknown
+'''
+        ).strip(),
+        run_callback=verifying_callback
+    ).run()
+    
+    if not result:
+        log.warning('Lighthouse beacon node verification was cancelled.')
+        return False
+
+    if not result['bn_is_working']:
+        # We could not get a proper result from Lighthouse beacon node
+        result = button_dialog(
+            title='Lighthouse beacon node verification interrupted',
+            text=(
+f'''
+We were interrupted before we could fully verify the lighthouse beacon node
+installation. Here are some results for the last tests we performed:
+
+Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
+Connected Peers: {result['bn_connected_peers']}
+
+We cannot proceed if the lighthouse beacon node is not installed properly.
+Make sure to check the logs and fix any issue found there. You can see the
+logs with:
+
+$ sudo journalctl -ru {nimbus_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your lighthouse beacon node service logs, type the following
+command:
+
+$ sudo journalctl -ru {nimbus_service_name}
+'''
+        )
+
+        return False
+    
+    log.info(
+f'''
+Nimbus is installed and working properly.
+
+Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
+Connected Peers: {result['bn_connected_peers']}
+''' )
+    time.sleep(5)
 
     return True
 
