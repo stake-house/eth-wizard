@@ -4595,7 +4595,7 @@ you typed during the keys generation step. It is not your mnemonic.
     # Import keystore(s) if we have some
     if len(keys['keystore_paths']) > 0:
         process_result = subprocess.run([
-            'sudo', '-u', nimbus_username, '-g', nimbus_username, NIMBUS_INSTALLED_PATH,
+            NIMBUS_INSTALLED_PATH,
             'deposits', 'import',
             f'--data-dir={nimbus_datadir}',
             keys['validator_keys_path']
@@ -4603,6 +4603,9 @@ you typed during the keys generation step. It is not your mnemonic.
         if process_result.returncode != 0:
             log.error('Unable to import keystore(s) with Nimbus.')
             return False
+        
+        subprocess.run([
+            'chown', '-R', f'{nimbus_username}:{nimbus_username}', nimbus_datadir])
     else:
         log.warning('No keystore files found to import. We\'ll guess they were already imported '
             'for now.')
