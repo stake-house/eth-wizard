@@ -491,8 +491,10 @@ def installation_steps():
                 context[mevboost_installed])
 
         elif consensus_client == CONSENSUS_CLIENT_NIMBUS:
-            # TODO: Install Nimbus validator client
-            pass
+            # Install Nimbus validator client
+            context[public_keys] = install_nimbus_validator(context[selected_network],
+                context[obtained_keys], context[selected_fee_recipient_address],
+                context[mevboost_installed])
 
         if type(context[public_keys]) is not list and not context[public_keys]:
             # User asked to quit
@@ -4529,6 +4531,185 @@ To examine your lighthouse validator client service logs, type the following
 command:
 
 $ sudo journalctl -ru {lighthouse_vc_service_name}
+'''
+        )
+
+        return False
+
+    return public_keys
+
+def install_nimbus_validator(network, keys, fee_recipient_address, mevboost_installed):
+    # Import keystore(s) and configure the Nimbus validator client part
+    # Returns a list of public keys when done
+
+    # Check for existing systemd service
+    nimbus_service_exists = False
+    nimbus_service_name = NIMBUS_SYSTEMD_SERVICE_NAME
+    nimbus_datadir = Path('/var/lib/nimbus')
+    nimbus_username = 'nimbus'
+
+    service_details = get_systemd_service_details(nimbus_service_name)
+
+    if service_details['LoadState'] == 'loaded':
+        nimbus_service_exists = True
+    
+    if not nimbus_service_exists:
+        log.error('The Nimbus service is missing. You might need to reinstall it.')
+        return False
+
+    result = button_dialog(
+        title='Nimbus validators',
+        text=(HTML(
+'''
+This next step will import your keystore(s) to be used with Nimbus.
+
+During the importation process, you will be asked to enter the password
+you typed during the keys generation step. It is not your mnemonic.
+'''     )),
+        buttons=[
+            ('Import', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+
+    # Stop the Nimbus service
+    subprocess.run([
+        'systemctl', 'stop', nimbus_service_name])
+
+    # Import keystore(s) if we have some
+    if len(keys['keystore_paths']) > 0:
+        process_result = subprocess.run([
+            'sudo', '-u', nimbus_username, '-g', nimbus_username, NIMBUS_INSTALLED_PATH,
+            'deposits', 'import',
+            f'--data-dir={nimbus_datadir}',
+            keys['validator_keys_path']
+        ])
+        if process_result.returncode != 0:
+            log.error('Unable to import keystore(s) with Nimbus.')
+            return False
+    else:
+        log.warning('No keystore files found to import. We\'ll guess they were already imported '
+            'for now.')
+        time.sleep(5)
+
+    # TODO: Check for correct keystore(s) import
+    public_keys = []
+
+    # Clean up generated keys
+    for keystore_path in keys['keystore_paths']:
+        os.unlink(keystore_path)
+    
+    log.info(
+f'''
+We found {len(public_keys)} key(s) imported into Nimbus.
+'''
+    )
+
+    # Get Nimbus version
+    nimbus_found = False
+    nimbus_version = 'unknown'
+    try:
+        process_result = subprocess.run([
+            'nimbus_beacon_node', '--version'
+            ], capture_output=True, text=True)
+        nimbus_found = True
+
+        process_output = process_result.stdout
+        result = re.search(r'Nimbus beacon node v?(?P<version>[^-]+)', process_output)
+        if result:
+            nimbus_version = result.group('version').strip()
+    except FileNotFoundError:
+        pass
+
+    if not nimbus_found:
+        log.error('We cannot find Nimbus anymore.')
+        return False
+
+    addparams = []
+
+    # Check if merge ready
+    merge_ready = False
+
+    result = re.search(r'([^-]+)', nimbus_version)
+    if result:
+        cleaned_nimbus_version = parse_version(result.group(1).strip())
+        target_nimbus_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][CONSENSUS_CLIENT_NIMBUS])
+
+        if cleaned_nimbus_version >= target_nimbus_version:
+            merge_ready = True
+
+    if merge_ready:
+        addparams.append(f'--suggested-fee-recipient={fee_recipient_address}')
+
+    addparams_string = ''
+    if len(addparams) > 0:
+        addparams_string = ' ' + ' '.join(addparams)
+
+    # TODO: Update Nimbus service with new configuration options
+    # TODO: Restart Nimbus service
+    subprocess.run([
+        'systemctl', 'daemon-reload'])
+    subprocess.run([
+        'systemctl', 'start', nimbus_service_name])
+
+    # Verify proper Nimbus installation
+    delay = 10
+    log.info(
+f'''
+We are giving Nimbus {delay} seconds to start before testing it.
+'''
+    )
+    time.sleep(delay)
+    try:
+        subprocess.run([
+            'journalctl', '-o', 'cat', '-fu', nimbus_service_name
+        ], timeout=16)
+    except subprocess.TimeoutExpired:
+        pass
+
+    # Check if the Nimbus service is still running
+    service_details = get_systemd_service_details(nimbus_service_name)
+
+    if not (
+        service_details['LoadState'] == 'loaded' and
+        service_details['ActiveState'] == 'active' and
+        service_details['SubState'] == 'running'
+    ):
+
+        result = button_dialog(
+            title='Nimbus service not running properly',
+            text=(
+f'''
+The Nimbus service we just started seems to have issues. Here are some
+details found:
+
+Description: {service_details['Description']}
+States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+UnitFilePreset: {service_details['UnitFilePreset']}
+ExecStart: {service_details['ExecStart']}
+ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
+FragmentPath: {service_details['FragmentPath']}
+
+We cannot proceed if the Nimbus service cannot be started properly. Make
+sure to check the logs and fix any issue found there. You can see the
+logs with:
+
+$ sudo journalctl -ru {nimbus_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your Nimbus service logs, type the following command:
+
+$ sudo journalctl -ru {nimbus_service_name}
 '''
         )
 
