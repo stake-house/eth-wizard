@@ -4606,13 +4606,30 @@ you typed during the keys generation step. It is not your mnemonic.
         
         subprocess.run([
             'chown', '-R', f'{nimbus_username}:{nimbus_username}', nimbus_datadir])
+        
     else:
         log.warning('No keystore files found to import. We\'ll guess they were already imported '
             'for now.')
         time.sleep(5)
 
-    # TODO: Check for correct keystore(s) import
+    # Check for correct keystore(s) import
     public_keys = []
+
+    nimbus_validators_path = nimbus_datadir.joinpath('validators')
+
+    with os.scandir(nimbus_validators_path) as it:
+        for entry in it:
+            if entry.name.startswith('.'):
+                continue
+
+            if entry.is_dir():
+                result = re.search(r'0x[0-9a-f]{96}', entry.name)
+                if result:
+                    public_keys.append(result.group(0))
+
+    if len(public_keys) < 1:
+        log.error('No key imported into Nimbus.')
+        return False
 
     # Clean up generated keys
     for keystore_path in keys['keystore_paths']:
