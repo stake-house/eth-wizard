@@ -147,11 +147,20 @@ def installation_steps():
     def select_custom_ports_function(step, context, step_sequence):
         # Context variables
         selected_ports = CTX_SELECTED_PORTS
+        selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
+
+        if not (
+            test_context_variable(context, selected_consensus_client, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_app()
+        
+        consensus_client = context[selected_consensus_client]
 
         if selected_ports not in context:
             context[selected_ports] = {
                 'eth1': DEFAULT_GETH_PORT,
-                'eth2_bn': DEFAULT_LIGHTHOUSE_BN_PORT
+                'eth2_bn': DEFAULT_CONSENSUS_PORT[consensus_client]
             }
         
         context[selected_ports] = select_custom_ports(context[selected_ports])
