@@ -404,15 +404,19 @@ def installation_steps():
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
         obtained_keys = CTX_OBTAINED_KEYS
+        selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
 
         if not (
-            test_context_variable(context, selected_network, log)
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, selected_consensus_client, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
         
+        consensus_client = context[selected_consensus_client]
+
         if obtained_keys not in context:
-            context[obtained_keys] = obtain_keys(context[selected_network])
+            context[obtained_keys] = obtain_keys(context[selected_network], consensus_client)
             step_sequence.save_state(step.step_id, context)
 
         if not context[obtained_keys]:
@@ -3754,30 +3758,34 @@ Connected Peers: {result['bn_connected_peers']}
 
     return True
 
-def obtain_keys(network):
+def obtain_keys(network, consensus_client):
     # Obtain validator keys for the selected network
 
-    # Check if there are keys already imported
     eth2_deposit_cli_path = Path(Path.home(), 'ethwizard', 'eth2depositcli')
     validator_keys_path = Path(eth2_deposit_cli_path, 'validator_keys')
 
-    lighthouse_datadir = Path('/var/lib/lighthouse')
+    # Check if there are keys already imported in our consensus client
+    if consensus_client == CONSENSUS_CLIENT_LIGHTHOUSE:
 
-    process_result = subprocess.run([
-        LIGHTHOUSE_INSTALLED_PATH, '--network', network, 'account', 'validator', 'list',
-        '--datadir', lighthouse_datadir
-        ], capture_output=True, text=True)
-    if process_result.returncode == 0:
-        process_output = process_result.stdout
-        public_keys = re.findall(r'0x[0-9a-f]{96}\s', process_output)
-        public_keys = list(map(lambda x: x.strip(), public_keys))
-        
-        if len(public_keys) > 0:
-            # We already have keys imported
+        # Check if there are keys already imported in Lighthouse validator client
 
-            result = button_dialog(
-                title='Validator keys already imported',
-                text=(
+        lighthouse_datadir = Path('/var/lib/lighthouse')
+
+        process_result = subprocess.run([
+            LIGHTHOUSE_INSTALLED_PATH, '--network', network, 'account', 'validator', 'list',
+            '--datadir', lighthouse_datadir
+            ], capture_output=True, text=True)
+        if process_result.returncode == 0:
+            process_output = process_result.stdout
+            public_keys = re.findall(r'0x[0-9a-f]{96}\s', process_output)
+            public_keys = list(map(lambda x: x.strip(), public_keys))
+            
+            if len(public_keys) > 0:
+                # We already have keys imported
+
+                result = button_dialog(
+                    title='Validator keys already imported',
+                    text=(
 f'''
 It seems like validator keys have already been imported. Here are some
 details found:
@@ -3787,21 +3795,26 @@ Location: {lighthouse_datadir}
 
 Do you want to skip generating new keys?
 '''             ),
-                buttons=[
-                    ('Skip', 1),
-                    ('Generate', 2),
-                    ('Quit', False)
-                ]
-            ).run()
+                    buttons=[
+                        ('Skip', 1),
+                        ('Generate', 2),
+                        ('Quit', False)
+                    ]
+                ).run()
 
-            if not result:
-                return result
-            
-            if result == 1:
-                generated_keys = search_for_generated_keys(validator_keys_path)
-                return generated_keys
+                if not result:
+                    return result
+                
+                if result == 1:
+                    generated_keys = search_for_generated_keys(validator_keys_path)
+                    return generated_keys
 
-            # We want to obtain new keys from here
+                # We want to obtain new keys from here
+    
+    elif consensus_client == CONSENSUS_CLIENT_NIMBUS:
+
+        # TODO: Check if there are keys already imported in Nimbus
+        pass
     
     # Check if there are keys already created
     generated_keys = search_for_generated_keys(validator_keys_path)
