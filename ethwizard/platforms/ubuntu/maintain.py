@@ -16,7 +16,8 @@ from ethwizard.platforms.common import (
     select_fee_recipient_address,
     get_geth_running_version,
     get_geth_latest_version,
-    get_mevboost_latest_version
+    get_mevboost_latest_version,
+    get_nimbus_latest_version
 )
 
 from ethwizard.platforms.ubuntu.common import (
@@ -38,6 +39,7 @@ from ethwizard.constants import (
     NETWORK_GOERLI,
     EXECUTION_CLIENT_GETH,
     CONSENSUS_CLIENT_LIGHTHOUSE,
+    CONSENSUS_CLIENT_NIMBUS,
     WIZARD_COMPLETED_STEP_ID,
     UNKNOWN_VALUE,
     GITHUB_REST_API_URL,
@@ -62,6 +64,8 @@ from ethwizard.constants import (
     LIGHTHOUSE_INSTALLED_DIRECTORY,
     LIGHTHOUSE_INSTALLED_PATH,
     LIGHTHOUSE_PRIME_PGP_KEY_ID,
+    NIMBUS_SYSTEMD_SERVICE_NAME,
+    NIMBUS_INSTALLED_PATH,
     BN_VERSION_EP,
     PGP_KEY_SERVERS,
 )
@@ -729,10 +733,127 @@ def get_consensus_client_details(consensus_client):
         details['versions']['latest'] = get_lighthouse_latest_version()
 
         return details
+    
+    elif consensus_client == CONSENSUS_CLIENT_NIMBUS:
+
+        details = {
+            'service': {
+                'found': False,
+                'load': UNKNOWN_VALUE,
+                'active': UNKNOWN_VALUE,
+                'sub': UNKNOWN_VALUE
+            },
+            'versions': {
+                'installed': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE,
+                'latest': UNKNOWN_VALUE
+            },
+            'exec': {
+                'path': UNKNOWN_VALUE,
+                'argv': []
+            },
+            'is_merge_configured': UNKNOWN_VALUE,
+        }
+        
+        # Check for existing systemd services
+        nimbus_service_exists = False
+        nimbus_service_name = NIMBUS_SYSTEMD_SERVICE_NAME
+
+        service_details = get_systemd_service_details(nimbus_service_name)
+
+        if service_details['LoadState'] == 'loaded':
+            nimbus_service_exists = True
+
+            details['service']['found'] = True
+            details['service']['load'] = service_details['LoadState']
+            details['service']['active'] = service_details['ActiveState']
+            details['service']['sub'] = service_details['SubState']
+            details['service']['running'] = is_service_running(service_details)
+
+        if 'ExecStart' in service_details:
+            details['exec'] = parse_exec_start(service_details['ExecStart'])
+
+            execution_jwt_flag_found = False
+            for arg in details['exec']['argv']:
+                if arg.lower().startswith('--jwt-secret'):
+                    execution_jwt_flag_found = True
+                    break
+            
+            details['is_merge_configured'] = execution_jwt_flag_found
+
+        details['versions']['installed'] = get_nimbus_installed_version()
+        details['versions']['running'] = get_nimbus_running_version()
+        details['versions']['latest'] = get_nimbus_latest_version(log)
+
+        return details
 
     else:
         log.error(f'Unknown consensus client {consensus_client}.')
         return False
+
+def get_nimbus_installed_version():
+    # Get the installed version for Nimbus
+
+    log.info('Getting Nimbus installed version...')
+
+    process_result = subprocess.run([NIMBUS_INSTALLED_PATH, '--version'], capture_output=True,
+        text=True)
+    
+    if process_result.returncode != 0:
+        log.error(f'Unexpected return code from Nimbus. Return code: '
+            f'{process_result.returncode}')
+        return UNKNOWN_VALUE
+    
+    process_output = process_result.stdout
+    result = re.search(r'Nimbus beacon node v?(?P<version>[^-]+)', process_output)
+    if not result:
+        log.error(f'Cannot parse {process_output} for Nimbus installed version.')
+        return UNKNOWN_VALUE
+    
+    installed_version = result.group('version')
+
+    log.info(f'Nimbus installed version is {installed_version}')
+
+    return installed_version
+
+def get_nimbus_running_version():
+    # Get the running version for Nimbus
+
+    log.info('Getting Nimbus running version...')
+
+    local_bn_version_url = 'http://127.0.0.1:5052' + BN_VERSION_EP
+
+    try:
+        response = httpx.get(local_bn_version_url)
+    except httpx.RequestError as exception:
+        log.error(f'Cannot connect to Nimbus. Exception: {exception}')
+        return UNKNOWN_VALUE
+
+    if response.status_code != 200:
+        log.error(f'Unexpected status code from {local_bn_version_url}. Status code: '
+            f'{response.status_code}')
+        return UNKNOWN_VALUE
+    
+    response_json = response.json()
+
+    if 'data' not in response_json or 'version' not in response_json['data']:
+        log.error(f'Unexpected JSON response from {local_bn_version_url}. result not found.')
+        return UNKNOWN_VALUE
+    
+    version_agent = response_json['data']['version']
+
+    # Version agent should look like: "Nimbus/v23.5.1-4842c9-stateofus
+    result = re.search(r'Nimbus/v(?P<version>[^-/]+)(-(?P<commit>[^-/]+))?',
+        version_agent)
+    if not result:
+        log.error(f'Cannot parse {version_agent} for Nimbus version.')
+        return UNKNOWN_VALUE
+
+    running_version = result.group('version')
+
+    log.info(f'Nimbus running version is {running_version}')
+
+    return running_version
 
 def get_lighthouse_installed_version():
     # Get the installed version for Lighthouse

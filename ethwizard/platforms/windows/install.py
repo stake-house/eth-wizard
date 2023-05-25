@@ -3517,10 +3517,10 @@ Do you want to skip installing the staking-deposit-cli binary?
 
         if install_eth2_deposit_binary:
             # Getting latest staking-deposit-cli release files
-            eth2_cli_gh_release_url = GITHUB_REST_API_URL + ETH2_DEPOSIT_CLI_LATEST_RELEASE
+            sdc_gh_release_url = GITHUB_REST_API_URL + SDC_LATEST_RELEASE
             headers = {'Accept': GITHUB_API_VERSION}
             try:
-                response = httpx.get(eth2_cli_gh_release_url, headers=headers, follow_redirects=True)
+                response = httpx.get(sdc_gh_release_url, headers=headers, follow_redirects=True)
             except httpx.RequestError as exception:
                 log.error(f'Cannot get latest staking-deposit-cli release from Github. '
                     f'Exception {exception}')

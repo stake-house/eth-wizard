@@ -1572,14 +1572,14 @@ def get_geth_latest_version(log):
     return latest_version
 
 def get_mevboost_latest_version(log):
-    # Get the latest stable version for MEV-Boost, potentially not available yet for update
+    # Get the latest stable version for MEV-Boost
 
     log.info('Getting MEV-Boost latest version...')
 
-    geth_gh_release_url = GITHUB_REST_API_URL + MEVBOOST_LATEST_RELEASE
+    gh_release_url = GITHUB_REST_API_URL + MEVBOOST_LATEST_RELEASE
     headers = {'Accept': GITHUB_API_VERSION}
     try:
-        response = httpx.get(geth_gh_release_url, headers=headers,
+        response = httpx.get(gh_release_url, headers=headers,
             follow_redirects=True)
     except httpx.RequestError as exception:
         log.error(f'Exception while getting the latest stable version for MEV-Boost. {exception}')
@@ -1606,6 +1606,44 @@ def get_mevboost_latest_version(log):
     latest_version = result.group('version')
 
     log.info(f'MEV-Boost latest version is {latest_version}')
+
+    return latest_version
+
+def get_nimbus_latest_version(log):
+    # Get the latest stable version for Nimbus
+
+    log.info('Getting Nimbus latest version...')
+
+    gh_release_url = GITHUB_REST_API_URL + NIMBUS_LATEST_RELEASE
+    headers = {'Accept': GITHUB_API_VERSION}
+    try:
+        response = httpx.get(gh_release_url, headers=headers,
+            follow_redirects=True)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while getting the latest stable version for Nimbus. {exception}')
+        return UNKNOWN_VALUE
+
+    if response.status_code != 200:
+        log.error(f'HTTP error while getting the latest stable version for Nimbus. '
+            f'Status code {response.status_code}')
+        return UNKNOWN_VALUE
+    
+    release_json = response.json()
+
+    if 'tag_name' not in release_json or not isinstance(release_json['tag_name'], str):
+        log.error(f'Unable to find tag name in Github response while getting the latest stable '
+            f'version for Nimbus.')
+        return UNKNOWN_VALUE
+    
+    tag_name = release_json['tag_name']
+    result = re.search(r'v?(?P<version>.+)', tag_name)
+    if not result:
+        log.error(f'Cannot parse tag name {tag_name} for Nimbus version.')
+        return UNKNOWN_VALUE
+    
+    latest_version = result.group('version')
+
+    log.info(f'Nimbus latest version is {latest_version}')
 
     return latest_version
 

@@ -3766,8 +3766,8 @@ Connected Peers: {result['bn_connected_peers']}
 def obtain_keys(network, consensus_client):
     # Obtain validator keys for the selected network
 
-    eth2_deposit_cli_path = Path(Path.home(), 'ethwizard', 'eth2depositcli')
-    validator_keys_path = Path(eth2_deposit_cli_path, 'validator_keys')
+    staking_deposit_cli_path = Path(Path.home(), 'ethwizard', 'staking-deposit-cli')
+    validator_keys_path = Path(staking_deposit_cli_path, 'validator_keys')
 
     # Check if there are keys already imported in our consensus client
 
@@ -4006,16 +4006,16 @@ to do a 32 {currency} deposit for each validator.
             return result
     
         # Check if staking-deposit-cli is already installed
-        eth2_deposit_cli_binary = Path(eth2_deposit_cli_path, 'deposit')
+        staking_deposit_cli_binary = Path(staking_deposit_cli_path, 'deposit')
 
-        eth2_deposit_found = False
+        staking_deposit_cli_found = False
 
-        if eth2_deposit_cli_binary.exists() and eth2_deposit_cli_binary.is_file():
+        if staking_deposit_cli_binary.exists() and staking_deposit_cli_binary.is_file():
             try:
                 process_result = subprocess.run([
-                    eth2_deposit_cli_binary, '--help'
+                    staking_deposit_cli_binary, '--help'
                     ], capture_output=True, text=True)
-                eth2_deposit_found = True
+                staking_deposit_cli_found = True
 
                 # TODO: Validate the output of deposit --help to make sure it's fine? Maybe?
                 # process_output = process_result.stdout
@@ -4023,9 +4023,9 @@ to do a 32 {currency} deposit for each validator.
             except FileNotFoundError:
                 pass
         
-        install_eth2_deposit_binary = True
+        install_staking_deposit_binary = True
 
-        if eth2_deposit_found:
+        if staking_deposit_cli_found:
             result = button_dialog(
                 title='staking-deposit-cli binary found',
                 text=(
@@ -4033,7 +4033,7 @@ f'''
 The staking-deposit-cli binary seems to have already been installed. Here
 are some details found:
 
-Location: {eth2_deposit_cli_binary}
+Location: {staking_deposit_cli_binary}
 
 Do you want to skip installing the staking-deposit-cli binary?
 '''             ),
@@ -4047,14 +4047,14 @@ Do you want to skip installing the staking-deposit-cli binary?
             if not result:
                 return result
         
-            install_eth2_deposit_binary = (result == 2)
+            install_staking_deposit_binary = (result == 2)
 
-        if install_eth2_deposit_binary:
+        if install_staking_deposit_binary:
             # Getting latest staking-deposit-cli release files
-            eth2_cli_gh_release_url = GITHUB_REST_API_URL + ETH2_DEPOSIT_CLI_LATEST_RELEASE
+            sdc_gh_release_url = GITHUB_REST_API_URL + SDC_LATEST_RELEASE
             headers = {'Accept': GITHUB_API_VERSION}
             try:
-                response = httpx.get(eth2_cli_gh_release_url, headers=headers,
+                response = httpx.get(sdc_gh_release_url, headers=headers,
                     follow_redirects=True)
             except httpx.RequestError as exception:
                 log.error(f'Cannot get latest staking-deposit-cli release from Github. '
@@ -4161,10 +4161,10 @@ Do you want to skip installing the staking-deposit-cli binary?
                     log.info('Good SHA256 checksum for staking-deposit-cli binary.')
             
             # Extracting the staking-deposit-cli binary archive
-            eth2_deposit_cli_path.mkdir(parents=True, exist_ok=True)
+            staking_deposit_cli_path.mkdir(parents=True, exist_ok=True)
             subprocess.run([
                 'tar', 'xvf', binary_path, '--strip-components', '2', '--directory',
-                eth2_deposit_cli_path])
+                staking_deposit_cli_path])
             
             # Remove download leftovers
             binary_path.unlink()
@@ -4175,7 +4175,7 @@ Do you want to skip installing the staking-deposit-cli binary?
         if validator_keys_path.is_dir():
             shutil.rmtree(validator_keys_path)
 
-        command = [eth2_deposit_cli_binary, 'new-mnemonic', '--chain', network]
+        command = [staking_deposit_cli_binary, 'new-mnemonic', '--chain', network]
 
         # Ask for withdrawal address
         withdrawal_address = select_withdrawal_address(log)
@@ -4187,10 +4187,10 @@ Do you want to skip installing the staking-deposit-cli binary?
 
         # Launch staking-deposit-cli
         log.info('Generating keys with staking-deposit-cli binary...')
-        subprocess.run(command, cwd=eth2_deposit_cli_path)
+        subprocess.run(command, cwd=staking_deposit_cli_path)
 
         # Clean up staking-deposit-cli binary
-        eth2_deposit_cli_binary.unlink()
+        staking_deposit_cli_binary.unlink()
 
         # Verify the generated keys
         generated_keys = search_for_generated_keys(validator_keys_path)
