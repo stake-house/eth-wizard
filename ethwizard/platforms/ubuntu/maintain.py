@@ -794,7 +794,7 @@ def get_consensus_client_details(consensus_client):
                 'argv': []
             },
             'is_merge_configured': UNKNOWN_VALUE,
-            'single_service': False,
+            'single_service': True,
         }
         
         # Check for existing systemd services
