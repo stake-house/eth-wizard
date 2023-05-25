@@ -3765,12 +3765,16 @@ def obtain_keys(network, consensus_client):
     validator_keys_path = Path(eth2_deposit_cli_path, 'validator_keys')
 
     # Check if there are keys already imported in our consensus client
-    
+
+    public_keys = []
+    keys_location = UNKNOWN_VALUE
+
     if consensus_client == CONSENSUS_CLIENT_LIGHTHOUSE:
 
         # Check if there are keys already imported in Lighthouse validator client
 
         lighthouse_datadir = Path('/var/lib/lighthouse')
+        keys_location = lighthouse_datadir
 
         process_result = subprocess.run([
             LIGHTHOUSE_INSTALLED_PATH, '--network', network, 'account', 'validator', 'list',
@@ -3780,45 +3784,13 @@ def obtain_keys(network, consensus_client):
             process_output = process_result.stdout
             public_keys = re.findall(r'0x[0-9a-f]{96}\s', process_output)
             public_keys = list(map(lambda x: x.strip(), public_keys))
-            
-            if len(public_keys) > 0:
-                # We already have keys imported
-
-                result = button_dialog(
-                    title='Validator keys already imported',
-                    text=(
-f'''
-It seems like validator keys have already been imported. Here are some
-details found:
-
-Number of validators: {len(public_keys)}
-Location: {lighthouse_datadir}
-
-Do you want to skip generating new keys?
-'''             ),
-                    buttons=[
-                        ('Skip', 1),
-                        ('Generate', 2),
-                        ('Quit', False)
-                    ]
-                ).run()
-
-                if not result:
-                    return result
-                
-                if result == 1:
-                    generated_keys = search_for_generated_keys(validator_keys_path)
-                    return generated_keys
-
-                # We want to obtain new keys from here
     
     elif consensus_client == CONSENSUS_CLIENT_NIMBUS:
 
         # Check if there are keys already imported in Nimbus
 
-        public_keys = []
-
         nimbus_datadir = Path('/var/lib/nimbus')
+        keys_location = nimbus_datadir
         nimbus_validators_path = nimbus_datadir.joinpath('validators')
 
         with os.scandir(nimbus_validators_path) as it:
@@ -3831,36 +3803,36 @@ Do you want to skip generating new keys?
                     if result:
                         public_keys.append(result.group(0))
         
-        if len(public_keys) > 0:
-            # We already have keys imported
+    if len(public_keys) > 0:
+        # We already have keys imported
 
-            result = button_dialog(
-                title='Validator keys already imported',
-                text=(
+        result = button_dialog(
+            title='Validator keys already imported',
+            text=(
 f'''
 It seems like validator keys have already been imported. Here are some
 details found:
 
 Number of validators: {len(public_keys)}
-Location: {nimbus_datadir}
+Location: {keys_location}
 
 Do you want to skip generating new keys?
 '''             ),
-                buttons=[
-                    ('Skip', 1),
-                    ('Generate', 2),
-                    ('Quit', False)
-                ]
-            ).run()
+            buttons=[
+                ('Skip', 1),
+                ('Generate', 2),
+                ('Quit', False)
+            ]
+        ).run()
 
-            if not result:
-                return result
-            
-            if result == 1:
-                generated_keys = search_for_generated_keys(validator_keys_path)
-                return generated_keys
+        if not result:
+            return result
+        
+        if result == 1:
+            generated_keys = search_for_generated_keys(validator_keys_path)
+            return generated_keys
 
-            # We want to obtain new keys from here
+        # We want to obtain new keys from here
     
     # Check if there are keys already created
     generated_keys = search_for_generated_keys(validator_keys_path)
