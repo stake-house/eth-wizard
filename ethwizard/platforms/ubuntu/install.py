@@ -4679,7 +4679,19 @@ We found {len(public_keys)} key(s) imported into Nimbus.
         log.error('We cannot find Nimbus anymore.')
         return False
 
-    addparams = []
+    # Configure the Nimbus service
+
+    nimbus_service_content = ''
+
+    with open('/etc/systemd/system/' + nimbus_service_name, 'r') as service_file:
+        nimbus_service_content = service_file.read()
+
+    result = re.search(r'ExecStart\s*=\s*(.*?)([^\\\n]*(\\\s+)?)*', nimbus_service_content)
+    if not result:
+        log.error('Cannot parse Nimbus service file.')
+        return False
+    
+    exec_start = result.group(0)
 
     # Check if merge ready
     merge_ready = False
@@ -4694,14 +4706,22 @@ We found {len(public_keys)} key(s) imported into Nimbus.
             merge_ready = True
 
     if merge_ready:
-        addparams.append(f'--suggested-fee-recipient={fee_recipient_address}')
+        log.info('Adding suggested fee recipient to Nimbus service...')
 
-    addparams_string = ''
-    if len(addparams) > 0:
-        addparams_string = ' ' + ' '.join(addparams)
+        # Remove all --suggested-fee-recipient related configuration
+        exec_start = re.sub(r'(\s*\\)?\s+--suggested-fee-recipient?\s*=?\s*\S+', '', exec_start)
 
-    # TODO: Update Nimbus service with new configuration options
-    # TODO: Restart Nimbus service
+        exec_start = exec_start + f' \\\n    --suggested-fee-recipient={fee_recipient_address}'
+
+    # Update Nimbus service with new configuration options
+    nimbus_service_content = re.sub(r'ExecStart\s*=\s*(.*?)([^\\\n]*(\\\s+)?)*',
+        exec_start, nimbus_service_content)
+
+    # Write back configuration
+    with open('/etc/systemd/system/' + nimbus_service_name, 'w') as service_file:
+        service_file.write(nimbus_service_content)
+
+    # Restart Nimbus service
     subprocess.run([
         'systemctl', 'daemon-reload'])
     subprocess.run([
