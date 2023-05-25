@@ -219,11 +219,18 @@ def show_dashboard(context):
 
     # If the service is not running, we need to start it
 
-    if not consensus_client_details['bn_service']['running']:
-        consensus_client_details['next_step'] = MAINTENANCE_START_SERVICE
+    if consensus_client_details['single_service']:
 
-    if not consensus_client_details['vc_service']['running']:
-        consensus_client_details['next_step'] = MAINTENANCE_START_SERVICE
+        if not consensus_client_details['service']['running']:
+            consensus_client_details['next_step'] = MAINTENANCE_START_SERVICE
+
+    else:
+
+        if not consensus_client_details['bn_service']['running']:
+            consensus_client_details['next_step'] = MAINTENANCE_START_SERVICE
+
+        if not consensus_client_details['vc_service']['running']:
+            consensus_client_details['next_step'] = MAINTENANCE_START_SERVICE
 
     # If the running version is older than the installed one, we need to restart the services
 
@@ -234,11 +241,20 @@ def show_dashboard(context):
     # If the installed version is merge ready but the client is not configured for the merge,
     # we need to configure the client for the merge
 
-    if is_version(installed_version):
-        if is_installed_cons_merge_ready and (
-            not consensus_client_details['is_bn_merge_configured'] or
-            not consensus_client_details['is_vc_merge_configured']):
-            consensus_client_details['next_step'] = MAINTENANCE_CONFIG_CLIENT_MERGE
+    if consensus_client_details['single_service']:
+
+        if is_version(installed_version):
+            if is_installed_cons_merge_ready and (
+                not consensus_client_details['is_merge_configured']):
+                consensus_client_details['next_step'] = MAINTENANCE_CONFIG_CLIENT_MERGE
+
+    else:
+
+        if is_version(installed_version):
+            if is_installed_cons_merge_ready and (
+                not consensus_client_details['is_bn_merge_configured'] or
+                not consensus_client_details['is_vc_merge_configured']):
+                consensus_client_details['next_step'] = MAINTENANCE_CONFIG_CLIENT_MERGE
 
     # If the installed version is older than the latest one, we need to upgrade the client
 
@@ -249,16 +265,31 @@ def show_dashboard(context):
             # If the next version is merge ready and we are not configured yet, we need to upgrade and
             # configure the client
 
-            if is_latest_cons_merge_ready and (
-                not consensus_client_details['is_bn_merge_configured'] or
-                not consensus_client_details['is_vc_merge_configured']):
-                consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
+            if consensus_client_details['single_service']:
+
+                if is_latest_cons_merge_ready and (
+                    not consensus_client_details['is_merge_configured']):
+                    consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
+
+            else:
+
+                if is_latest_cons_merge_ready and (
+                    not consensus_client_details['is_bn_merge_configured'] or
+                    not consensus_client_details['is_vc_merge_configured']):
+                    consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
 
     # If the service is not installed or found, we need to reinstall the client
 
-    if (not consensus_client_details['bn_service']['found'] or
-        not consensus_client_details['vc_service']['found']):
-        consensus_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
+    if consensus_client_details['single_service']:
+
+        if not consensus_client_details['service']['found']:
+            consensus_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
+
+    else:
+
+        if (not consensus_client_details['bn_service']['found'] or
+            not consensus_client_details['vc_service']['found']):
+            consensus_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
 
     # Get MEV-Boost details
 
@@ -341,10 +372,23 @@ def show_dashboard(context):
         f'Service is running: {execution_client_details["service"]["running"]}\n'
         f'<b>Maintenance task</b>: {maintenance_tasks_description.get(execution_client_details["next_step"], UNKNOWN_VALUE)}')
 
-    cc_section = (f'<b>Lighthouse</b> details (I: {consensus_client_details["versions"]["installed"]}, '
+    cc_running_service_section = ''
+
+    if consensus_client_details['single_service']:
+
+        cc_running_service_section = f'Service is running: {consensus_client_details["service"]["running"]}\n'
+
+    else:
+
+        cc_running_service_section = (
+            f'Running services - Beacon node: {consensus_client_details["bn_service"]["running"]}'
+            f', Validator client: {consensus_client_details["vc_service"]["running"]}\n'
+        )
+
+    cc_section = (f'<b>{current_consensus_client}</b> details (I: {consensus_client_details["versions"]["installed"]}, '
         f'R: {consensus_client_details["versions"]["running"]}, '
         f'L: {consensus_client_details["versions"]["latest"]})\n'
-        f'Running services - Beacon node: {consensus_client_details["bn_service"]["running"]}, Validator client: {consensus_client_details["vc_service"]["running"]}\n'
+        f'{cc_running_service_section}'
         f'<b>Maintenance task</b>: {maintenance_tasks_description.get(consensus_client_details["next_step"], UNKNOWN_VALUE)}')
 
     mb_section = ''
@@ -669,7 +713,8 @@ def get_consensus_client_details(consensus_client):
                 'argv': []
             },
             'is_bn_merge_configured': UNKNOWN_VALUE,
-            'is_vc_merge_configured': UNKNOWN_VALUE
+            'is_vc_merge_configured': UNKNOWN_VALUE,
+            'single_service': False,
         }
         
         # Check for existing systemd services
@@ -749,6 +794,7 @@ def get_consensus_client_details(consensus_client):
                 'argv': []
             },
             'is_merge_configured': UNKNOWN_VALUE,
+            'single_service': False,
         }
         
         # Check for existing systemd services
