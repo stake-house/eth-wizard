@@ -673,13 +673,11 @@ def get_consensus_client_details(consensus_client):
         }
         
         # Check for existing systemd services
-        lighthouse_bn_service_exists = False
         lighthouse_bn_service_name = LIGHTHOUSE_BN_SYSTEMD_SERVICE_NAME
 
         service_details = get_systemd_service_details(lighthouse_bn_service_name)
 
         if service_details['LoadState'] == 'loaded':
-            lighthouse_bn_service_exists = True
 
             details['bn_service']['found'] = True
             details['bn_service']['load'] = service_details['LoadState']
@@ -703,13 +701,11 @@ def get_consensus_client_details(consensus_client):
             details['is_bn_merge_configured'] = (
                 execution_jwt_flag_found and execution_endpoint_flag_found)
 
-        lighthouse_vc_service_exists = False
         lighthouse_vc_service_name = LIGHTHOUSE_VC_SYSTEMD_SERVICE_NAME
 
         service_details = get_systemd_service_details(lighthouse_vc_service_name)
 
         if service_details['LoadState'] == 'loaded':
-            lighthouse_vc_service_exists = True
         
             details['vc_service']['found'] = True
             details['vc_service']['load'] = service_details['LoadState']
@@ -769,6 +765,9 @@ def get_consensus_client_details(consensus_client):
             details['service']['active'] = service_details['ActiveState']
             details['service']['sub'] = service_details['SubState']
             details['service']['running'] = is_service_running(service_details)
+
+        if not nimbus_service_exists:
+            return details
 
         if 'ExecStart' in service_details:
             details['exec'] = parse_exec_start(service_details['ExecStart'])
