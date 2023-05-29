@@ -42,6 +42,7 @@ from ethwizard.platforms.common import (
     input_dialog_default,
     progress_log_dialog,
     search_for_generated_keys,
+    select_consensus_client,
     select_keys_directory,
     select_fee_recipient_address,
     select_withdrawal_address,
@@ -118,11 +119,20 @@ def installation_steps(*args, **kwargs):
     def select_custom_ports_function(step, context, step_sequence):
         # Context variables
         selected_ports = CTX_SELECTED_PORTS
+        selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
+
+        if not (
+            test_context_variable(context, selected_consensus_client, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_app()
+        
+        consensus_client = context[selected_consensus_client]
 
         if selected_ports not in context:
             context[selected_ports] = {
                 'eth1': DEFAULT_GETH_PORT,
-                'eth2_bn': DEFAULT_TEKU_BN_PORT
+                'eth2_bn': DEFAULT_CONSENSUS_PORT[consensus_client]
             }
         
         context[selected_ports] = select_custom_ports(context[selected_ports])
@@ -257,17 +267,21 @@ def installation_steps(*args, **kwargs):
         selected_directory = CTX_SELECTED_DIRECTORY
         selected_network = CTX_SELECTED_NETWORK
         obtained_keys = CTX_OBTAINED_KEYS
+        selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
 
         if not (
             test_context_variable(context, selected_directory, log) and
-            test_context_variable(context, selected_network, log)
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, selected_consensus_client, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
         
+        consensus_client = context[selected_consensus_client]
+        
         if obtained_keys not in context:
             context[obtained_keys] = obtain_keys(context[selected_directory],
-                context[selected_network])
+                context[selected_network], consensus_client)
             step_sequence.save_state(step.step_id, context)
 
         if not context[obtained_keys]:
@@ -420,7 +434,7 @@ def installation_steps(*args, **kwargs):
         exc_function=select_consensus_checkpoint_url_function
     )
 
-    def install_teku_function(step, context, step_sequence):
+    def install_consensus_function(step, context, step_sequence):
         # Context variables
         selected_directory = CTX_SELECTED_DIRECTORY
         selected_network = CTX_SELECTED_NETWORK
@@ -433,6 +447,7 @@ def installation_steps(*args, **kwargs):
         public_keys = CTX_PUBLIC_KEYS
         consensus_improved_service_timeout = CTX_CONSENSUS_IMPROVED_SERVICE_TIMEOUT
         mevboost_installed = CTX_MEVBOOST_INSTALLED
+        selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
 
         if not (
             test_context_variable(context, selected_directory, log) and
@@ -442,15 +457,27 @@ def installation_steps(*args, **kwargs):
             test_context_variable(context, selected_eth1_fallbacks, log) and
             test_context_variable(context, selected_consensus_checkpoint_url, log) and
             test_context_variable(context, selected_fee_recipient_address, log) and
-            test_context_variable(context, mevboost_installed, log)
+            test_context_variable(context, mevboost_installed, log) and
+            test_context_variable(context, selected_consensus_client, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
         
-        context[public_keys] = install_teku(context[selected_directory],
-            context[selected_network], context[obtained_keys], context[selected_eth1_fallbacks],
-            context[selected_consensus_checkpoint_url], context[selected_ports],
-            context[selected_fee_recipient_address], context[mevboost_installed])
+        consensus_client = context[selected_consensus_client]
+
+        if consensus_client == CONSENSUS_CLIENT_TEKU:
+
+            context[public_keys] = install_teku(context[selected_directory],
+                context[selected_network], context[obtained_keys], context[selected_eth1_fallbacks],
+                context[selected_consensus_checkpoint_url], context[selected_ports],
+                context[selected_fee_recipient_address], context[mevboost_installed])
+        
+        elif consensus_client == CONSENSUS_CLIENT_NIMBUS:
+
+            context[public_keys] = install_nimbus(context[selected_directory],
+                context[selected_network], context[obtained_keys], context[selected_eth1_fallbacks],
+                context[selected_consensus_checkpoint_url], context[selected_ports],
+                context[selected_fee_recipient_address], context[mevboost_installed])
 
         if type(context[public_keys]) is not list and not context[public_keys]:
             # User asked to quit or error
@@ -459,15 +486,14 @@ def installation_steps(*args, **kwargs):
 
             quit_app()
         
-        context[selected_consensus_client] = CONSENSUS_CLIENT_TEKU
         context[consensus_improved_service_timeout] = True
 
         return context
     
-    install_teku_step = Step(
-        step_id=INSTALL_TEKU_STEP_ID,
-        display_name='Teku installation',
-        exc_function=install_teku_function
+    install_consensus_step = Step(
+        step_id=INSTALL_CONSENSUS_STEP_ID,
+        display_name='Consensus client installation',
+        exc_function=install_consensus_function
     )
 
     def test_open_ports_function(step, context, step_sequence):
@@ -611,9 +637,29 @@ def installation_steps(*args, **kwargs):
         exc_function=show_public_keys_function
     )
 
+    def select_consensus_client_function(step, context, step_sequence):
+        # Context variables
+        selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
+
+        consensus_client = select_consensus_client(SUPPORTED_WINDOWS_CONSENSUS_CLIENTS)
+
+        if not consensus_client:
+            quit_app()
+        
+        context[selected_consensus_client] = consensus_client
+
+        return context
+    
+    select_consensus_client_step = Step(
+        step_id=SELECT_CONSENSUS_CLIENT_STEP_ID,
+        display_name='Select consensus client',
+        exc_function=select_consensus_client_function
+    )
+
     return [
         select_directory_step,
         select_network_step,
+        select_consensus_client_step,
         install_chocolatey_step,
         install_nssm_step,
         install_mevboost_step,
@@ -624,7 +670,7 @@ def installation_steps(*args, **kwargs):
         select_eth1_fallbacks_step,
         obtain_keys_step,
         select_fee_recipient_address_step,
-        install_teku_step,
+        install_consensus_step,
         install_geth_step,
         test_open_ports_step,
         install_monitoring_step,
@@ -2307,6 +2353,12 @@ def detect_merge_ready(base_directory, network):
 
     return {'result': is_merge_ready}
 
+def install_nimbus(base_directory, network, keys, eth1_fallbacks, consensus_checkpoint_url, ports,
+    fee_recipient_address, mevboost_installed):
+    # TODO: Install Nimbus for the selected network and return a list of public keys
+
+    pass
+
 def install_teku(base_directory, network, keys, eth1_fallbacks, consensus_checkpoint_url, ports,
     fee_recipient_address, mevboost_installed):
     # Install Teku for the selected network and return a list of public keys
@@ -3283,10 +3335,16 @@ Connected Peers: {result['bn_connected_peers']}
 
     return public_keys
 
-def obtain_keys(base_directory, network):
+def obtain_keys(base_directory, network, consensus_client):
     # Obtain validator keys for the selected network
 
     base_directory = Path(base_directory)
+
+    # Check if there are keys already imported in our consensus client
+
+    public_keys = []
+    keys_location = UNKNOWN_VALUE
+    generated_keys = {}
 
     # Check if there are keys already created
     keys_path = base_directory.joinpath('var', 'lib', 'eth', 'keys')
@@ -3340,6 +3398,57 @@ all previously generated keys and deposit data file.
         
         if result == 1:
             return generated_keys
+
+    if consensus_client == CONSENSUS_CLIENT_TEKU:
+
+        # Check if there are keys already imported into nimbus
+        nimbus_datadir = base_directory.joinpath('var', 'lib', 'nimbus')
+        keys_location = nimbus_datadir
+        nimbus_validators_path = nimbus_datadir.joinpath('validators')
+
+        # Ensure we currently have ACL permission to read from the keys path
+        if nimbus_validators_path.is_dir():
+            subprocess.run([
+                'icacls', str(nimbus_validators_path), '/inheritancelevel:e'
+            ])
+
+            with os.scandir(nimbus_validators_path) as it:
+                for entry in it:
+                    if entry.name.startswith('.'):
+                        continue
+
+                    if entry.is_dir():
+                        result = re.search(r'0x[0-9a-f]{96}', entry.name)
+                        if result:
+                            public_keys.append(result.group(0))
+    
+        if len(public_keys) > 0:
+            # We already have keys imported
+
+            result = button_dialog(
+                title='Validator keys already imported',
+                text=(
+f'''
+It seems like validator keys have already been imported. Here are some
+details found:
+
+Number of validators: {len(public_keys)}
+Location: {keys_location}
+
+Do you want to skip generating new keys?
+'''             ),
+                buttons=[
+                    ('Skip', 1),
+                    ('Generate', 2),
+                    ('Quit', False)
+                ]
+            ).run()
+
+            if not result:
+                return result
+            
+            if result == 1:
+                return generated_keys
 
     currency = NETWORK_CURRENCY[network]
 
@@ -3727,10 +3836,12 @@ Do you want to skip installing the staking-deposit-cli binary?
     if actual_keys['deposit_data_path'] is not None:
         shutil.copyfile(actual_keys['deposit_data_path'], target_deposit_data_path)
 
-    # Generate password files
-    keystore_password = input_dialog(
-        title='Enter your keystore password',
-        text=(
+    if consensus_client == CONSENSUS_CLIENT_TEKU:
+
+        # Generate password files
+        keystore_password = input_dialog(
+            title='Enter your keystore password',
+            text=(
 f'''
 Please enter the password you used to create your keystore with the
 staking-deposit-cli tool:
@@ -3740,25 +3851,25 @@ validator keys when starting. Permissions will be changed so that only
 the local system account can access the keys and the password file.
 
 * Press the tab key to switch between the controls below
-'''     ),
-        password=True).run()
+'''         ),
+            password=True).run()
 
-    if not keystore_password:
-        return False
+        if not keystore_password:
+            return False
 
-    with os.scandir(keys_path) as it:
-        for entry in it:
-            if not entry.is_file():
-                continue
-            if not entry.name.startswith('keystore'):
-                continue
-            if not entry.name.endswith('.json'):
-                continue
+        with os.scandir(keys_path) as it:
+            for entry in it:
+                if not entry.is_file():
+                    continue
+                if not entry.name.startswith('keystore'):
+                    continue
+                if not entry.name.endswith('.json'):
+                    continue
 
-            entry_path = Path(entry.path)
-            target_file = keys_path.joinpath(entry_path.stem + '.txt')
-            with open(target_file, 'w', encoding='utf8') as password_file:
-                password_file.write(keystore_password)
+                entry_path = Path(entry.path)
+                target_file = keys_path.joinpath(entry_path.stem + '.txt')
+                with open(target_file, 'w', encoding='utf8') as password_file:
+                    password_file.write(keystore_password)
 
     actual_keys = search_for_generated_keys(keys_path)
 
