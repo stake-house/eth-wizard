@@ -2600,9 +2600,6 @@ Do you want to skip installing the Nimbus binary?
 
         with os.scandir(extract_directory) as it:
             for entry in it:
-                if entry.name.startswith('.'):
-                    continue
-
                 if entry.is_dir():
                     if entry.name == 'build':
                         build_path = entry.path
@@ -2712,6 +2709,10 @@ you typed during the keys generation step. It is not your mnemonic.
         return result
 
     # Import validator keys into nimbus
+    subprocess.run([
+        'icacls', keys['validator_keys_path'], '/grant', 'Everyone:(F)', '/t'
+    ])
+
     if len(keys['keystore_paths']) > 0:
         process_result = subprocess.run([
             str(nimbus_path),
@@ -2731,11 +2732,12 @@ you typed during the keys generation step. It is not your mnemonic.
     # Check for correct keystore(s) import
     public_keys = []
 
+    if not nimbus_validators_path.is_dir():
+        log.error('There is no imported keystore files for Nimbus. We cannot continue.')
+        return False
+
     with os.scandir(nimbus_validators_path) as it:
         for entry in it:
-            if entry.name.startswith('.'):
-                continue
-
             if entry.is_dir():
                 result = re.search(r'0x[0-9a-f]{96}', entry.name)
                 if result:
@@ -2749,63 +2751,598 @@ you typed during the keys generation step. It is not your mnemonic.
     for keystore_path in keys['keystore_paths']:
         os.unlink(keystore_path)
     
+    subprocess.run([
+        'icacls', keys['validator_keys_path'], '/remove:g', 'Everyone', '/t'
+    ])
+    
     log.info(
 f'''
 We found {len(public_keys)} key(s) imported into Nimbus.
 '''
     )
 
-    # TODO: Protect imported keystore files and secrets
+    # Perform checkpoint sync
+    if consensus_checkpoint_url != '':
+        # Perform checkpoint sync with the trustedNodeSync command
+        log.info('Initializing Nimbus with a checkpoint sync endpoint.')
+        process_result = subprocess.run([
+            str(nimbus_path),
+            'trustedNodeSync',
+            f'--network={network}',
+            f'--data-dir={nimbus_datadir}',
+            f'--trusted-node-url={consensus_checkpoint_url}',
+            '--backfill=false'
+        ])
+        if process_result.returncode != 0:
+            log.error('Unable to initialize Nimbus with a checkpoint sync endpoint.')
+            return False
 
+    # Protect imported keystore files and secrets
     subprocess.run([
-        'icacls', str(nimbus_datadir), '/inheritance:e', '/remove:g', datadir_perm, '/t'
+        'icacls', str(nimbus_datadir), '/inheritance:e', '/remove:g', current_identity, '/t'
     ])
 
     system_identity = 'SYSTEM'
     datadir_perm = f'{system_identity}:(OI)(CI)(F)'
     secrets_perm = f'{system_identity}:(F)'
 
-    subprocess.run([
-        'icacls', str(nimbus_datadir), '/inheritance:r', '/grant:r', datadir_perm, '/t'
-    ])
+    # Set correct ACL permissions on secrets and validators directories
+    secrets_dirs_to_explore = []
+    secrets_dirs_explored = []
 
-    subprocess.run([
-        'icacls', str(nimbus_validators_path), '/inheritance:r', '/grant:r', secrets_perm, '/t'
-    ])
-    subprocess.run([
-        'icacls', str(nimbus_secrets_path), '/inheritance:r', '/grant:r', secrets_perm, '/t'
-    ])
+    secrets_dirs_to_explore.append(str(nimbus_validators_path))
+    secrets_dirs_to_explore.append(str(nimbus_secrets_path))
+    
+    while len(secrets_dirs_to_explore) > 0:
+        next_dir = secrets_dirs_to_explore.pop()
 
-    # Configure the Nimbus service
+        with os.scandir(next_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    secrets_dirs_to_explore.append(entry.path)
+                elif entry.is_file():
+                    subprocess.run([
+                        'icacls', entry.path, '/inheritance:r', '/grant:r', secrets_perm
+                    ])
 
-    '''subprocess.run([
-        'icacls', keys['validator_keys_path'], '/grant', 'Everyone:(R,RD)', '/t'
-    ])
+        secrets_dirs_explored.append(next_dir)
+    
+    for directory in reversed(secrets_dirs_explored):
+        subprocess.run([
+            'icacls', directory, '/inheritance:r', '/grant:r', secrets_perm
+        ])
+    
+    # Set correct ACL permissions on data directory.
+    data_dirs_to_explore = []
+    data_dirs_explored = []
 
-    with os.scandir(keys['validator_keys_path']) as it:
-        for entry in it:
-            if not entry.is_file():
-                continue
+    secrets_dirs = set((str(nimbus_validators_path), str(nimbus_secrets_path)))
 
-            if not entry.name.startswith('keystore'):
-                continue
+    data_dirs_to_explore.append(str(nimbus_datadir))
 
-            if not entry.name.endswith('.json'):
-                continue
+    while len(data_dirs_to_explore) > 0:
+        next_dir = data_dirs_to_explore.pop()
 
-            with open(entry.path, 'r') as keystore_file:
-                keystore = json.loads(keystore_file.read(204800))
+        with os.scandir(next_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    if entry.path in secrets_dirs:
+                        continue
+
+                    data_dirs_to_explore.append(entry.path)
+
+        data_dirs_explored.append(next_dir)
+    
+    for directory in reversed(data_dirs_explored):
+        subprocess.run([
+            'icacls', directory, '/inheritance:r', '/grant:r', datadir_perm
+        ])
+
+    # Setup Nimbus service
+    log_path = base_directory.joinpath('var', 'log')
+    log_path.mkdir(parents=True, exist_ok=True)
+
+    nimbus_stdout_log_path = log_path.joinpath('nimbus-service-stdout.log')
+    nimbus_stderr_log_path = log_path.joinpath('nimbus-service-stderr.log')
+
+    if nimbus_stdout_log_path.is_file():
+        nimbus_stdout_log_path.unlink()
+    if nimbus_stderr_log_path.is_file():
+        nimbus_stderr_log_path.unlink()
+
+    # Check if merge ready
+    merge_ready = False
+
+    result = re.search(r'([^-]+)', nimbus_version)
+    if result:
+        cleaned_nimbus_version = parse_version(result.group(1).strip())
+        target_nimbus_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][CONSENSUS_CLIENT_NIMBUS])
+
+        if cleaned_nimbus_version >= target_nimbus_version:
+            merge_ready = True
+
+    nimbus_arguments = NIMBUS_ARGUMENTS[network]
+
+    if merge_ready:
+        jwt_token_dir = base_directory.joinpath('var', 'lib', 'ethereum')
+        jwt_token_path = jwt_token_dir.joinpath('jwttoken')
+
+        if not setup_jwt_token_file(base_directory):
+            log.error(
+f'''
+Unable to create JWT token file in {jwt_token_path}
+'''
+            )
+
+            return False
         
-                if 'pubkey' not in keystore:
-                    log.error(f'No pubkey found in keystore file {entry.path}')
-                    continue
-                
-                public_key = keystore['pubkey']
-                public_keys.append('0x' + public_key)
+        nimbus_arguments.append(f'--jwt-secret={jwt_token_path}')
+        nimbus_arguments.append(f'--suggested-fee-recipient={fee_recipient_address}')
 
-    subprocess.run([
-        'icacls', keys['validator_keys_path'], '/remove:g', 'Everyone', '/t'
-    ])'''
+    local_eth1_endpoint = 'http://127.0.0.1:8545'
+    eth1_endpoints_flag = '--web3-url='
+    if merge_ready:
+        local_eth1_endpoint = 'http://127.0.0.1:8551'
+
+    nimbus_arguments.append(f'{eth1_endpoints_flag}{local_eth1_endpoint}')
+    nimbus_arguments.append(f'--data-dir={nimbus_datadir}')
+
+    if ports['eth2_bn'] != DEFAULT_NIMBUS_BN_PORT:
+        nimbus_arguments.append(f'--tcp-port={ports["eth2_bn"]}')
+        nimbus_arguments.append(f'--udp-port={ports["eth2_bn"]}')
+
+    if mevboost_installed:
+        nimbus_arguments.append('--payload-builder=true')
+        nimbus_arguments.append('--payload-builder-url=http://127.0.0.1:18550')
+
+    parameters = {
+        'DisplayName': NIMBUS_SERVICE_DISPLAY_NAME[network],
+        'AppRotateFiles': '1',
+        'AppRotateSeconds': '86400',
+        'AppRotateBytes': '10485760',
+        'AppStdout': str(nimbus_stdout_log_path),
+        'AppStderr': str(nimbus_stderr_log_path),
+        'AppStopMethodConsole': '1500'
+    }
+
+    if not create_service(nssm_binary, nimbus_service_name, str(nimbus_path), nimbus_arguments,
+        parameters):
+        log.error('There was an issue creating the Nimbus service. We cannot continue.')
+        return False
+
+    log.info('Starting Nimbus service...')
+    process_result = subprocess.run([
+        str(nssm_binary), 'start', nimbus_service_name
+    ])
+
+    delay = 30
+    log.info(f'We are giving {delay} seconds for the Nimbus service to start properly.')
+    time.sleep(delay)
+
+    # Verify proper Nimbus service installation
+    service_details = get_service_details(nssm_binary, nimbus_service_name)
+    if not service_details:
+        log.error('We could not find the Nimbus service we just created. '
+            'We cannot continue.')
+        return False
+
+    if not (service_details['status'] == WINDOWS_SERVICE_RUNNING):
+
+        result = button_dialog(
+            title='Nimbus service not running properly',
+            text=(
+f'''
+The Nimbus service we just created seems to have issues. Here are some
+details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+We cannot proceed if the Nimbus service cannot be started properly. Make
+sure to check the logs and fix any issue found there. You can see the
+logs in:
+
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        # Stop the service to prevent indefinite restart attempts
+        subprocess.run([
+            str(nssm_binary), 'stop', nimbus_service_name])
+
+        log.info(
+f'''
+To examine your Nimbus service logs, inspect the following files:
+
+{nimbus_stdout_log_path}
+{nimbus_stdout_log_path}
+'''
+        )
+
+        return False
+    
+    # TODO: Finish tests
+    return False
+
+    # Verify proper Teku installation and syncing
+    local_teku_http_base = 'http://127.0.0.1:5051'
+    
+    teku_version_query = BN_VERSION_EP
+    teku_query_url = local_teku_http_base + teku_version_query
+    headers = {
+        'accept': 'application/json'
+    }
+
+    keep_retrying = True
+
+    retry_index = 0
+    retry_count = 6
+    retry_delay = 30
+    retry_delay_increase = 10
+    last_exception = None
+    last_status_code = None
+
+    while keep_retrying and retry_index < retry_count:
+        try:
+            response = httpx.get(teku_query_url, headers=headers)
+        except httpx.RequestError as exception:
+            last_exception = exception
+
+            # Check for evidence of wrong password file
+            if teku_stderr_log_path.is_file():
+                log_part = ''
+                try:
+                    with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
+                        log_part = log_file.read(1024 * 100)
+                except OSError as os_exception:
+                    log.warning(f'Unable to read Teku log file in {teku_stderr_log_path}. '
+                        f'{os_exception}')
+                result = re.search(r'Failed to decrypt', log_part)
+                if result:
+                    subprocess.run([
+                        str(nssm_binary), 'stop', teku_service_name])
+                    
+                    log.error(
+f'''
+Your password file contains the wrong password. Teku cannot be started. You
+might need to generate your keys again or fix your password file. We cannot
+continue.
+
+Your password files are the .txt files in:
+
+{keys['validator_keys_path']}
+'''                 )
+                    return False
+            
+            log.warning(f'Exception {exception} when trying to connect to teku HTTP server on '
+                f'{teku_query_url}')
+
+            retry_index = retry_index + 1
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            retry_delay = retry_delay + retry_delay_increase
+            continue
+
+        if response.status_code != 200:
+            last_status_code = response.status_code
+
+            log.error(f'Error code {response.status_code} when trying to connect to teku HTTP '
+                f'server on {teku_query_url}')
+            
+            retry_index = retry_index + 1
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            retry_delay = retry_delay + retry_delay_increase
+            continue
+        
+        keep_retrying = False
+        last_exception = None
+        last_status_code = None
+    
+    if keep_retrying:
+        if last_exception is not None:
+            result = button_dialog(
+                title='Cannot connect to Teku',
+                text=(
+f'''
+We could not connect to teku HTTP server. Here are some details for this
+last test we tried to perform:
+
+URL: {teku_query_url}
+Method: GET
+Headers: {headers}
+Exception: {last_exception}
+
+We cannot proceed if the teku HTTP server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            log.info(
+f'''
+To examine your teku service logs, inspect the following files:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''
+            )
+
+            return False
+        elif last_status_code is not None:
+            result = button_dialog(
+                title='Cannot connect to Teku',
+                text=(
+f'''
+We could not connect to teku HTTP server. Here are some details for this
+last test we tried to perform:
+
+URL: {teku_query_url}
+Method: GET
+Headers: {headers}
+Status code: {last_status_code}
+
+We cannot proceed if the teku HTTP server is not responding properly. Make
+sure to check the logs and fix any issue found there. You can see the logs
+in:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            log.info(
+f'''
+To examine your teku service logs, inspect the following files:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''
+            )
+
+            return False
+
+    # Verify proper Teku syncing
+    def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
+        bn_is_working = False
+        bn_is_syncing = False
+        bn_has_few_peers = False
+        bn_connected_peers = 0
+        bn_head_slot = UNKNOWN_VALUE
+        bn_sync_distance = UNKNOWN_VALUE
+
+        set_result({
+            'bn_is_working': bn_is_working,
+            'bn_is_syncing': bn_is_syncing,
+            'bn_head_slot': bn_head_slot,
+            'bn_sync_distance': bn_sync_distance,
+            'bn_connected_peers': bn_connected_peers
+        })
+
+        set_percentage(10)
+
+        out_log_read_index = 0
+        err_log_read_index = 0
+
+        while True:
+
+            if get_exited():
+                return {
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                }
+
+            # Output logs
+            out_log_text = ''
+            with open(teku_stdout_log_path, 'r', encoding='utf8') as log_file:
+                log_file.seek(out_log_read_index)
+                out_log_text = log_file.read()
+                out_log_read_index = log_file.tell()
+            
+            err_log_text = ''
+            with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
+                log_file.seek(err_log_read_index)
+                err_log_text = log_file.read()
+                err_log_read_index = log_file.tell()
+            
+            out_log_length = len(out_log_text)
+            if out_log_length > 0:
+                log_text(out_log_text)
+
+            err_log_length = len(err_log_text)
+            if err_log_length > 0:
+                log_text(err_log_text)
+
+            time.sleep(1)
+            
+            teku_syncing_query = BN_SYNCING_EP
+            teku_query_url = local_teku_http_base + teku_syncing_query
+            headers = {
+                'accept': 'application/json'
+            }
+            try:
+                response = httpx.get(teku_query_url, headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Teku.')
+                continue
+
+            if response.status_code != 200:
+                log_text(f'Status code: {response.status_code} while querying Teku.')
+                continue
+        
+            response_json = response.json()
+            syncing_json = response_json
+
+            teku_peers_query = BN_PEERS_EP
+            teku_query_url = local_teku_http_base + teku_peers_query
+            headers = {
+                'accept': 'application/json'
+            }
+            try:
+                response = httpx.get(teku_query_url, headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Teku.')
+                continue
+
+            if response.status_code != 200:
+                log_text(f'Status code: {response.status_code} while querying Teku.')
+                continue
+
+            response_json = response.json()
+            peers_json = response_json
+
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'is_syncing' in syncing_json['data']
+                ):
+                bn_is_syncing = bool(syncing_json['data']['is_syncing'])
+            else:
+                bn_is_syncing = False
+            
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'head_slot' in syncing_json['data']
+                ):
+                bn_head_slot = syncing_json['data']['head_slot']
+            else:
+                bn_head_slot = UNKNOWN_VALUE
+
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'sync_distance' in syncing_json['data']
+                ):
+                bn_sync_distance = syncing_json['data']['sync_distance']
+            else:
+                bn_sync_distance = UNKNOWN_VALUE
+
+            bn_connected_peers = 0
+            if (
+                peers_json and
+                'data' in peers_json and
+                type(peers_json['data']) is list
+                ):
+                for peer in peers_json['data']:
+                    if 'state' not in peer:
+                        continue
+                    if peer['state'] == 'connected':
+                        bn_connected_peers = bn_connected_peers + 1
+            
+            bn_has_few_peers = bn_connected_peers >= BN_MIN_FEW_PEERS
+
+            if bn_is_syncing or bn_has_few_peers:
+                set_percentage(100)
+            else:
+                set_percentage(10 + round(min(bn_connected_peers / BN_MIN_FEW_PEERS, 1.0) * 90.0))
+
+            change_status((
+f'''
+Syncing: {bn_is_syncing} (Head slot: {bn_head_slot}, Sync distance: {bn_sync_distance})
+Connected Peers: {bn_connected_peers}
+'''         ).strip())
+
+            if bn_is_syncing or bn_has_few_peers:
+                bn_is_working = True
+                return {
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                }
+            else:
+                set_result({
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                })
+
+    result = progress_log_dialog(
+        title='Verifying proper Teku service installation',
+        text=(
+f'''
+We are waiting for Teku to sync or find enough peers to confirm that it is
+working properly.
+'''     ),
+        status_text=(
+'''
+Syncing: Unknown (Head slot: Unknown, Sync distance: Unknown)
+Connected Peers: Unknown
+'''
+        ).strip(),
+        run_callback=verifying_callback
+    ).run()
+    
+    if not result:
+        log.warning('Teku service installation verification was cancelled.')
+        return False
+
+    if not result['bn_is_working']:
+        # We could not get a proper result from the Teku
+        result = button_dialog(
+            title='Teku service installation verification interrupted',
+            text=(
+f'''
+We were interrupted before we could fully verify the teku service
+installation. Here are some results for the last tests we performed:
+
+Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
+Connected Peers: {result['bn_connected_peers']}
+
+We cannot proceed if the teku service is not installed properly. Make sure
+to check the logs and fix any issue found there. You can see the logs in:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your teku service logs, inspect the following files:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''
+        )
+
+        return False
+
+    log.info(
+f'''
+Teku is installed and working properly.
+
+Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
+Connected Peers: {result['bn_connected_peers']}
+''' )
+    time.sleep(5)
 
     return public_keys
 
@@ -3849,24 +4386,21 @@ all previously generated keys and deposit data file.
         if result == 1:
             return generated_keys
 
-    if consensus_client == CONSENSUS_CLIENT_TEKU:
+    if consensus_client == CONSENSUS_CLIENT_NIMBUS:
 
         # Check if there are keys already imported into nimbus
         nimbus_datadir = base_directory.joinpath('var', 'lib', 'nimbus')
         keys_location = nimbus_datadir
         nimbus_validators_path = nimbus_datadir.joinpath('validators')
 
-        # Ensure we currently have ACL permission to read from the keys path
+        # TODO: Ensure we currently have ACL permission to read from the keys path
         if nimbus_validators_path.is_dir():
-            subprocess.run([
+            '''subprocess.run([
                 'icacls', str(nimbus_validators_path), '/inheritancelevel:e'
-            ])
+            ])'''
 
             with os.scandir(nimbus_validators_path) as it:
                 for entry in it:
-                    if entry.name.startswith('.'):
-                        continue
-
                     if entry.is_dir():
                         result = re.search(r'0x[0-9a-f]{96}', entry.name)
                         if result:
@@ -3974,9 +4508,6 @@ Would you like to import your keys or generate them here?
             # Copy keys into keys_path
             with os.scandir(selected_keys_directory) as it:
                 for entry in it:
-                    if entry.name.startswith('.'):
-                        continue
-
                     if not entry.is_file():
                         continue
 
@@ -4242,7 +4773,7 @@ Do you want to skip installing the staking-deposit-cli binary?
 
         # Ask for withdrawal address
         withdrawal_address = select_withdrawal_address(log)
-        if withdrawal_address is None:
+        if withdrawal_address is None or withdrawal_address is False:
             return False
         
         if withdrawal_address != '':
@@ -4325,11 +4856,7 @@ the local system account can access the keys and the password file.
 
     # Change ACL to protect keys directory
     subprocess.run([
-        'icacls', str(keys_path), '/grant', 'SYSTEM:F', '/t'
-    ])
-
-    subprocess.run([
-        'icacls', str(keys_path), '/inheritancelevel:r'
+        'icacls', str(keys_path), '/inheritancelevel:r', '/grant', 'SYSTEM:F', '/t'
     ])
 
     return actual_keys

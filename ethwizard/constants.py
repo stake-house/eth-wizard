@@ -295,6 +295,16 @@ NIMBUS_INSTALLED_DIRECTORY = '/usr/local/bin'
 NIMBUS_INSTALLED_PATH = f'{NIMBUS_INSTALLED_DIRECTORY}/nimbus_beacon_node'
 NIMBUS_VC_INSTALLED_PATH = f'{NIMBUS_INSTALLED_DIRECTORY}/nimbus_validator_client'
 
+NIMBUS_SERVICE_DISPLAY_NAME = {
+    NETWORK_MAINNET: 'Nimbus Ethereum Client (Mainnet)',
+    NETWORK_GOERLI: 'Nimbus Ethereum Client (Görli)'
+}
+
+NIMBUS_ARGUMENTS = {
+    NETWORK_MAINNET: ['--network=mainnet', '--rest=true', '--metrics=true', '--enr-auto-update=true'],
+    NETWORK_GOERLI: ['--network=goerli', '--rest=true', '--metrics=true', '--enr-auto-update=true']
+}
+
 WINDOWS_SERVICE_RUNNING = 'SERVICE_RUNNING'
 WINDOWS_SERVICE_START_PENDING = 'SERVICE_START_PENDING'
 

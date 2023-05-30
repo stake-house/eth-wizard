@@ -4179,7 +4179,7 @@ Do you want to skip installing the staking-deposit-cli binary?
 
         # Ask for withdrawal address
         withdrawal_address = select_withdrawal_address(log)
-        if withdrawal_address is None:
+        if withdrawal_address is None or withdrawal_address is False:
             return False
         
         if withdrawal_address != '':
