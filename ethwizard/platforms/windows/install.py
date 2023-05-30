@@ -2618,6 +2618,13 @@ Do you want to skip installing the Nimbus binary?
         bin_path = base_directory.joinpath('bin')
         bin_path.mkdir(parents=True, exist_ok=True)
 
+        dest_nimbus_bn_path = bin_path.joinpath('nimbus_beacon_node.exe')
+        dest_nimbus_vc_path = bin_path.joinpath('nimbus_validator_client.exe')
+        if dest_nimbus_bn_path.is_file():
+            dest_nimbus_bn_path.unlink()
+        if dest_nimbus_vc_path.is_file():
+            dest_nimbus_vc_path.unlink()
+
         shutil.move(src_nimbus_bn_path, bin_path)
         shutil.move(src_nimbus_vc_path, bin_path)
 
