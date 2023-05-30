@@ -684,24 +684,24 @@ def installation_steps(*args, **kwargs):
 def create_firewall_rule(ports):
     # Add rules to Windows Firewall to make sure we can accept connections on clients ports
 
-    geth_rule_name = 'geth'
+    execution_rule_name = 'Ethereum execution client'
 
-    geth_tcp_rule_name = f'{geth_rule_name} TCP'
-    geth_udp_rule_name = f'{geth_rule_name} UDP'
+    ec_tcp_rule_name = f'{execution_rule_name} TCP'
+    ec_udp_rule_name = f'{execution_rule_name} UDP'
 
-    log.info('Checking if we have a TCP firewall rule for Geth...')
+    log.info('Checking if we have a TCP firewall rule for the execution client...')
     process_result = subprocess.run([
-        'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={geth_tcp_rule_name}'
+        'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={ec_tcp_rule_name}'
     ])
     if process_result.returncode == 0:
-        log.info('Deleting existing TCP firewall rule for Geth before creating the new one...')
+        log.info('Deleting existing TCP firewall rule for the execution client before creating the new one...')
         subprocess.run([
-            'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={geth_tcp_rule_name}'
+            'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={ec_tcp_rule_name}'
         ])
-    log.info('Creating a new TCP firewall rule for Geth...')
+    log.info('Creating a new TCP firewall rule for the execution client...')
     process_result = subprocess.run([
         'netsh', 'advfirewall', 'firewall', 'add', 'rule',
-        f'name={geth_tcp_rule_name}',
+        f'name={ec_tcp_rule_name}',
         'dir=in',
         'action=allow',
         'service=any',
@@ -710,19 +710,19 @@ def create_firewall_rule(ports):
         f'localport={ports["eth1"]}'
     ])
 
-    log.info('Checking if we have a UDP firewall rule for Geth...')
+    log.info('Checking if we have a UDP firewall rule for the execution client...')
     process_result = subprocess.run([
-        'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={geth_udp_rule_name}'
+        'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={ec_udp_rule_name}'
     ])
     if process_result.returncode == 0:
-        log.info('Deleting existing UDP firewall rule for Geth before creating the new one...')
+        log.info('Deleting existing UDP firewall rule for the execution client before creating the new one...')
         subprocess.run([
-            'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={geth_udp_rule_name}'
+            'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={ec_udp_rule_name}'
         ])
-    log.info('Creating a new UDP firewall rule for Geth...')
+    log.info('Creating a new UDP firewall rule for the execution client...')
     process_result = subprocess.run([
         'netsh', 'advfirewall', 'firewall', 'add', 'rule',
-        f'name={geth_udp_rule_name}',
+        f'name={ec_udp_rule_name}',
         'dir=in',
         'action=allow',
         'service=any',
@@ -731,24 +731,24 @@ def create_firewall_rule(ports):
         f'localport={ports["eth1"]}'
     ])
 
-    teku_rule_name = 'teku'
+    consensus_rule_name = 'Ethereum consensus client'
 
-    teku_tcp_rule_name = f'{teku_rule_name} TCP'
-    teku_udp_rule_name = f'{teku_rule_name} UDP'
+    cc_tcp_rule_name = f'{consensus_rule_name} TCP'
+    cc_udp_rule_name = f'{consensus_rule_name} UDP'
 
-    log.info('Checking if we have a TCP firewall rule for Teku...')
+    log.info('Checking if we have a TCP firewall rule for the consensus client...')
     process_result = subprocess.run([
-        'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={teku_tcp_rule_name}'
+        'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={cc_tcp_rule_name}'
     ])
     if process_result.returncode == 0:
-        log.info('Deleting existing TCP firewall rule for Teku before creating the new one...')
+        log.info('Deleting existing TCP firewall rule for the consensus client before creating the new one...')
         subprocess.run([
-            'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={teku_tcp_rule_name}'
+            'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={cc_tcp_rule_name}'
         ])
-    log.info('Creating a new TCP firewall rule for Teku...')
+    log.info('Creating a new TCP firewall rule for the consensus client...')
     process_result = subprocess.run([
         'netsh', 'advfirewall', 'firewall', 'add', 'rule',
-        f'name={teku_tcp_rule_name}',
+        f'name={cc_tcp_rule_name}',
         'dir=in',
         'action=allow',
         'service=any',
@@ -757,19 +757,19 @@ def create_firewall_rule(ports):
         f'localport={ports["eth2_bn"]}'
     ])
 
-    log.info('Checking if we have a UDP firewall rule for Teku...')
+    log.info('Checking if we have a UDP firewall rule for the consensus client...')
     process_result = subprocess.run([
-        'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={teku_udp_rule_name}'
+        'netsh', 'advfirewall', 'firewall', 'show', 'rule', f'name={cc_udp_rule_name}'
     ])
     if process_result.returncode == 0:
-        log.info('Deleting existing UDP firewall rule for Teku before creating the new one...')
+        log.info('Deleting existing UDP firewall rule for the consensus client before creating the new one...')
         subprocess.run([
-            'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={teku_udp_rule_name}'
+            'netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={cc_udp_rule_name}'
         ])
-    log.info('Creating a new UDP firewall rule for Teku...')
+    log.info('Creating a new UDP firewall rule for the consensus client...')
     process_result = subprocess.run([
         'netsh', 'advfirewall', 'firewall', 'add', 'rule',
-        f'name={teku_udp_rule_name}',
+        f'name={cc_udp_rule_name}',
         'dir=in',
         'action=allow',
         'service=any',
@@ -2355,9 +2355,320 @@ def detect_merge_ready(base_directory, network):
 
 def install_nimbus(base_directory, network, keys, eth1_fallbacks, consensus_checkpoint_url, ports,
     fee_recipient_address, mevboost_installed):
-    # TODO: Install Nimbus for the selected network and return a list of public keys
+    # Install Nimbus for the selected network and return a list of public keys
 
-    pass
+    base_directory = Path(base_directory)
+
+    nssm_binary = get_nssm_binary()
+    if not nssm_binary:
+        return False
+
+    # Check for existing service
+    nimbus_service_exists = False
+    nimbus_service_name = 'nimbus'
+
+    service_details = get_service_details(nssm_binary, nimbus_service_name)
+
+    if service_details is not None:
+        nimbus_service_exists = True
+    
+    if nimbus_service_exists:
+        result = button_dialog(
+            title='Nimbus service found',
+            text=(
+f'''
+The Nimbus service seems to have already been created. Here are some
+details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+Do you want to skip installing Nimbus and its service?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            public_keys = []
+
+            subprocess.run([
+                'icacls', keys['validator_keys_path'], '/grant', 'Everyone:(R,RD)', '/t'
+            ])
+
+            with os.scandir(keys['validator_keys_path']) as it:
+                for entry in it:
+                    if not entry.is_file():
+                        continue
+
+                    if not entry.name.startswith('keystore'):
+                        continue
+
+                    if not entry.name.endswith('.json'):
+                        continue
+
+                    with open(entry.path, 'r') as keystore_file:
+                        keystore = json.loads(keystore_file.read(204800))
+                
+                        if 'pubkey' not in keystore:
+                            log.error(f'No pubkey found in keystore file {entry.path}')
+                            continue
+                        
+                        public_key = keystore['pubkey']
+                        public_keys.append('0x' + public_key)
+
+            subprocess.run([
+                'icacls', keys['validator_keys_path'], '/remove:g', 'Everyone', '/t'
+            ])
+
+            return public_keys
+        
+        # User wants to proceed, make sure the Nimbus service is stopped first
+        subprocess.run([
+            str(nssm_binary), 'stop', nimbus_service_name])
+    
+    result = button_dialog(
+        title='Nimbus installation',
+        text=(
+'''
+This next step will install Nimbus, an Ethereum consensus client that
+includes a beacon node and a validator client in the same binary
+distribution.
+
+It will download the official Nimbus binary distribution from GitHub and
+it will extract it for easy use. You will be invited to provide an
+initial state to fast-track syncing.
+
+Once installed locally, it will create a service that will automatically
+start Nimbus on reboot or if it crashes. The Nimbus client will be
+started and you will start syncing with the Ethereum network. The Nimbus
+client will automatically start validating once syncing is completed and
+your validator(s) are activated.
+'''     ),
+        buttons=[
+            ('Install', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+
+    # Check if Nimbus is already installed
+    nimbus_path = base_directory.joinpath('bin', 'nimbus_beacon_node.exe')
+
+    nimbus_found = False
+    nimbus_version = 'unknown'
+
+    if nimbus_path.is_file():
+        try:
+            process_result = subprocess.run([str(nimbus_path), '--version'],
+                capture_output=True, text=True)
+            nimbus_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'Nimbus beacon node v?(?P<version>[^-]+)', process_output)
+            if result:
+                nimbus_version = result.group('version').strip()
+
+        except FileNotFoundError:
+            pass
+    
+    install_nimbus_binary = True
+
+    if nimbus_found:
+        result = button_dialog(
+            title='Nimbus binary found',
+            text=(
+f'''
+The Nimbus binary seems to have already been installed. Here are some
+details found:
+
+Version: {nimbus_version}
+Location: {nimbus_path}
+
+Do you want to skip installing the Nimbus binary?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        install_nimbus_binary = (result == 2)
+    
+    if install_nimbus_binary:
+        # Getting latest Nimbus release files
+        nimbus_gh_release_url = GITHUB_REST_API_URL + NIMBUS_LATEST_RELEASE
+        headers = {'Accept': GITHUB_API_VERSION}
+        try:
+            response = httpx.get(nimbus_gh_release_url, headers=headers,
+                follow_redirects=True)
+        except httpx.RequestError as exception:
+            log.error(f'Exception while downloading Nimbus binary. {exception}')
+            return False
+
+        if response.status_code != 200:
+            log.error(f'HTTP error while downloading Nimbus binary. '
+                f'Status code {response.status_code}')
+            return False
+        
+        release_json = response.json()
+
+        if 'assets' not in release_json:
+            log.error('No assets in Github release for Nimbus.')
+            return False
+        
+        binary_asset = None
+
+        archive_filename_comp = 'nimbus-eth2_Windows_amd64'
+
+        for asset in release_json['assets']:
+            if 'name' not in asset:
+                continue
+            if 'browser_download_url' not in asset:
+                continue
+        
+            file_name = asset['name']
+            file_url = asset['browser_download_url']
+
+            if file_name.startswith(archive_filename_comp):
+                binary_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+
+        if binary_asset is None:
+            log.error('Could not find binary in Github release.')
+            return False
+        
+        # Downloading latest Nimbus release files
+        download_path = base_directory.joinpath('downloads')
+        download_path.mkdir(parents=True, exist_ok=True)
+
+        binary_path = Path(download_path, binary_asset['file_name'])
+
+        try:
+            with open(binary_path, 'wb') as binary_file:
+                with httpx.stream('GET', binary_asset['file_url'],
+                    follow_redirects=True) as http_stream:
+                    if http_stream.status_code != 200:
+                        log.error(f'HTTP error while downloading Nimbus binary from Github. '
+                            f'Status code {http_stream.status_code}')
+                        return False
+                    for data in http_stream.iter_bytes():
+                        binary_file.write(data)
+        except httpx.RequestError as exception:
+            log.error(f'Exception while downloading Nimbus binary from Github. {exception}')
+            return False
+        
+        extract_directory = download_path.joinpath('nimbus')
+        if extract_directory.is_dir():
+            shutil.rmtree(extract_directory)
+        elif extract_directory.is_file():
+            os.unlink(extract_directory)
+        extract_directory.mkdir(parents=True, exist_ok=True)
+        
+        # Extracting the Lighthouse binary archive
+        subprocess.run([
+            'tar', 'xvf', binary_path, '--directory', extract_directory])
+        
+        # Remove download leftovers
+        binary_path.unlink()
+
+        # Find the Nimbus binaries and copy them in their installed location
+        build_path = None
+
+        with os.scandir(extract_directory) as it:
+            for entry in it:
+                if entry.name.startswith('.'):
+                    continue
+
+                if entry.is_dir():
+                    if entry.name == 'build':
+                        build_path = entry.path
+                    else:
+                        build_path = os.path.join(entry.path, 'build')
+                    break
+        
+        if build_path is None:
+            log.error('Cannot find the correct directory in the extracted Nimbus archive.')
+            return False
+
+        src_nimbus_bn_path = Path(build_path, 'nimbus_beacon_node.exe')
+        src_nimbus_vc_path = Path(build_path, 'nimbus_validator_client.exe')
+
+        if not src_nimbus_bn_path.is_file() or not src_nimbus_vc_path.is_file():
+            log.error(f'Cannot find the Nimbus binaries in the extracted archive.')
+            return False
+        
+        bin_path = base_directory.joinpath('bin')
+        bin_path.mkdir(parents=True, exist_ok=True)
+
+        shutil.move(src_nimbus_bn_path, bin_path)
+        shutil.move(src_nimbus_vc_path, bin_path)
+
+        # Remove extraction leftovers
+        shutil.rmtree(extract_directory)
+
+        # Get Nimbus version
+        try:
+            process_result = subprocess.run([str(nimbus_path), '--version'],
+                capture_output=True, text=True)
+            nimbus_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'Nimbus beacon node v?(?P<version>[^-]+)', process_output)
+            if result:
+                nimbus_version = result.group('version').strip()
+        except FileNotFoundError:
+            pass
+
+    public_keys = []
+
+    '''subprocess.run([
+        'icacls', keys['validator_keys_path'], '/grant', 'Everyone:(R,RD)', '/t'
+    ])
+
+    with os.scandir(keys['validator_keys_path']) as it:
+        for entry in it:
+            if not entry.is_file():
+                continue
+
+            if not entry.name.startswith('keystore'):
+                continue
+
+            if not entry.name.endswith('.json'):
+                continue
+
+            with open(entry.path, 'r') as keystore_file:
+                keystore = json.loads(keystore_file.read(204800))
+        
+                if 'pubkey' not in keystore:
+                    log.error(f'No pubkey found in keystore file {entry.path}')
+                    continue
+                
+                public_key = keystore['pubkey']
+                public_keys.append('0x' + public_key)
+
+    subprocess.run([
+        'icacls', keys['validator_keys_path'], '/remove:g', 'Everyone', '/t'
+    ])'''
+
+    return public_keys
 
 def install_teku(base_directory, network, keys, eth1_fallbacks, consensus_checkpoint_url, ports,
     fee_recipient_address, mevboost_installed):
