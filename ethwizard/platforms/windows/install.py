@@ -2363,6 +2363,9 @@ def install_nimbus(base_directory, network, keys, eth1_fallbacks, consensus_chec
     if not nssm_binary:
         return False
 
+    nimbus_datadir = base_directory.joinpath('var', 'lib', 'nimbus')
+    nimbus_validators_path = nimbus_datadir.joinpath('validators')
+
     # Check for existing service
     nimbus_service_exists = False
     nimbus_service_name = 'nimbus'
@@ -2401,7 +2404,9 @@ Do you want to skip installing Nimbus and its service?
         if result == 1:
             public_keys = []
 
-            subprocess.run([
+            # TODO: Find existing imported keys in Nimbus
+
+            '''subprocess.run([
                 'icacls', keys['validator_keys_path'], '/grant', 'Everyone:(R,RD)', '/t'
             ])
 
@@ -2428,7 +2433,7 @@ Do you want to skip installing Nimbus and its service?
 
             subprocess.run([
                 'icacls', keys['validator_keys_path'], '/remove:g', 'Everyone', '/t'
-            ])
+            ])'''
 
             return public_keys
         
@@ -2644,7 +2649,112 @@ Do you want to skip installing the Nimbus binary?
         except FileNotFoundError:
             pass
 
+    # Check if Nimbus directory already exists
+    if nimbus_datadir.is_dir():
+        nimbus_datadir_size = sizeof_fmt(get_dir_size(nimbus_datadir))
+
+        result = button_dialog(
+            title='Nimbus data directory found',
+            text=(
+f'''
+An existing Nimbus data directory has been found. Here are some
+details found:
+
+Location: {nimbus_datadir}
+Size: {nimbus_datadir_size}
+
+Do you want to remove this directory first and start from nothing?
+'''         ),
+            buttons=[
+                ('Remove', 1),
+                ('Keep', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            shutil.rmtree(nimbus_datadir)
+
+    # Setup Nimbus directory
+    nimbus_datadir.mkdir(parents=True, exist_ok=True)
+
+    # Setup Nimbus data directory permission
+
+    current_username = os.environ['USERNAME']
+    current_userdomain = os.environ['USERDOMAIN']
+    current_identity = f'{current_userdomain}\\{current_username}'
+    datadir_perm = f'{current_identity}:(OI)(CI)(F)'
+
+    subprocess.run([
+        'icacls', str(nimbus_datadir), '/inheritance:r', '/grant:r', datadir_perm
+    ])
+
+    result = button_dialog(
+        title='Nimbus validators',
+        text=(HTML(
+'''
+This next step will import your keystore(s) to be used with Nimbus.
+
+During the importation process, you will be asked to enter the password
+you typed during the keys generation step. It is not your mnemonic.
+'''     )),
+        buttons=[
+            ('Import', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+
+    # Import validator keys into nimbus
+    if len(keys['keystore_paths']) > 0:
+        process_result = subprocess.run([
+            str(nimbus_path),
+            'deposits', 'import',
+            f'--data-dir={nimbus_datadir}',
+            keys['validator_keys_path']
+        ])
+        if process_result.returncode != 0:
+            log.error('Unable to import keystore(s) with Nimbus.')
+            return False
+        
+    else:
+        log.warning('No keystore files found to import. We\'ll guess they were already imported '
+            'for now.')
+        time.sleep(5)
+
+    # Check for correct keystore(s) import
     public_keys = []
+
+    with os.scandir(nimbus_validators_path) as it:
+        for entry in it:
+            if entry.name.startswith('.'):
+                continue
+
+            if entry.is_dir():
+                result = re.search(r'0x[0-9a-f]{96}', entry.name)
+                if result:
+                    public_keys.append(result.group(0))
+
+    if len(public_keys) < 1:
+        log.error('No key imported into Nimbus.')
+        return False
+
+    # Clean up generated keys
+    for keystore_path in keys['keystore_paths']:
+        os.unlink(keystore_path)
+    
+    log.info(
+f'''
+We found {len(public_keys)} key(s) imported into Nimbus.
+'''
+    )
+
+    # TODO: Protect imported keystore files and secrets
 
     '''subprocess.run([
         'icacls', keys['validator_keys_path'], '/grant', 'Everyone:(R,RD)', '/t'
