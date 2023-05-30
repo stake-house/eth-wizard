@@ -2365,6 +2365,7 @@ def install_nimbus(base_directory, network, keys, eth1_fallbacks, consensus_chec
 
     nimbus_datadir = base_directory.joinpath('var', 'lib', 'nimbus')
     nimbus_validators_path = nimbus_datadir.joinpath('validators')
+    nimbus_secrets_path = nimbus_datadir.joinpath('secrets')
 
     # Check for existing service
     nimbus_service_exists = False
@@ -2689,7 +2690,7 @@ Do you want to remove this directory first and start from nothing?
     datadir_perm = f'{current_identity}:(OI)(CI)(F)'
 
     subprocess.run([
-        'icacls', str(nimbus_datadir), '/inheritance:r', '/grant:r', datadir_perm
+        'icacls', str(nimbus_datadir), '/inheritance:r', '/grant:r', datadir_perm, '/t'
     ])
 
     result = button_dialog(
@@ -2755,6 +2756,27 @@ We found {len(public_keys)} key(s) imported into Nimbus.
     )
 
     # TODO: Protect imported keystore files and secrets
+
+    subprocess.run([
+        'icacls', str(nimbus_datadir), '/inheritance:e', '/remove:g', datadir_perm, '/t'
+    ])
+
+    system_identity = 'SYSTEM'
+    datadir_perm = f'{system_identity}:(OI)(CI)(F)'
+    secrets_perm = f'{system_identity}:(F)'
+
+    subprocess.run([
+        'icacls', str(nimbus_datadir), '/inheritance:r', '/grant:r', datadir_perm, '/t'
+    ])
+
+    subprocess.run([
+        'icacls', str(nimbus_validators_path), '/inheritance:r', '/grant:r', secrets_perm, '/t'
+    ])
+    subprocess.run([
+        'icacls', str(nimbus_secrets_path), '/inheritance:r', '/grant:r', secrets_perm, '/t'
+    ])
+
+    # Configure the Nimbus service
 
     '''subprocess.run([
         'icacls', keys['validator_keys_path'], '/grant', 'Everyone:(R,RD)', '/t'
