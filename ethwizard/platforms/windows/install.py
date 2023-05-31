@@ -575,17 +575,21 @@ def installation_steps(*args, **kwargs):
         selected_directory = CTX_SELECTED_DIRECTORY
         selected_network = CTX_SELECTED_NETWORK
         obtained_keys = CTX_OBTAINED_KEYS
+        selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
 
         if not (
             test_context_variable(context, selected_directory, log) and
             test_context_variable(context, selected_network, log) and
-            test_context_variable(context, obtained_keys, log)
+            test_context_variable(context, obtained_keys, log) and
+            test_context_variable(context, selected_consensus_client, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
         
+        consensus_client = context[selected_consensus_client]
+        
         if not initiate_deposit(context[selected_directory], context[selected_network],
-            context[obtained_keys]):
+            context[obtained_keys], consensus_client):
             # User asked to quit
             quit_app()
 
@@ -4950,7 +4954,7 @@ the local system account can access the keys and the password file.
 
     return actual_keys
 
-def initiate_deposit(base_directory, network, keys):
+def initiate_deposit(base_directory, network, keys, consensus_client):
     # Initiate and explain the deposit on launchpad
 
     base_directory = Path(base_directory)
@@ -4968,26 +4972,37 @@ def initiate_deposit(base_directory, network, keys):
         return False
 
     # Check for syncing status before prompting for deposit
+    local_bn_http_base = 'http://127.0.0.1:5052'
 
-    teku_service_name = 'teku'
-    log_path = base_directory.joinpath('var', 'log')
+    stdout_log_path = UNKNOWN_VALUE
+    stderr_log_path = UNKNOWN_VALUE
 
-    teku_stdout_log_path = log_path.joinpath('teku-service-stdout.log')
-    teku_stderr_log_path = log_path.joinpath('teku-service-stderr.log')
+    if consensus_client == CONSENSUS_CLIENT_TEKU:
 
-    # Check if Teku service is still running
-    service_details = get_service_details(nssm_binary, teku_service_name)
-    if not service_details:
-        log.error('We could not find the teku service we created. '
-            'We cannot continue.')
-        return False
+        local_bn_http_base = 'http://127.0.0.1:5051'
 
-    if not (
-        service_details['status'] == WINDOWS_SERVICE_RUNNING):
+        teku_service_name = 'teku'
+        log_path = base_directory.joinpath('var', 'log')
 
-        result = button_dialog(
-            title='Teku service not running properly',
-            text=(
+        teku_stdout_log_path = log_path.joinpath('teku-service-stdout.log')
+        teku_stderr_log_path = log_path.joinpath('teku-service-stderr.log')
+
+        stdout_log_path = teku_stdout_log_path
+        stderr_log_path = teku_stderr_log_path
+
+        # Check if Teku service is still running
+        service_details = get_service_details(nssm_binary, teku_service_name)
+        if not service_details:
+            log.error('We could not find the teku service we created. '
+                'We cannot continue.')
+            return False
+
+        if not (
+            service_details['status'] == WINDOWS_SERVICE_RUNNING):
+
+            result = button_dialog(
+                title='Teku service not running properly',
+                text=(
 f'''
 The teku service we created seems to have issues. Here are some details
 found:
@@ -5003,53 +5018,109 @@ to check the logs and fix any issue found there. You can see the logs in:
 
 {teku_stdout_log_path}
 {teku_stderr_log_path}
-'''         ),
-            buttons=[
-                ('Quit', False)
-            ]
-        ).run()
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
 
-        log.info(
+            log.info(
 f'''
 To examine your teku service logs, inspect the following files:
 
 {teku_stdout_log_path}
 {teku_stderr_log_path}
 '''
-        )
+            )
 
-        return False
-
-    # Verify proper Teku installation and syncing
-    local_teku_http_base = 'http://127.0.0.1:5051'
+            return False
     
-    teku_version_query = BN_VERSION_EP
-    teku_query_url = local_teku_http_base + teku_version_query
+    elif consensus_client == CONSENSUS_CLIENT_NIMBUS:
+
+        nimbus_service_name = 'nimbus'
+        log_path = base_directory.joinpath('var', 'log')
+
+        nimbus_stdout_log_path = log_path.joinpath('nimbus-service-stdout.log')
+        nimbus_stderr_log_path = log_path.joinpath('nimbus-service-stderr.log')
+
+        stdout_log_path = nimbus_stdout_log_path
+        stderr_log_path = nimbus_stderr_log_path
+
+        # Check if Teku service is still running
+        service_details = get_service_details(nssm_binary, nimbus_service_name)
+        if not service_details:
+            log.error('We could not find the Nimbus service we created. '
+                'We cannot continue.')
+            return False
+
+        if not (
+            service_details['status'] == WINDOWS_SERVICE_RUNNING):
+
+            result = button_dialog(
+                title='Nimbus service not running properly',
+                text=(
+f'''
+The Nimbus service we created seems to have issues. Here are some details
+found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+We cannot proceed if the Nimbus service cannot be started properly. Make
+sure to check the logs and fix any issue found there. You can see the
+logs in:
+
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            log.info(
+f'''
+To examine your teku service logs, inspect the following files:
+
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
+'''
+            )
+
+            return False
+
+
+    # Verify proper consensus installation and syncing
+    bn_version_query = BN_VERSION_EP
+    bn_query_url = local_bn_http_base + bn_version_query
     headers = {
         'accept': 'application/json'
     }
     try:
-        response = httpx.get(teku_query_url, headers=headers)
+        response = httpx.get(bn_query_url, headers=headers)
     except httpx.RequestError as exception:
 
         result = button_dialog(
-            title='Cannot connect to Teku',
+            title='Cannot connect to beacon node',
             text=(
 f'''
-We could not connect to teku HTTP server. Here are some details for this
-last test we tried to perform:
+We could not connect to beacon node HTTP server. Here are some details
+for this last test we tried to perform:
 
-URL: {teku_query_url}
+URL: {bn_query_url}
 Method: GET
 Headers: {headers}
 Exception: {exception}
 
-We cannot proceed if the teku HTTP server is not responding properly. Make
-sure to check the logs and fix any issue found there. You can see the logs
-in:
+We cannot proceed if the beacon node HTTP server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs with:
 
-{teku_stdout_log_path}
-{teku_stderr_log_path}
+{stdout_log_path}
+{stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -5058,10 +5129,10 @@ in:
 
         log.info(
 f'''
-To examine your teku service logs, inspect the following files:
+To examine your beacon node service logs, inspect the following files:
 
-{teku_stdout_log_path}
-{teku_stderr_log_path}
+{stdout_log_path}
+{stderr_log_path}
 '''
         )
 
@@ -5069,23 +5140,23 @@ To examine your teku service logs, inspect the following files:
 
     if response.status_code != 200:
         result = button_dialog(
-            title='Cannot connect to Teku',
+            title='Cannot connect to beacon node',
             text=(
 f'''
-We could not connect to teku HTTP server. Here are some details for this
-last test we tried to perform:
+We could not connect to beacon node HTTP server. Here are some details
+for this last test we tried to perform:
 
-URL: {teku_query_url}
+URL: {bn_query_url}
 Method: GET
 Headers: {headers}
 Status code: {response.status_code}
 
-We cannot proceed if the teku HTTP server is not responding properly. Make
-sure to check the logs and fix any issue found there. You can see the logs
-in:
+We cannot proceed if the beacon node HTTP server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs with:
 
-{teku_stdout_log_path}
-{teku_stderr_log_path}
+{stdout_log_path}
+{stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -5094,10 +5165,10 @@ in:
 
         log.info(
 f'''
-To examine your teku service logs, inspect the following files:
+To examine your beacon node service logs, inspect the following files:
 
-{teku_stdout_log_path}
-{teku_stderr_log_path}
+{stdout_log_path}
+{stderr_log_path}
 '''
         )
 
@@ -5107,7 +5178,7 @@ To examine your teku service logs, inspect the following files:
 
     while not is_fully_sync:
 
-        # Verify proper Teku syncing
+        # Verify proper beacon node syncing
         def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
             bn_is_fully_sync = False
             bn_is_syncing = False
@@ -5141,13 +5212,13 @@ To examine your teku service logs, inspect the following files:
 
                 # Output logs
                 out_log_text = ''
-                with open(teku_stdout_log_path, 'r', encoding='utf8') as log_file:
+                with open(stdout_log_path, 'r', encoding='utf8') as log_file:
                     log_file.seek(out_log_read_index)
                     out_log_text = log_file.read()
                     out_log_read_index = log_file.tell()
                 
                 err_log_text = ''
-                with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
+                with open(stderr_log_path, 'r', encoding='utf8') as log_file:
                     log_file.seek(err_log_read_index)
                     err_log_text = log_file.read()
                     err_log_read_index = log_file.tell()
@@ -5160,37 +5231,37 @@ To examine your teku service logs, inspect the following files:
                 if err_log_length > 0:
                     log_text(err_log_text)
                 
-                teku_syncing_query = BN_SYNCING_EP
-                teku_query_url = local_teku_http_base + teku_syncing_query
+                bn_syncing_query = BN_SYNCING_EP
+                bn_query_url = local_bn_http_base + bn_syncing_query
                 headers = {
                     'accept': 'application/json'
                 }
                 try:
-                    response = httpx.get(teku_query_url, headers=headers)
+                    response = httpx.get(bn_query_url, headers=headers)
                 except httpx.RequestError as exception:
-                    log_text(f'Exception: {exception} while querying Teku.')
+                    log_text(f'Exception: {exception} while querying beacon node.')
                     continue
 
                 if response.status_code != 200:
-                    log_text(f'Status code: {response.status_code} while querying Teku.')
+                    log_text(f'Status code: {response.status_code} while querying beacon node.')
                     continue
             
                 response_json = response.json()
                 syncing_json = response_json
 
-                teku_peers_query = BN_PEERS_EP
-                teku_query_url = local_teku_http_base + teku_peers_query
+                bn_peers_query = BN_PEERS_EP
+                bn_query_url = local_bn_http_base + bn_peers_query
                 headers = {
                     'accept': 'application/json'
                 }
                 try:
-                    response = httpx.get(teku_query_url, headers=headers)
+                    response = httpx.get(bn_peers_query, headers=headers)
                 except httpx.RequestError as exception:
-                    log_text(f'Exception: {exception} while querying Teku.')
+                    log_text(f'Exception: {exception} while querying beacon node.')
                     continue
 
                 if response.status_code != 200:
-                    log_text(f'Status code: {response.status_code} while querying Teku.')
+                    log_text(f'Status code: {response.status_code} while querying beacon node.')
                     continue
 
                 response_json = response.json()
@@ -5306,7 +5377,7 @@ Connected Peers: {bn_connected_peers}
             log.error(f'Exception: {exception} while querying beaconcha.in.')
 
         result = progress_log_dialog(
-            title='Verifying Teku syncing status',
+            title='Verifying beacon node syncing status',
             text=(HTML(
 f'''
 It is a good idea to wait for your beacon node to be in sync before doing
@@ -5326,19 +5397,19 @@ Connected Peers: Unknown
         ).run()
         
         if not result:
-            log.warning('Teku syncing wait was cancelled.')
+            log.warning('Beacon node syncing wait was cancelled.')
             return False
 
         syncing_status = result
 
         if not result['bn_is_fully_sync']:
-            # We could not get a proper result from the Teku
+            # We could not get a proper result from the beacon node
             result = button_dialog(
-                title='Teku beacon node syncing wait interrupted',
+                title='Beacon node beacon node syncing wait interrupted',
                 text=(HTML(
 f'''
-We were interrupted before we could confirm the Teku beacon node
-was in sync. Here are some results for the last tests we performed:
+We were interrupted before we could confirm the beacon node was in sync.
+Here are some results for the last tests we performed:
 
 Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
 Connected Peers: {result['bn_connected_peers']}
