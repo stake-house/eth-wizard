@@ -2727,20 +2727,6 @@ Do you want to remove this directory first and start from nothing?
             ])
             shutil.rmtree(nimbus_datadir)
 
-    # Setup Nimbus directory
-    nimbus_datadir.mkdir(parents=True, exist_ok=True)
-
-    # Setup Nimbus data directory permission
-
-    current_username = os.environ['USERNAME']
-    current_userdomain = os.environ['USERDOMAIN']
-    current_identity = f'{current_userdomain}\\{current_username}'
-    datadir_perm = f'{current_identity}:(OI)(CI)(F)'
-
-    subprocess.run([
-        'icacls', str(nimbus_datadir), '/inheritance:r', '/grant:r', datadir_perm, '/t'
-    ])
-
     result = button_dialog(
         title='Nimbus validators',
         text=(HTML(
@@ -2759,9 +2745,52 @@ you typed during the keys generation step. It is not your mnemonic.
     if not result:
         return result
 
+    # Setup Nimbus directory
+    nimbus_datadir.mkdir(parents=True, exist_ok=True)
+
+    # Setup Nimbus data directory permission
+    current_username = os.environ['USERNAME']
+    current_userdomain = os.environ['USERDOMAIN']
+    current_identity = f'{current_userdomain}\\{current_username}'
+    datadir_perm = f'{current_identity}:(OI)(CI)(F)'
+    datadir_perm_file = f'{current_identity}:(F)'
+
+    subprocess.run([
+        'icacls', str(nimbus_datadir), '/inheritance:r', '/grant:r', datadir_perm, '/t'
+    ])
+
+    # Rework preexisting permissions
+    system_identity = 'SYSTEM'
+    dirs_to_explore = []
+    dirs_explored = []
+
+    dirs_to_explore.append(str(nimbus_datadir))
+    
+    while len(dirs_to_explore) > 0:
+        next_dir = dirs_to_explore.pop()
+
+        with os.scandir(next_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    dirs_to_explore.append(entry.path)
+                elif entry.is_file():
+                    subprocess.run([
+                        'icacls', entry.path, '/inheritance:r', '/grant:r', datadir_perm_file
+                    ])
+                    subprocess.run([
+                        'icacls', entry.path, '/remove:g', system_identity
+                    ])
+
+        dirs_explored.append(next_dir)
+    
+    for directory in reversed(dirs_explored):
+        subprocess.run([
+            'icacls', directory, '/remove:g', system_identity
+        ])
+
     # Import validator keys into nimbus
     subprocess.run([
-        'icacls', keys['validator_keys_path'], '/grant', 'Everyone:(F)', '/t'
+        'icacls', keys['validator_keys_path'], '/grant:r', 'Everyone:(F)', '/t'
     ])
 
     if len(keys['keystore_paths']) > 0:
@@ -2829,45 +2858,12 @@ We found {len(public_keys)} key(s) imported into Nimbus.
             return False
 
     # Protect imported keystore files and secrets
-    subprocess.run([
-        'icacls', str(nimbus_datadir), '/inheritance:e', '/remove:g', current_identity, '/t'
-    ])
-
-    system_identity = 'SYSTEM'
     datadir_perm = f'{system_identity}:(OI)(CI)(F)'
     secrets_perm = f'{system_identity}:(F)'
-
-    # Set correct ACL permissions on secrets and validators directories
-    secrets_dirs_to_explore = []
-    secrets_dirs_explored = []
-
-    secrets_dirs_to_explore.append(str(nimbus_validators_path))
-    secrets_dirs_to_explore.append(str(nimbus_secrets_path))
-    
-    while len(secrets_dirs_to_explore) > 0:
-        next_dir = secrets_dirs_to_explore.pop()
-
-        with os.scandir(next_dir) as it:
-            for entry in it:
-                if entry.is_dir():
-                    secrets_dirs_to_explore.append(entry.path)
-                elif entry.is_file():
-                    subprocess.run([
-                        'icacls', entry.path, '/inheritance:r', '/grant:r', secrets_perm
-                    ])
-
-        secrets_dirs_explored.append(next_dir)
-    
-    for directory in reversed(secrets_dirs_explored):
-        subprocess.run([
-            'icacls', directory, '/inheritance:r', '/grant:r', secrets_perm
-        ])
     
     # Set correct ACL permissions on data directory.
     data_dirs_to_explore = []
     data_dirs_explored = []
-
-    secrets_dirs = set((str(nimbus_validators_path), str(nimbus_secrets_path)))
 
     data_dirs_to_explore.append(str(nimbus_datadir))
 
@@ -2877,16 +2873,42 @@ We found {len(public_keys)} key(s) imported into Nimbus.
         with os.scandir(next_dir) as it:
             for entry in it:
                 if entry.is_dir():
-                    if entry.path in secrets_dirs:
-                        continue
-
                     data_dirs_to_explore.append(entry.path)
+                elif entry.is_file():
+                    subprocess.run([
+                        'icacls', entry.path, '/inheritance:r', '/grant:r', secrets_perm
+                    ])
 
         data_dirs_explored.append(next_dir)
     
     for directory in reversed(data_dirs_explored):
         subprocess.run([
             'icacls', directory, '/inheritance:r', '/grant:r', datadir_perm
+        ])
+    
+    # Remove current identity permissions
+    dirs_to_explore = []
+    dirs_explored = []
+
+    dirs_to_explore.append(str(nimbus_datadir))
+
+    while len(dirs_to_explore) > 0:
+        next_dir = dirs_to_explore.pop()
+
+        with os.scandir(next_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    dirs_to_explore.append(entry.path)
+                elif entry.is_file():
+                    subprocess.run([
+                        'icacls', entry.path, '/remove:g', current_identity
+                    ])
+
+        dirs_explored.append(next_dir)
+    
+    for directory in reversed(dirs_explored):
+        subprocess.run([
+            'icacls', directory, '/remove:g', current_identity
         ])
 
     # Setup Nimbus service
