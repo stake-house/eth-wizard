@@ -5255,7 +5255,7 @@ To examine your beacon node service logs, inspect the following files:
                     'accept': 'application/json'
                 }
                 try:
-                    response = httpx.get(bn_peers_query, headers=headers)
+                    response = httpx.get(bn_query_url, headers=headers)
                 except httpx.RequestError as exception:
                     log_text(f'Exception: {exception} while querying beacon node.')
                     continue
