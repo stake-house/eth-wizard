@@ -967,11 +967,12 @@ Binary: {service_details['install']}
 App parameters: {service_details['parameters'].get('AppParameters')}
 App directory: {service_details['parameters'].get('AppDirectory')}
 
-Do you want to skip installing MEV-Boost and its service?
+Do you want to keep the current MEV-Boost service?
 '''         ),
             buttons=[
-                ('Skip', 1),
-                ('Install', 2),
+                ('Keep', 1),
+                ('Reinstall', 2),
+                ('Remove', 3),
                 ('Quit', False)
             ]
         ).run()
@@ -981,6 +982,15 @@ Do you want to skip installing MEV-Boost and its service?
 
         if result == 1:
             installed_value['installed'] = True
+            return installed_value
+
+        if result == 3:
+            subprocess.run([
+                str(nssm_binary), 'stop', mevboost_service_name])
+            subprocess.run([
+                str(nssm_binary), 'remove', mevboost_service_name, 'confirm'])
+
+            installed_value['installed'] = False
             return installed_value
         
         # User wants to proceed, make sure the MEV-Boost service is stopped first

@@ -1101,11 +1101,12 @@ ExecStart: {service_details['ExecStart']}
 ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
 FragmentPath: {service_details['FragmentPath']}
 
-Do you want to skip installing MEV-Boost and its service?
+Do you want to keep the current MEV-Boost service?
 '''         ),
             buttons=[
-                ('Skip', 1),
-                ('Install', 2),
+                ('Keep', 1),
+                ('Reinstall', 2),
+                ('Remove', 3),
                 ('Quit', False)
             ]
         ).run()
@@ -1115,6 +1116,16 @@ Do you want to skip installing MEV-Boost and its service?
         
         if result == 1:
             installed_value['installed'] = True
+            return installed_value
+
+        if result == 3:
+            subprocess.run([
+                'systemctl', 'stop', mevboost_service_name])
+            os.unlink('/etc/systemd/system/' + mevboost_service_name)
+            subprocess.run([
+                'systemctl', 'daemon-reload'])
+
+            installed_value['installed'] = False
             return installed_value
         
         # User wants to proceed, make sure the mev-boost service is stopped first
