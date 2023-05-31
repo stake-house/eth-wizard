@@ -980,7 +980,8 @@ Do you want to skip installing MEV-Boost and its service?
             return result
 
         if result == 1:
-            return True
+            installed_value['installed'] = True
+            return installed_value
         
         # User wants to proceed, make sure the MEV-Boost service is stopped first
         subprocess.run([
@@ -2405,36 +2406,52 @@ Do you want to skip installing Nimbus and its service?
         if result == 1:
             public_keys = []
 
-            # TODO: Find existing imported keys in Nimbus
-
-            '''subprocess.run([
-                'icacls', keys['validator_keys_path'], '/grant', 'Everyone:(R,RD)', '/t'
+            # Find existing imported keys in Nimbus
+            subprocess.run([
+                'icacls', str(nimbus_datadir), '/grant:r', 'Everyone:(F)', '/t'
             ])
 
-            with os.scandir(keys['validator_keys_path']) as it:
-                for entry in it:
-                    if not entry.is_file():
-                        continue
+            if nimbus_validators_path.is_dir():
+                with os.scandir(nimbus_validators_path) as it:
+                    for entry in it:
+                        if entry.is_dir():
+                            result = re.search(r'0x[0-9a-f]{96}', entry.name)
+                            if result:
+                                public_keys.append(result.group(0))
 
-                    if not entry.name.startswith('keystore'):
-                        continue
+            dirs_to_explore = []
+            dirs_explored = []
 
-                    if not entry.name.endswith('.json'):
-                        continue
+            dirs_to_explore.append(str(nimbus_datadir))
+            
+            while len(dirs_to_explore) > 0:
+                next_dir = dirs_to_explore.pop()
 
-                    with open(entry.path, 'r') as keystore_file:
-                        keystore = json.loads(keystore_file.read(204800))
-                
-                        if 'pubkey' not in keystore:
-                            log.error(f'No pubkey found in keystore file {entry.path}')
-                            continue
-                        
-                        public_key = keystore['pubkey']
-                        public_keys.append('0x' + public_key)
+                with os.scandir(next_dir) as it:
+                    for entry in it:
+                        if entry.is_dir():
+                            dirs_to_explore.append(entry.path)
+                        elif entry.is_file():
+                            subprocess.run([
+                                'icacls', entry.path, '/remove:g', 'Everyone'
+                            ])
 
-            subprocess.run([
-                'icacls', keys['validator_keys_path'], '/remove:g', 'Everyone', '/t'
-            ])'''
+                dirs_explored.append(next_dir)
+            
+            for directory in reversed(dirs_explored):
+                subprocess.run([
+                    'icacls', directory, '/remove:g', 'Everyone'
+                ])
+
+            if len(public_keys) < 1:
+                log.error('No key imported into Nimbus.')
+                return False
+    
+            log.info(
+f'''
+We found {len(public_keys)} key(s) imported into Nimbus.
+'''
+            )
 
             return public_keys
         
@@ -2649,7 +2666,38 @@ Do you want to skip installing the Nimbus binary?
 
     # Check if Nimbus directory already exists
     if nimbus_datadir.is_dir():
+
+        # Correct permissions for reading
+        subprocess.run([
+            'icacls', str(nimbus_datadir), '/grant:r', 'Everyone:(F)', '/t'
+        ])
+
         nimbus_datadir_size = sizeof_fmt(get_dir_size(nimbus_datadir))
+
+        # Removing these added permissions
+        dirs_to_explore = []
+        dirs_explored = []
+
+        dirs_to_explore.append(str(nimbus_datadir))
+        
+        while len(dirs_to_explore) > 0:
+            next_dir = dirs_to_explore.pop()
+
+            with os.scandir(next_dir) as it:
+                for entry in it:
+                    if entry.is_dir():
+                        dirs_to_explore.append(entry.path)
+                    elif entry.is_file():
+                        subprocess.run([
+                            'icacls', entry.path, '/remove:g', 'Everyone'
+                        ])
+
+            dirs_explored.append(next_dir)
+        
+        for directory in reversed(dirs_explored):
+            subprocess.run([
+                'icacls', directory, '/remove:g', 'Everyone'
+            ])
 
         result = button_dialog(
             title='Nimbus data directory found',
@@ -2674,6 +2722,9 @@ Do you want to remove this directory first and start from nothing?
             return result
         
         if result == 1:
+            subprocess.run([
+                'icacls', str(nimbus_datadir), '/grant', 'Everyone:(F)', '/t'
+            ])
             shutil.rmtree(nimbus_datadir)
 
     # Setup Nimbus directory
@@ -2885,7 +2936,11 @@ Unable to create JWT token file in {jwt_token_path}
     if merge_ready:
         local_eth1_endpoint = 'http://127.0.0.1:8551'
 
-    nimbus_arguments.append(f'{eth1_endpoints_flag}{local_eth1_endpoint}')
+    eth1_endpoints = [local_eth1_endpoint] + eth1_fallbacks
+
+    for endpoint in eth1_endpoints:
+        nimbus_arguments.append(f'{eth1_endpoints_flag}{endpoint}')
+
     nimbus_arguments.append(f'--data-dir={nimbus_datadir}')
 
     if ports['eth2_bn'] != DEFAULT_NIMBUS_BN_PORT:
@@ -2968,15 +3023,12 @@ To examine your Nimbus service logs, inspect the following files:
         )
 
         return False
-    
-    # TODO: Finish tests
-    return False
 
-    # Verify proper Teku installation and syncing
-    local_teku_http_base = 'http://127.0.0.1:5051'
+    # Verify proper Nimbus installation and syncing
+    local_nimbus_http_base = 'http://127.0.0.1:5052'
     
-    teku_version_query = BN_VERSION_EP
-    teku_query_url = local_teku_http_base + teku_version_query
+    cc_version_query = BN_VERSION_EP
+    cc_query_url = local_nimbus_http_base + cc_version_query
     headers = {
         'accept': 'application/json'
     }
@@ -2992,38 +3044,12 @@ To examine your Nimbus service logs, inspect the following files:
 
     while keep_retrying and retry_index < retry_count:
         try:
-            response = httpx.get(teku_query_url, headers=headers)
+            response = httpx.get(cc_query_url, headers=headers)
         except httpx.RequestError as exception:
             last_exception = exception
-
-            # Check for evidence of wrong password file
-            if teku_stderr_log_path.is_file():
-                log_part = ''
-                try:
-                    with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
-                        log_part = log_file.read(1024 * 100)
-                except OSError as os_exception:
-                    log.warning(f'Unable to read Teku log file in {teku_stderr_log_path}. '
-                        f'{os_exception}')
-                result = re.search(r'Failed to decrypt', log_part)
-                if result:
-                    subprocess.run([
-                        str(nssm_binary), 'stop', teku_service_name])
-                    
-                    log.error(
-f'''
-Your password file contains the wrong password. Teku cannot be started. You
-might need to generate your keys again or fix your password file. We cannot
-continue.
-
-Your password files are the .txt files in:
-
-{keys['validator_keys_path']}
-'''                 )
-                    return False
             
-            log.warning(f'Exception {exception} when trying to connect to teku HTTP server on '
-                f'{teku_query_url}')
+            log.warning(f'Exception {exception} when trying to connect to Nimbus HTTP server on '
+                f'{cc_query_url}')
 
             retry_index = retry_index + 1
             log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
@@ -3034,8 +3060,8 @@ Your password files are the .txt files in:
         if response.status_code != 200:
             last_status_code = response.status_code
 
-            log.error(f'Error code {response.status_code} when trying to connect to teku HTTP '
-                f'server on {teku_query_url}')
+            log.error(f'Error code {response.status_code} when trying to connect to Nimbus HTTP '
+                f'server on {cc_query_url}')
             
             retry_index = retry_index + 1
             log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
@@ -3050,23 +3076,23 @@ Your password files are the .txt files in:
     if keep_retrying:
         if last_exception is not None:
             result = button_dialog(
-                title='Cannot connect to Teku',
+                title='Cannot connect to Nimbus',
                 text=(
 f'''
-We could not connect to teku HTTP server. Here are some details for this
-last test we tried to perform:
+We could not connect to Nimbus HTTP server. Here are some details for
+this last test we tried to perform:
 
-URL: {teku_query_url}
+URL: {cc_query_url}
 Method: GET
 Headers: {headers}
 Exception: {last_exception}
 
-We cannot proceed if the teku HTTP server is not responding properly. Make
-sure to check the logs and fix any issue found there. You can see the logs
-in:
+We cannot proceed if the Nimbus HTTP server is not responding properly.
+Make sure to check the logs and fix any issue found there. You can see
+the logs in:
 
-{teku_stdout_log_path}
-{teku_stderr_log_path}
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
 '''             ),
                 buttons=[
                     ('Quit', False)
@@ -3075,33 +3101,33 @@ in:
 
             log.info(
 f'''
-To examine your teku service logs, inspect the following files:
+To examine your Nimbus service logs, inspect the following files:
 
-{teku_stdout_log_path}
-{teku_stderr_log_path}
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
 '''
             )
 
             return False
         elif last_status_code is not None:
             result = button_dialog(
-                title='Cannot connect to Teku',
+                title='Cannot connect to Nimbus',
                 text=(
 f'''
-We could not connect to teku HTTP server. Here are some details for this
-last test we tried to perform:
+We could not connect to Nimbus HTTP server. Here are some details for
+this last test we tried to perform:
 
-URL: {teku_query_url}
+URL: {cc_query_url}
 Method: GET
 Headers: {headers}
 Status code: {last_status_code}
 
-We cannot proceed if the teku HTTP server is not responding properly. Make
-sure to check the logs and fix any issue found there. You can see the logs
-in:
+We cannot proceed if the Nimbus HTTP server is not responding properly.
+Make sure to check the logs and fix any issue found there. You can see
+the logs in:
 
-{teku_stdout_log_path}
-{teku_stderr_log_path}
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
 '''             ),
                 buttons=[
                     ('Quit', False)
@@ -3110,16 +3136,16 @@ in:
 
             log.info(
 f'''
-To examine your teku service logs, inspect the following files:
+To examine your Nimbus service logs, inspect the following files:
 
-{teku_stdout_log_path}
-{teku_stderr_log_path}
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
 '''
             )
 
             return False
 
-    # Verify proper Teku syncing
+    # Verify proper Nimbus syncing
     def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
         bn_is_working = False
         bn_is_syncing = False
@@ -3154,13 +3180,13 @@ To examine your teku service logs, inspect the following files:
 
             # Output logs
             out_log_text = ''
-            with open(teku_stdout_log_path, 'r', encoding='utf8') as log_file:
+            with open(nimbus_stdout_log_path, 'r', encoding='utf8') as log_file:
                 log_file.seek(out_log_read_index)
                 out_log_text = log_file.read()
                 out_log_read_index = log_file.tell()
             
             err_log_text = ''
-            with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
+            with open(nimbus_stderr_log_path, 'r', encoding='utf8') as log_file:
                 log_file.seek(err_log_read_index)
                 err_log_text = log_file.read()
                 err_log_read_index = log_file.tell()
@@ -3175,37 +3201,37 @@ To examine your teku service logs, inspect the following files:
 
             time.sleep(1)
             
-            teku_syncing_query = BN_SYNCING_EP
-            teku_query_url = local_teku_http_base + teku_syncing_query
+            cc_syncing_query = BN_SYNCING_EP
+            cc_query_url = local_nimbus_http_base + cc_syncing_query
             headers = {
                 'accept': 'application/json'
             }
             try:
-                response = httpx.get(teku_query_url, headers=headers)
+                response = httpx.get(cc_query_url, headers=headers)
             except httpx.RequestError as exception:
-                log_text(f'Exception: {exception} while querying Teku.')
+                log_text(f'Exception: {exception} while querying Nimbus.')
                 continue
 
             if response.status_code != 200:
-                log_text(f'Status code: {response.status_code} while querying Teku.')
+                log_text(f'Status code: {response.status_code} while querying Nimbus.')
                 continue
         
             response_json = response.json()
             syncing_json = response_json
 
-            teku_peers_query = BN_PEERS_EP
-            teku_query_url = local_teku_http_base + teku_peers_query
+            cc_peers_query = BN_PEERS_EP
+            cc_query_url = local_nimbus_http_base + cc_peers_query
             headers = {
                 'accept': 'application/json'
             }
             try:
-                response = httpx.get(teku_query_url, headers=headers)
+                response = httpx.get(cc_query_url, headers=headers)
             except httpx.RequestError as exception:
-                log_text(f'Exception: {exception} while querying Teku.')
+                log_text(f'Exception: {exception} while querying Nimbus.')
                 continue
 
             if response.status_code != 200:
-                log_text(f'Status code: {response.status_code} while querying Teku.')
+                log_text(f'Status code: {response.status_code} while querying Nimbus.')
                 continue
 
             response_json = response.json()
@@ -3282,11 +3308,11 @@ Connected Peers: {bn_connected_peers}
                 })
 
     result = progress_log_dialog(
-        title='Verifying proper Teku service installation',
+        title='Verifying proper Nimbus service installation',
         text=(
 f'''
-We are waiting for Teku to sync or find enough peers to confirm that it is
-working properly.
+We are waiting for Nimbus to sync or find enough peers to confirm that it
+is working properly.
 '''     ),
         status_text=(
 '''
@@ -3298,26 +3324,27 @@ Connected Peers: Unknown
     ).run()
     
     if not result:
-        log.warning('Teku service installation verification was cancelled.')
+        log.warning('Nimbus service installation verification was cancelled.')
         return False
 
     if not result['bn_is_working']:
-        # We could not get a proper result from the Teku
+        # We could not get a proper result from the Nimbus
         result = button_dialog(
-            title='Teku service installation verification interrupted',
+            title='Nimbus service installation verification interrupted',
             text=(
 f'''
-We were interrupted before we could fully verify the teku service
+We were interrupted before we could fully verify the Nimbus service
 installation. Here are some results for the last tests we performed:
 
 Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
 Connected Peers: {result['bn_connected_peers']}
 
-We cannot proceed if the teku service is not installed properly. Make sure
-to check the logs and fix any issue found there. You can see the logs in:
+We cannot proceed if the Nimbus service is not installed properly. Make
+sure to check the logs and fix any issue found there. You can see the
+logs in:
 
-{teku_stdout_log_path}
-{teku_stderr_log_path}
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -3326,10 +3353,10 @@ to check the logs and fix any issue found there. You can see the logs in:
 
         log.info(
 f'''
-To examine your teku service logs, inspect the following files:
+To examine your Nimbus service logs, inspect the following files:
 
-{teku_stdout_log_path}
-{teku_stderr_log_path}
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
 '''
         )
 
@@ -3337,7 +3364,7 @@ To examine your teku service logs, inspect the following files:
 
     log.info(
 f'''
-Teku is installed and working properly.
+Nimbus is installed and working properly.
 
 Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
 Connected Peers: {result['bn_connected_peers']}
@@ -4393,18 +4420,44 @@ all previously generated keys and deposit data file.
         keys_location = nimbus_datadir
         nimbus_validators_path = nimbus_datadir.joinpath('validators')
 
-        # TODO: Ensure we currently have ACL permission to read from the keys path
-        if nimbus_validators_path.is_dir():
-            '''subprocess.run([
-                'icacls', str(nimbus_validators_path), '/inheritancelevel:e'
-            ])'''
+        # Ensure we currently have ACL permission to read from the keys path
+        if nimbus_datadir.is_dir():
 
-            with os.scandir(nimbus_validators_path) as it:
-                for entry in it:
-                    if entry.is_dir():
-                        result = re.search(r'0x[0-9a-f]{96}', entry.name)
-                        if result:
-                            public_keys.append(result.group(0))
+            subprocess.run([
+                'icacls', str(nimbus_datadir), '/grant:r', 'Everyone:(F)', '/t'
+            ])
+
+            if nimbus_validators_path.is_dir():
+                with os.scandir(nimbus_validators_path) as it:
+                    for entry in it:
+                        if entry.is_dir():
+                            result = re.search(r'0x[0-9a-f]{96}', entry.name)
+                            if result:
+                                public_keys.append(result.group(0))
+
+            dirs_to_explore = []
+            dirs_explored = []
+
+            dirs_to_explore.append(str(nimbus_datadir))
+            
+            while len(dirs_to_explore) > 0:
+                next_dir = dirs_to_explore.pop()
+
+                with os.scandir(next_dir) as it:
+                    for entry in it:
+                        if entry.is_dir():
+                            dirs_to_explore.append(entry.path)
+                        elif entry.is_file():
+                            subprocess.run([
+                                'icacls', entry.path, '/remove:g', 'Everyone'
+                            ])
+
+                dirs_explored.append(next_dir)
+            
+            for directory in reversed(dirs_explored):
+                subprocess.run([
+                    'icacls', directory, '/remove:g', 'Everyone'
+                ])
     
         if len(public_keys) > 0:
             # We already have keys imported
