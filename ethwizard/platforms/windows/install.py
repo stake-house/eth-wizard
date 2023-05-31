@@ -521,14 +521,18 @@ def installation_steps(*args, **kwargs):
     def install_monitoring_function(step, context, step_sequence):
         # Context variables
         selected_directory = CTX_SELECTED_DIRECTORY
+        selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
 
         if not (
-            test_context_variable(context, selected_directory, log)
+            test_context_variable(context, selected_directory, log) and
+            test_context_variable(context, selected_consensus_client, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
         
-        if not install_monitoring(context[selected_directory]):
+        consensus_client = context[selected_consensus_client]
+
+        if not install_monitoring(context[selected_directory], consensus_client):
             # User asked to quit or error
             quit_app()
 
@@ -5653,17 +5657,17 @@ Would you like to disable automatic Windows updates?
 
     return True
 
-def install_monitoring(base_directory):
+def install_monitoring(base_directory, consensus_client):
 
     base_directory = Path(base_directory)
 
     result = button_dialog(
         title='Monitoring installation',
         text=(
-'''
+f'''
 This next step is optional but recommended. It will install Prometheus,
 Grafana and Windows Exporter so you can easily monitor your machine's
-resources, Geth, Teku and your validator(s).
+resources, Geth, {consensus_client} and your validator(s).
 
 It will download the official Prometheus binary distribution from GitHub,
 it will download the official Grafana binary distribution their official
@@ -5686,13 +5690,13 @@ start Prometheus, Grafana and Windows Exporter on reboot or if they crash.
     if not result:
         return result
     
-    if not install_prometheus(base_directory):
+    if not install_prometheus(base_directory, consensus_client):
         return False
     
     if not install_windows_exporter(base_directory):
         return False
     
-    if not install_grafana(base_directory):
+    if not install_grafana(base_directory, consensus_client):
         return False
     
     # Show message on how to use monitoring
@@ -5719,7 +5723,7 @@ Teku and your system resources.
 
     return result
 
-def install_prometheus(base_directory):
+def install_prometheus(base_directory, consensus_client):
     # Install Prometheus as a service
 
     nssm_binary = get_nssm_binary()
@@ -5981,8 +5985,13 @@ Do you want to remove this directory first and start from nothing?
     if prometheus_config_file.is_file():
         prometheus_config_file.unlink()
     
+    prometheus_config_content = PROMETHEUS_CONFIG_WINDOWS
+
+    prometheus_config_content = prometheus_config_content.format(
+        scrape_configs=CONSENSUS_PROMETHEUS_CONFIG[consensus_client])
+
     with open(str(prometheus_config_file), 'w', encoding='utf8') as config_file:
-        config_file.write(PROMETHEUS_CONFIG_WINDOWS)
+        config_file.write(prometheus_config_content)
 
     # Setup prometheus service
     log_path = base_directory.joinpath('var', 'log')
@@ -6759,7 +6768,7 @@ Windows Exporter is installed and working properly.
 
     return True
 
-def install_grafana(base_directory):
+def install_grafana(base_directory, consensus_client):
     # Install Grafana as a service
 
     nssm_binary = get_nssm_binary()
@@ -7123,9 +7132,14 @@ providers:
     with open(windows_services_dashboard_file, 'w', encoding='utf8') as dashboard_file:
         dashboard_file.write(WINDOWS_SERVICES_PROCESSES_GRAFANA_DASHBOARD)
     
-    teku_dashboard_file = grafana_dashboard_dir.joinpath('teku.json')
-    with open(teku_dashboard_file, 'w', encoding='utf8') as dashboard_file:
-        dashboard_file.write(TEKU_GRAFANA_DASHBOARD)
+    if consensus_client == CONSENSUS_CLIENT_TEKU:
+        teku_dashboard_file = grafana_dashboard_dir.joinpath('teku.json')
+        with open(teku_dashboard_file, 'w', encoding='utf8') as dashboard_file:
+            dashboard_file.write(TEKU_GRAFANA_DASHBOARD)
+    elif consensus_client == CONSENSUS_CLIENT_NIMBUS:
+        nimbus_dashboard_file = grafana_dashboard_dir.joinpath('nimbus.json')
+        with open(nimbus_dashboard_file, 'w', encoding='utf8') as dashboard_file:
+            dashboard_file.write(NIMBUS_GRAFANA_DASHBOARD)
     
     home_dashboard_file = grafana_dashboard_dir.joinpath('home.json')
     with open(home_dashboard_file, 'w', encoding='utf8') as dashboard_file:
