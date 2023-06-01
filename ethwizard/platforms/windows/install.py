@@ -4444,9 +4444,10 @@ def obtain_keys(base_directory, network, consensus_client):
     keys_path = base_directory.joinpath('var', 'lib', 'eth', 'keys')
 
     # Ensure we currently have ACL permission to read from the keys path
-    subprocess.run([
-        'icacls', str(keys_path), '/grant:r', 'Everyone:(F)', '/t'
-    ])
+    if keys_path.is_dir():
+        subprocess.run([
+            'icacls', str(keys_path), '/grant:r', 'Everyone:(F)', '/t'
+        ])
 
     # Check if there are keys already created
     deposit_data_directory = base_directory.joinpath('var', 'lib', 'eth', 'deposit')
@@ -4455,35 +4456,36 @@ def obtain_keys(base_directory, network, consensus_client):
     generated_keys = search_for_generated_keys(keys_path)
 
     # Change ACL to protect keys directory
-    dirs_to_explore = []
-    dirs_explored = []
+    if keys_path.is_dir():
+        dirs_to_explore = []
+        dirs_explored = []
 
-    dirs_to_explore.append(str(keys_path))
-    
-    while len(dirs_to_explore) > 0:
-        next_dir = dirs_to_explore.pop()
+        dirs_to_explore.append(str(keys_path))
+        
+        while len(dirs_to_explore) > 0:
+            next_dir = dirs_to_explore.pop()
 
-        with os.scandir(next_dir) as it:
-            for entry in it:
-                if entry.is_dir():
-                    dirs_to_explore.append(entry.path)
-                elif entry.is_file():
-                    subprocess.run([
-                        'icacls', entry.path, '/inheritancelevel:r', '/grant:r', 'SYSTEM:F'
-                    ])
-                    subprocess.run([
-                        'icacls', entry.path, '/remove:g', 'Everyone'
-                    ])
+            with os.scandir(next_dir) as it:
+                for entry in it:
+                    if entry.is_dir():
+                        dirs_to_explore.append(entry.path)
+                    elif entry.is_file():
+                        subprocess.run([
+                            'icacls', entry.path, '/inheritancelevel:r', '/grant:r', 'SYSTEM:F'
+                        ])
+                        subprocess.run([
+                            'icacls', entry.path, '/remove:g', 'Everyone'
+                        ])
 
-        dirs_explored.append(next_dir)
-    
-    for directory in reversed(dirs_explored):
-        subprocess.run([
-            'icacls', directory, '/inheritancelevel:r', '/grant:r', 'SYSTEM:F'
-        ])
-        subprocess.run([
-            'icacls', directory, '/remove:g', 'Everyone'
-        ])
+            dirs_explored.append(next_dir)
+        
+        for directory in reversed(dirs_explored):
+            subprocess.run([
+                'icacls', directory, '/inheritancelevel:r', '/grant:r', 'SYSTEM:F'
+            ])
+            subprocess.run([
+                'icacls', directory, '/remove:g', 'Everyone'
+            ])
 
     deposit_data_file = 'unknown'
     if target_deposit_data_path.is_file():
