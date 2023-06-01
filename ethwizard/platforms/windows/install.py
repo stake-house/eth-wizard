@@ -4908,7 +4908,7 @@ Do you want to skip installing the staking-deposit-cli binary?
     deposit_data_directory.mkdir(parents=True, exist_ok=True)
     
     if actual_keys['deposit_data_path'] is not None:
-        shutil.copyfile(actual_keys['deposit_data_path'], target_deposit_data_path)
+        shutil.move(actual_keys['deposit_data_path'], target_deposit_data_path)
 
     if consensus_client == CONSENSUS_CLIENT_TEKU:
 
