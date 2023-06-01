@@ -3486,9 +3486,29 @@ Do you want to skip installing teku and its service?
                         public_key = keystore['pubkey']
                         public_keys.append('0x' + public_key)
 
-            subprocess.run([
-                'icacls', keys['validator_keys_path'], '/remove:g', 'Everyone', '/t'
-            ])
+            dirs_to_explore = []
+            dirs_explored = []
+
+            dirs_to_explore.append(keys['validator_keys_path'])
+            
+            while len(dirs_to_explore) > 0:
+                next_dir = dirs_to_explore.pop()
+
+                with os.scandir(next_dir) as it:
+                    for entry in it:
+                        if entry.is_dir():
+                            dirs_to_explore.append(entry.path)
+                        elif entry.is_file():
+                            subprocess.run([
+                                'icacls', entry.path, '/remove:g', 'Everyone'
+                            ])
+
+                dirs_explored.append(next_dir)
+            
+            for directory in reversed(dirs_explored):
+                subprocess.run([
+                    'icacls', directory, '/remove:g', 'Everyone'
+                ])
 
             return public_keys
         
@@ -4434,6 +4454,37 @@ def obtain_keys(base_directory, network, consensus_client):
 
     generated_keys = search_for_generated_keys(keys_path)
 
+    # Change ACL to protect keys directory
+    dirs_to_explore = []
+    dirs_explored = []
+
+    dirs_to_explore.append(str(keys_path))
+    
+    while len(dirs_to_explore) > 0:
+        next_dir = dirs_to_explore.pop()
+
+        with os.scandir(next_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    dirs_to_explore.append(entry.path)
+                elif entry.is_file():
+                    subprocess.run([
+                        'icacls', entry.path, '/inheritancelevel:r', '/grant:r', 'SYSTEM:F'
+                    ])
+                    subprocess.run([
+                        'icacls', entry.path, '/remove:g', 'Everyone'
+                    ])
+
+        dirs_explored.append(next_dir)
+    
+    for directory in reversed(dirs_explored):
+        subprocess.run([
+            'icacls', directory, '/inheritancelevel:r', '/grant:r', 'SYSTEM:F'
+        ])
+        subprocess.run([
+            'icacls', directory, '/remove:g', 'Everyone'
+        ])
+
     deposit_data_file = 'unknown'
     if target_deposit_data_path.is_file():
         deposit_data_file = target_deposit_data_path
@@ -4614,6 +4665,9 @@ Would you like to import your keys or generate them here?
 
             # Clean potential leftover keys
             if keys_path.is_dir():
+                subprocess.run([
+                    'icacls', str(keys_path), '/grant:r', 'Everyone:(F)', '/t'
+                ])
                 shutil.rmtree(keys_path)
             keys_path.mkdir(parents=True, exist_ok=True)
 
@@ -4877,6 +4931,9 @@ Do you want to skip installing the staking-deposit-cli binary?
 
         # Clean potential leftover keys
         if keys_path.is_dir():
+            subprocess.run([
+                'icacls', str(keys_path), '/grant:r', 'Everyone:(F)', '/t'
+            ])
             shutil.rmtree(keys_path)
         keys_path.mkdir(parents=True, exist_ok=True)
         
