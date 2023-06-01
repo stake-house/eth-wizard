@@ -26,7 +26,8 @@ from ethwizard.platforms.common import (
     select_fee_recipient_address,
     get_geth_running_version,
     get_geth_latest_version,
-    get_mevboost_latest_version
+    get_mevboost_latest_version,
+    get_nimbus_latest_version
 )
 
 from ethwizard.platforms.windows.common import (
@@ -49,6 +50,7 @@ from ethwizard.constants import (
     CTX_SELECTED_DIRECTORY,
     EXECUTION_CLIENT_GETH,
     CONSENSUS_CLIENT_TEKU,
+    CONSENSUS_CLIENT_NIMBUS,
     WIZARD_COMPLETED_STEP_ID,
     UNKNOWN_VALUE,
     MAINTENANCE_DO_NOTHING,
@@ -66,6 +68,7 @@ from ethwizard.constants import (
     GITHUB_API_VERSION,
     MEVBOOST_LATEST_RELEASE,
     TEKU_LATEST_RELEASE,
+    NIMBUS_LATEST_RELEASE,
     GETH_STORE_BUILDS_PARAMS,
     GETH_STORE_BUILDS_URL,
     GETH_BUILDS_BASE_URL,
@@ -224,11 +227,18 @@ def show_dashboard(context):
 
     # If the service is not running, we need to start it
 
-    if not consensus_client_details['bn_service']['running']:
-        consensus_client_details['next_step'] = MAINTENANCE_START_SERVICE
+    if consensus_client_details['single_service']:
 
-    if not consensus_client_details['vc_service']['running']:
-        consensus_client_details['next_step'] = MAINTENANCE_START_SERVICE
+        if not consensus_client_details['service']['running']:
+            consensus_client_details['next_step'] = MAINTENANCE_START_SERVICE
+
+    else:
+
+        if not consensus_client_details['bn_service']['running']:
+            consensus_client_details['next_step'] = MAINTENANCE_START_SERVICE
+
+        if not consensus_client_details['vc_service']['running']:
+            consensus_client_details['next_step'] = MAINTENANCE_START_SERVICE
 
     # If the running version is older than the installed one, we need to restart the services
 
@@ -239,11 +249,20 @@ def show_dashboard(context):
     # If the installed version is merge ready but the client is not configured for the merge,
     # we need to configure the client for the merge
 
-    if is_version(installed_version):
-        if is_installed_cons_merge_ready and (
-            not consensus_client_details['is_bn_merge_configured'] or
-            not consensus_client_details['is_vc_merge_configured']):
-            consensus_client_details['next_step'] = MAINTENANCE_CONFIG_CLIENT_MERGE
+    if consensus_client_details['single_service']:
+
+        if is_version(installed_version):
+            if is_installed_cons_merge_ready and (
+                not consensus_client_details['is_merge_configured']):
+                consensus_client_details['next_step'] = MAINTENANCE_CONFIG_CLIENT_MERGE
+
+    else:
+
+        if is_version(installed_version):
+            if is_installed_cons_merge_ready and (
+                not consensus_client_details['is_bn_merge_configured'] or
+                not consensus_client_details['is_vc_merge_configured']):
+                consensus_client_details['next_step'] = MAINTENANCE_CONFIG_CLIENT_MERGE
 
     # If the installed version is older than the latest one, we need to upgrade the client
 
@@ -254,20 +273,31 @@ def show_dashboard(context):
             # If the next version is merge ready and we are not configured yet, we need to upgrade and
             # configure the client
 
-            if is_latest_cons_merge_ready and (
-                not consensus_client_details['is_bn_merge_configured'] or
-                not consensus_client_details['is_vc_merge_configured']):
-                consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
+            if consensus_client_details['single_service']:
 
-    # If the service do not have improved shutdown timeout, we need to improve it
-    if not current_consensus_improved_service_timeout:
-        consensus_client_details['next_step'] = MAINTENANCE_IMPROVE_TIMEOUT
+                if is_latest_cons_merge_ready and (
+                    not consensus_client_details['is_merge_configured']):
+                    consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
+
+            else:
+
+                if is_latest_cons_merge_ready and (
+                    not consensus_client_details['is_bn_merge_configured'] or
+                    not consensus_client_details['is_vc_merge_configured']):
+                    consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
 
     # If the service is not installed or found, we need to reinstall the client
 
-    if (not consensus_client_details['bn_service']['found'] or
-        not consensus_client_details['vc_service']['found']):
-        consensus_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
+    if consensus_client_details['single_service']:
+
+        if not consensus_client_details['service']['found']:
+            consensus_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
+
+    else:
+
+        if (not consensus_client_details['bn_service']['found'] or
+            not consensus_client_details['vc_service']['found']):
+            consensus_client_details['next_step'] = MAINTENANCE_REINSTALL_CLIENT
 
     # Get MEV-Boost details
 
@@ -349,14 +379,23 @@ def show_dashboard(context):
         f'Service is running: {execution_client_details["service"]["running"]}\n'
         f'<b>Maintenance task</b>: {maintenance_tasks_description.get(execution_client_details["next_step"], UNKNOWN_VALUE)}')
 
-    cc_services = f'Running services - Beacon node: {consensus_client_details["bn_service"]["running"]}, Validator client: {consensus_client_details["vc_service"]["running"]}\n'
-    if consensus_client_details['unified_service']:
-        cc_services = f'Service is running: {consensus_client_details["bn_service"]["running"]}\n'
+    cc_running_service_section = ''
 
-    cc_section = (f'<b>Teku</b> details (I: {consensus_client_details["versions"]["installed"]}, '
+    if consensus_client_details['single_service']:
+
+        cc_running_service_section = f'Service is running: {consensus_client_details["service"]["running"]}\n'
+
+    else:
+
+        cc_running_service_section = (
+            f'Running services - Beacon node: {consensus_client_details["bn_service"]["running"]}'
+            f', Validator client: {consensus_client_details["vc_service"]["running"]}\n'
+        )
+
+    cc_section = (f'<b>{current_consensus_client}</b> details (I: {consensus_client_details["versions"]["installed"]}, '
         f'R: {consensus_client_details["versions"]["running"]}, '
         f'L: {consensus_client_details["versions"]["latest"]})\n'
-        f'{cc_services}'
+        f'{cc_running_service_section}'
         f'<b>Maintenance task</b>: {maintenance_tasks_description.get(consensus_client_details["next_step"], UNKNOWN_VALUE)}')
 
     mb_section = ''
@@ -594,15 +633,7 @@ def get_consensus_client_details(base_directory, consensus_client):
     if consensus_client == CONSENSUS_CLIENT_TEKU:
 
         details = {
-            'unified_service': True,
-            'bn_service': {
-                'found': False,
-                'status': UNKNOWN_VALUE,
-                'binary': UNKNOWN_VALUE,
-                'parameters': UNKNOWN_VALUE,
-                'running': UNKNOWN_VALUE
-            },
-            'vc_service': {
+            'service': {
                 'found': False,
                 'status': UNKNOWN_VALUE,
                 'binary': UNKNOWN_VALUE,
@@ -614,16 +645,12 @@ def get_consensus_client_details(base_directory, consensus_client):
                 'running': UNKNOWN_VALUE,
                 'latest': UNKNOWN_VALUE
             },
-            'bn_exec': {
+            'exec': {
                 'path': UNKNOWN_VALUE,
                 'argv': []
             },
-            'vc_exec': {
-                'path': UNKNOWN_VALUE,
-                'argv': []
-            },
-            'is_bn_merge_configured': UNKNOWN_VALUE,
-            'is_vc_merge_configured': UNKNOWN_VALUE
+            'is_merge_configured': UNKNOWN_VALUE,
+            'single_service': True,
         }
         
         # Check for existing service
@@ -638,27 +665,18 @@ def get_consensus_client_details(base_directory, consensus_client):
         if not teku_service_exists:
             return details
 
-        details['bn_service']['found'] = True
-        details['bn_service']['status'] = service_details['status']
-        details['bn_service']['binary'] = service_details['install']
-        details['bn_service']['parameters'] = service_details['parameters']['AppParameters']
-        details['bn_service']['running'] = is_service_running(service_details)
+        details['service']['found'] = True
+        details['service']['status'] = service_details['status']
+        details['service']['binary'] = service_details['install']
+        details['service']['parameters'] = service_details['parameters']['AppParameters']
+        details['service']['running'] = is_service_running(service_details)
 
-        details['bn_exec']['path'] = service_details['install']
-        details['bn_exec']['argv'] = shlex.split(service_details['parameters']['AppParameters'], posix=False)
-
-        details['vc_service']['found'] = details['bn_service']['found']
-        details['vc_service']['status'] = details['bn_service']['status']
-        details['vc_service']['binary'] = details['bn_service']['binary']
-        details['vc_service']['parameters'] = details['bn_service']['parameters']
-        details['vc_service']['running'] = details['bn_service']['running']
-
-        details['vc_exec']['path'] = details['bn_exec']['path']
-        details['vc_exec']['argv'] = details['bn_exec']['argv']
+        details['exec']['path'] = service_details['install']
+        details['exec']['argv'] = shlex.split(service_details['parameters']['AppParameters'], posix=False)
 
         execution_jwt_flag_found = False
         execution_endpoint_flag_found = False
-        for arg in details['bn_exec']['argv']:
+        for arg in details['exec']['argv']:
             if arg.lower().startswith('--ee-jwt-secret-file'):
                 execution_jwt_flag_found = True
             if arg.lower().startswith('--ee-endpoint'):
@@ -666,20 +684,70 @@ def get_consensus_client_details(base_directory, consensus_client):
             if execution_jwt_flag_found and execution_endpoint_flag_found:
                 break
         
-        details['is_bn_merge_configured'] = (
+        details['is_merge_configured'] = (
             execution_jwt_flag_found and execution_endpoint_flag_found)
-        
-        for arg in details['vc_exec']['argv']:
-            if arg.lower().startswith('--validators-proposer-default-fee-recipient'):
-                details['is_vc_merge_configured'] = True
-                break
-        
-        if details['is_vc_merge_configured'] == UNKNOWN_VALUE:
-            details['is_vc_merge_configured'] = False
 
         details['versions']['installed'] = get_teku_installed_version(base_directory)
         details['versions']['running'] = get_teku_running_version()
         details['versions']['latest'] = get_teku_latest_version()
+
+        return details
+
+    elif consensus_client == CONSENSUS_CLIENT_NIMBUS:
+
+        details = {
+            'service': {
+                'found': False,
+                'status': UNKNOWN_VALUE,
+                'binary': UNKNOWN_VALUE,
+                'parameters': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE
+            },
+            'versions': {
+                'installed': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE,
+                'latest': UNKNOWN_VALUE
+            },
+            'exec': {
+                'path': UNKNOWN_VALUE,
+                'argv': []
+            },
+            'is_merge_configured': UNKNOWN_VALUE,
+            'single_service': True,
+        }
+        
+        # Check for existing service
+        nimbus_service_exists = False
+        nimbus_service_name = 'nimbus'
+
+        service_details = get_service_details(nssm_binary, nimbus_service_name)
+
+        if service_details is not None:
+            nimbus_service_exists = True
+        
+        if not nimbus_service_exists:
+            return details
+
+        details['service']['found'] = True
+        details['service']['status'] = service_details['status']
+        details['service']['binary'] = service_details['install']
+        details['service']['parameters'] = service_details['parameters']['AppParameters']
+        details['service']['running'] = is_service_running(service_details)
+
+        details['exec']['path'] = service_details['install']
+        details['exec']['argv'] = shlex.split(service_details['parameters']['AppParameters'], posix=False)
+
+        execution_jwt_flag_found = False
+        for arg in details['exec']['argv']:
+            if arg.lower().startswith('--jwt-secret'):
+                execution_jwt_flag_found = True
+                break
+        
+        details['is_merge_configured'] = execution_jwt_flag_found
+
+        details['versions']['installed'] = get_nimbus_installed_version(base_directory)
+        details['versions']['running'] = get_nimbus_running_version()
+        details['versions']['latest'] = get_nimbus_latest_version(log)
 
         return details
 
@@ -730,6 +798,85 @@ def get_teku_installed_version(base_directory):
         log.info(f'Teku installed version is {teku_version}')
 
         return teku_version
+    
+    return UNKNOWN_VALUE
+
+def get_nimbus_running_version():
+    # Get the running version for Nimbus
+
+    log.info('Getting Nimbus running version...')
+
+    local_nimbus_bn_version_url = 'http://127.0.0.1:5052' + BN_VERSION_EP
+
+    try:
+        response = httpx.get(local_nimbus_bn_version_url)
+    except httpx.RequestError as exception:
+        log.error(f'Cannot connect to Nimbus. Exception: {exception}')
+        return UNKNOWN_VALUE
+
+    if response.status_code != 200:
+        log.error(f'Unexpected status code from {local_nimbus_bn_version_url}. Status code: '
+            f'{response.status_code}')
+        return UNKNOWN_VALUE
+    
+    response_json = response.json()
+
+    if 'data' not in response_json or 'version' not in response_json['data']:
+        log.error(f'Unexpected JSON response from {local_nimbus_bn_version_url}. result not found.')
+        return UNKNOWN_VALUE
+    
+    version_agent = response_json['data']['version']
+
+    # Version agent should look like: Nimbus/v23.5.1-4842c9-stateofus
+    result = re.search(r'Nimbus/v?(?P<version>[^-/]+)(-(?P<commit>[^-/]+))?',
+        version_agent)
+    if not result:
+        log.error(f'Cannot parse {version_agent} for Nimbus version.')
+        return UNKNOWN_VALUE
+
+    running_version = result.group('version')
+
+    log.info(f'Nimbus running version is {running_version}')
+
+    return running_version
+
+def get_nimbus_installed_version(base_directory):
+    # Get the installed version for Nimbus
+
+    log.info('Getting Nimbus installed version...')
+
+    nimbus_path = base_directory.joinpath('bin', 'nimbus_beacon_node.exe')
+
+    nimbus_found = False
+    nimbus_version = UNKNOWN_VALUE
+
+    if nimbus_path.is_file():
+        try:
+            process_result = subprocess.run([
+                str(nimbus_path), '--version'
+                ], capture_output=True, text=True)
+            
+            if process_result.returncode != 0:
+                log.error(f'Unexpected return code from Nimbus. Return code: '
+                    f'{process_result.returncode}')
+                return UNKNOWN_VALUE
+
+            nimbus_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'Nimbus beacon node v?(?P<version>[^-]+)', process_output)
+            if result:
+                nimbus_version = result.group('version').strip()
+            else:
+                log.error(f'We could not parse Nimbus version from output: {process_result.stdout}')
+
+        except FileNotFoundError:
+            pass
+
+    if nimbus_found:
+        log.info(f'Nimbus installed version is {nimbus_version}')
+
+        return nimbus_version
     
     return UNKNOWN_VALUE
 
@@ -974,6 +1121,39 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
 
         elif consensus_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
             log.warning('TODO: Reinstalling client is to be implemented.')
+    
+    elif consensus_client == CONSENSUS_CLIENT_NIMBUS:
+        # Nimbus maintenance tasks
+        nimbus_service_name = 'nimbus'
+
+        if consensus_client_details['next_step'] == MAINTENANCE_RESTART_SERVICE:
+            log.info('Restarting Nimbus service...')
+
+            subprocess.run([str(nssm_binary), 'restart', nimbus_service_name])
+
+        elif consensus_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT:
+            if not upgrade_nimbus(base_directory, nssm_binary):
+                log.error('We could not upgrade the Nimbus client.')
+                return False
+        
+        elif consensus_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT_MERGE:
+            log.warning('Upgrading Nimbus client for merge is not implemented. This should '
+                'not be needed as Nimbus support was added after the merge.')
+            return False
+    
+        elif consensus_client_details['next_step'] == MAINTENANCE_CONFIG_CLIENT_MERGE:
+            log.warning('Configuring Nimbus client for merge is not implemented. This should '
+                'not be needed as Nimbus support was added after the merge.')
+            return False
+            
+        elif consensus_client_details['next_step'] == MAINTENANCE_START_SERVICE:
+            log.info('Starting Nimbus service...')
+
+            subprocess.run([str(nssm_binary), 'start', nimbus_service_name])
+
+        elif consensus_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
+            log.warning('TODO: Reinstalling client is to be implemented.')
+
     else:
         log.error(f'Unknown consensus client {consensus_client}.')
         return False
@@ -1418,9 +1598,158 @@ Unable to create JWT token file in {jwt_token_path}
         
         geth_arguments[replaced_index] = replaced_arg
 
-
     if not set_service_param(nssm_binary, geth_service_name, 'AppParameters', geth_arguments):
         return False
+
+    return True
+
+def upgrade_nimbus(base_directory, nssm_binary):
+    # Upgrade the Nimbus client
+    log.info('Upgrading Nimbus client...')
+
+    nimbus_gh_release_url = GITHUB_REST_API_URL + NIMBUS_LATEST_RELEASE
+    headers = {'Accept': GITHUB_API_VERSION}
+    try:
+        response = httpx.get(nimbus_gh_release_url, headers=headers,
+            follow_redirects=True)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading Nimbus binary. {exception}')
+        return False
+
+    if response.status_code != 200:
+        log.error(f'HTTP error while downloading Nimbus binary. '
+            f'Status code {response.status_code}')
+        return False
+    
+    release_json = response.json()
+
+    if 'assets' not in release_json:
+        log.error('No assets in Github release for Nimbus.')
+        return False
+    
+    binary_asset = None
+
+    archive_filename_comp = 'nimbus-eth2_Windows_amd64'
+
+    for asset in release_json['assets']:
+        if 'name' not in asset:
+            continue
+        if 'browser_download_url' not in asset:
+            continue
+    
+        file_name = asset['name']
+        file_url = asset['browser_download_url']
+
+        if file_name.startswith(archive_filename_comp):
+            binary_asset = {
+                'file_name': file_name,
+                'file_url': file_url
+            }
+
+    if binary_asset is None:
+        log.error('Could not find binary in Github release.')
+        return False
+    
+    # Downloading latest Nimbus release files
+    download_path = base_directory.joinpath('downloads')
+    download_path.mkdir(parents=True, exist_ok=True)
+
+    binary_path = Path(download_path, binary_asset['file_name'])
+
+    try:
+        with open(binary_path, 'wb') as binary_file:
+            with httpx.stream('GET', binary_asset['file_url'],
+                follow_redirects=True) as http_stream:
+                if http_stream.status_code != 200:
+                    log.error(f'HTTP error while downloading Nimbus binary from Github. '
+                        f'Status code {http_stream.status_code}')
+                    return False
+                for data in http_stream.iter_bytes():
+                    binary_file.write(data)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading Nimbus binary from Github. {exception}')
+        return False
+    
+    extract_directory = download_path.joinpath('nimbus')
+    if extract_directory.is_dir():
+        shutil.rmtree(extract_directory)
+    elif extract_directory.is_file():
+        os.unlink(extract_directory)
+    extract_directory.mkdir(parents=True, exist_ok=True)
+    
+    # Extracting the Lighthouse binary archive
+    subprocess.run([
+        'tar', 'xvf', binary_path, '--directory', extract_directory])
+    
+    # Remove download leftovers
+    binary_path.unlink()
+
+    # Find the Nimbus binaries and copy them in their installed location
+    build_path = None
+
+    with os.scandir(extract_directory) as it:
+        for entry in it:
+            if entry.is_dir():
+                if entry.name == 'build':
+                    build_path = entry.path
+                else:
+                    build_path = os.path.join(entry.path, 'build')
+                break
+    
+    if build_path is None:
+        log.error('Cannot find the correct directory in the extracted Nimbus archive.')
+        return False
+
+    src_nimbus_bn_path = Path(build_path, 'nimbus_beacon_node.exe')
+    src_nimbus_vc_path = Path(build_path, 'nimbus_validator_client.exe')
+
+    if not src_nimbus_bn_path.is_file() or not src_nimbus_vc_path.is_file():
+        log.error(f'Cannot find the Nimbus binaries in the extracted archive.')
+        return False
+    
+    bin_path = base_directory.joinpath('bin')
+    bin_path.mkdir(parents=True, exist_ok=True)
+
+    nimbus_service_name = 'nimbus'
+    subprocess.run([str(nssm_binary), 'stop', nimbus_service_name])
+
+    dest_nimbus_bn_path = bin_path.joinpath('nimbus_beacon_node.exe')
+    dest_nimbus_vc_path = bin_path.joinpath('nimbus_validator_client.exe')
+    if dest_nimbus_bn_path.is_file():
+        dest_nimbus_bn_path.unlink()
+    if dest_nimbus_vc_path.is_file():
+        dest_nimbus_vc_path.unlink()
+
+    shutil.move(src_nimbus_bn_path, bin_path)
+    shutil.move(src_nimbus_vc_path, bin_path)
+
+    # Remove extraction leftovers
+    shutil.rmtree(extract_directory)
+
+    # Make sure Nimbus was installed properly
+    nimbus_path = dest_nimbus_bn_path
+    nimbus_found = False
+    nimbus_version = UNKNOWN_VALUE
+    try:
+        process_result = subprocess.run([str(nimbus_path), '--version'],
+            capture_output=True, text=True)
+        nimbus_found = True
+
+        process_output = process_result.stdout
+        result = re.search(r'Nimbus beacon node v?(?P<version>[^-]+)', process_output)
+        if result:
+            nimbus_version = result.group('version').strip()
+    except FileNotFoundError:
+        pass
+
+    if not nimbus_found:
+        log.error(f'We could not find the Nimbus binary from the installed archive '
+            f'in {nimbus_path}. We cannot continue.')
+        return False
+    else:
+        log.info(f'Nimbus version {nimbus_version} installed.')
+
+    subprocess.run([str(nssm_binary), 'start', nimbus_service_name])
 
     return True
 
