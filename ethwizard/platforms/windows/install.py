@@ -3076,9 +3076,9 @@ To examine your Nimbus service logs, inspect the following files:
     keep_retrying = True
 
     retry_index = 0
-    retry_count = 6
+    retry_count = 10
     retry_delay = 30
-    retry_delay_increase = 10
+    retry_delay_increase = 15
     last_exception = None
     last_status_code = None
 

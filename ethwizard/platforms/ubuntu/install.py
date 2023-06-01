@@ -2631,7 +2631,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
     keep_retrying = True
 
     retry_index = 0
-    retry_count = 5
+    retry_count = 10
     retry_delay = 30
     retry_delay_increase = 15
     last_exception = None
@@ -3422,7 +3422,7 @@ $ sudo journalctl -ru {nimbus_service_name}
     keep_retrying = True
 
     retry_index = 0
-    retry_count = 5
+    retry_count = 10
     retry_delay = 30
     retry_delay_increase = 15
     last_exception = None
