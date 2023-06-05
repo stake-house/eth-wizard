@@ -11,7 +11,6 @@ Eth-wizard should be stable enough to be used by everyone. It was never audited 
 ## Goals
 
 * Simple to use
-* Minimal
 * Mostly automated
 * For Ubuntu 20.04 or 22.04 using Lighthouse or Nimbus and Geth
 * For Windows 10 or 11 using Teku or Nimbus and Geth
