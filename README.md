@@ -6,7 +6,7 @@ An Ethereum validator installation wizard meant to guide anyone through the diff
 
 ## Disclaimer
 
-The eth-wizard should be stable enough to be used by everyone. It was never audited and it might still have some issues. Support is offered through [the ETHStaker community](https://ethstaker.cc/).
+Eth-wizard should be stable enough to be used by everyone. It was never audited and it might still have some issues. Support is offered through [the ETHStaker community](https://ethstaker.cc/).
 
 ## Goals
 
