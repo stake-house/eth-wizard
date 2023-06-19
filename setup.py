@@ -235,8 +235,8 @@ ExecuteParameters="-m ethwizard"
         # Download Python embeddable package
         import httpx
 
-        python_embed_url = 'https://www.python.org/ftp/python/3.11.3/python-3.11.3-embed-amd64.zip'
-        python_embed_name = 'python-3.11.3-embed-amd64.zip'
+        python_embed_url = 'https://www.python.org/ftp/python/3.11.4/python-3.11.4-embed-amd64.zip'
+        python_embed_name = 'python-3.11.4-embed-amd64.zip'
 
         python_embed_archive = download_path.joinpath(python_embed_name)
         try:
