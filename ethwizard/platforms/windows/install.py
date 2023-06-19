@@ -438,25 +438,19 @@ def installation_steps(*args, **kwargs):
         # Context variables
         selected_directory = CTX_SELECTED_DIRECTORY
         selected_network = CTX_SELECTED_NETWORK
-        obtained_keys = CTX_OBTAINED_KEYS
         selected_ports = CTX_SELECTED_PORTS
         selected_eth1_fallbacks = CTX_SELECTED_ETH1_FALLBACKS
         selected_consensus_checkpoint_url = CTX_SELECTED_CONSENSUS_CHECKPOINT_URL
         selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
-        selected_fee_recipient_address = CTX_SELECTED_FEE_RECIPIENT_ADDRESS
-        public_keys = CTX_PUBLIC_KEYS
         consensus_improved_service_timeout = CTX_CONSENSUS_IMPROVED_SERVICE_TIMEOUT
         mevboost_installed = CTX_MEVBOOST_INSTALLED
-        selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
 
         if not (
             test_context_variable(context, selected_directory, log) and
             test_context_variable(context, selected_network, log) and
-            test_context_variable(context, obtained_keys, log) and
             test_context_variable(context, selected_ports, log) and
             test_context_variable(context, selected_eth1_fallbacks, log) and
             test_context_variable(context, selected_consensus_checkpoint_url, log) and
-            test_context_variable(context, selected_fee_recipient_address, log) and
             test_context_variable(context, mevboost_installed, log) and
             test_context_variable(context, selected_consensus_client, log)
             ):
@@ -467,24 +461,27 @@ def installation_steps(*args, **kwargs):
 
         if consensus_client == CONSENSUS_CLIENT_TEKU:
 
-            context[public_keys] = install_teku(context[selected_directory],
-                context[selected_network], context[obtained_keys], context[selected_eth1_fallbacks],
-                context[selected_consensus_checkpoint_url], context[selected_ports],
-                context[selected_fee_recipient_address], context[mevboost_installed])
+            if not install_teku(context[selected_directory], context[selected_network],
+                context[selected_eth1_fallbacks], context[selected_consensus_checkpoint_url],
+                context[selected_ports], context[mevboost_installed]):
+                # User asked to quit or error
+                quit_app()
         
         elif consensus_client == CONSENSUS_CLIENT_NIMBUS:
 
-            context[public_keys] = install_nimbus(context[selected_directory],
-                context[selected_network], context[obtained_keys], context[selected_eth1_fallbacks],
-                context[selected_consensus_checkpoint_url], context[selected_ports],
-                context[selected_fee_recipient_address], context[mevboost_installed])
+            if not install_nimbus(context[selected_directory], context[selected_network],
+                context[selected_eth1_fallbacks], context[selected_consensus_checkpoint_url],
+                context[selected_ports], context[mevboost_installed]):
+                # User asked to quit or error
+                quit_app()
+        
+        elif consensus_client == CONSENSUS_CLIENT_LIGHTHOUSE:
 
-        if type(context[public_keys]) is not list and not context[public_keys]:
-            # User asked to quit or error
-            del context[public_keys]
-            step_sequence.save_state(step.step_id, context)
-
-            quit_app()
+            if not install_lighthouse(context[selected_directory], context[selected_network],
+                context[selected_eth1_fallbacks], context[selected_consensus_checkpoint_url],
+                context[selected_ports], context[mevboost_installed]):
+                # User asked to quit or error
+                quit_app()
         
         context[consensus_improved_service_timeout] = True
 
@@ -664,6 +661,62 @@ def installation_steps(*args, **kwargs):
         exc_function=select_consensus_client_function
     )
 
+    def install_validator_function(step, context, step_sequence):
+        # Context variables
+        selected_directory = CTX_SELECTED_DIRECTORY
+        selected_network = CTX_SELECTED_NETWORK
+        obtained_keys = CTX_OBTAINED_KEYS       
+        selected_fee_recipient_address = CTX_SELECTED_FEE_RECIPIENT_ADDRESS
+        public_keys = CTX_PUBLIC_KEYS
+        mevboost_installed = CTX_MEVBOOST_INSTALLED
+        selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
+
+        if not (
+            test_context_variable(context, selected_directory, log) and
+            test_context_variable(context, selected_network, log) and
+            test_context_variable(context, obtained_keys, log) and
+            test_context_variable(context, selected_fee_recipient_address, log) and
+            test_context_variable(context, mevboost_installed, log) and
+            test_context_variable(context, selected_consensus_client, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_app()
+        
+        consensus_client = context[selected_consensus_client]
+
+        if consensus_client == CONSENSUS_CLIENT_TEKU:
+            # Install Teku validator client
+            context[public_keys] = install_teku_validator(context[selected_directory],
+                context[selected_network], context[obtained_keys],
+                context[selected_fee_recipient_address], context[mevboost_installed])
+
+        elif consensus_client == CONSENSUS_CLIENT_NIMBUS:
+            # Install Nimbus validator client
+            context[public_keys] = install_nimbus_validator(context[selected_directory],
+                context[selected_network], context[obtained_keys],
+                context[selected_fee_recipient_address], context[mevboost_installed])
+        
+        elif consensus_client == CONSENSUS_CLIENT_LIGHTHOUSE:
+            # Install Lighthouse validator client
+            context[public_keys] = install_lighthouse_validator(context[selected_directory],
+                context[selected_network], context[obtained_keys],
+                context[selected_fee_recipient_address], context[mevboost_installed])
+
+        if type(context[public_keys]) is not list and not context[public_keys]:
+            # User asked to quit
+            del context[public_keys]
+            step_sequence.save_state(step.step_id, context)
+
+            quit_app()
+
+        return context
+    
+    install_validator_step = Step(
+        step_id=INSTALL_VALIDATOR_STEP_ID,
+        display_name='Validator client installation',
+        exc_function=install_validator_function
+    )
+
     return [
         select_directory_step,
         select_network_step,
@@ -676,11 +729,12 @@ def installation_steps(*args, **kwargs):
         detect_merge_ready_step,
         select_consensus_checkpoint_url_step,
         select_eth1_fallbacks_step,
-        obtain_keys_step,
-        select_fee_recipient_address_step,
         install_consensus_step,
         install_geth_step,
         test_open_ports_step,
+        obtain_keys_step,
+        select_fee_recipient_address_step,
+        install_validator_step,
         install_monitoring_step,
         improve_time_sync_step,
         disable_windows_updates_step,
@@ -2372,9 +2426,9 @@ def detect_merge_ready(base_directory, network):
 
     return {'result': is_merge_ready}
 
-def install_nimbus(base_directory, network, keys, eth1_fallbacks, consensus_checkpoint_url, ports,
-    fee_recipient_address, mevboost_installed):
-    # Install Nimbus for the selected network and return a list of public keys
+def install_nimbus(base_directory, network, eth1_fallbacks, consensus_checkpoint_url, ports,
+    mevboost_installed):
+    # Install Nimbus for the selected network
 
     base_directory = Path(base_directory)
 
@@ -3413,9 +3467,9 @@ Connected Peers: {result['bn_connected_peers']}
 
     return public_keys
 
-def install_teku(base_directory, network, keys, eth1_fallbacks, consensus_checkpoint_url, ports,
-    fee_recipient_address, mevboost_installed):
-    # Install Teku for the selected network and return a list of public keys
+def install_teku(base_directory, network, eth1_fallbacks, consensus_checkpoint_url, ports,
+    mevboost_installed):
+    # Install Teku for the selected network
 
     base_directory = Path(base_directory)
 
@@ -4428,6 +4482,47 @@ Connected Peers: {result['bn_connected_peers']}
         ])
 
     return public_keys
+
+def install_lighthouse(base_directory, network, eth1_fallbacks, consensus_checkpoint_url, ports,
+    mevboost_installed):
+    # Install Lighthouse for the selected network
+
+    base_directory = Path(base_directory)
+
+    nssm_binary = get_nssm_binary()
+    if not nssm_binary:
+        return False
+
+    # TODO: Implement
+
+    return True
+
+def install_teku_validator(base_directory, network, keys, fee_recipient_address,
+    mevboost_installed):
+    # Import keystore(s) and configure the Teku validator client (as part of the same service)
+    # Returns a list of public keys when done
+
+    # TODO: Implement
+
+    return False
+
+def install_nimbus_validator(base_directory, network, keys, fee_recipient_address,
+    mevboost_installed):
+    # Import keystore(s) and configure the Nimbus validator client (as part of the same service)
+    # Returns a list of public keys when done
+
+    # TODO: Implement
+
+    return False
+
+def install_lighthouse_validator(base_directory, network, keys, fee_recipient_address,
+    mevboost_installed):
+    # Import keystore(s) and configure the Nimbus validator client (as part of the same service)
+    # Returns a list of public keys when done
+
+    # TODO: Implement
+
+    return False
 
 def obtain_keys(base_directory, network, consensus_client):
     # Obtain validator keys for the selected network
