@@ -2206,7 +2206,8 @@ Once installed locally, it will create a systemd service that will
 automatically start the Lighthouse beacon node on reboot or if it crashes.
 The beacon node will be started and you will slowly start syncing with the
 Ethereum network. This syncing process can take a few hours or days even
-with good hardware and good internet.
+with good hardware and good internet if you did not select a working
+checkpoint sync endpoint.
 '''     ),
         buttons=[
             ('Install', True),

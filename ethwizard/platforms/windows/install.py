@@ -62,7 +62,8 @@ from ethwizard.platforms.windows.common import (
     is_stable_windows_amd64_archive,
     install_gpg,
     set_service_param,
-    setup_jwt_token_file
+    setup_jwt_token_file,
+    is_adx_supported
 )
 
 from prompt_toolkit.formatted_text import HTML
@@ -2437,8 +2438,6 @@ def install_nimbus(base_directory, network, eth1_fallbacks, consensus_checkpoint
         return False
 
     nimbus_datadir = base_directory.joinpath('var', 'lib', 'nimbus')
-    nimbus_validators_path = nimbus_datadir.joinpath('validators')
-    nimbus_secrets_path = nimbus_datadir.joinpath('secrets')
 
     # Check for existing service
     nimbus_service_exists = False
@@ -2476,56 +2475,7 @@ Do you want to skip installing Nimbus and its service?
             return result
         
         if result == 1:
-            public_keys = []
-
-            # Find existing imported keys in Nimbus
-            subprocess.run([
-                'icacls', str(nimbus_datadir), '/grant:r', 'Everyone:(F)', '/t'
-            ])
-
-            if nimbus_validators_path.is_dir():
-                with os.scandir(nimbus_validators_path) as it:
-                    for entry in it:
-                        if entry.is_dir():
-                            result = re.search(r'0x[0-9a-f]{96}', entry.name)
-                            if result:
-                                public_keys.append(result.group(0))
-
-            dirs_to_explore = []
-            dirs_explored = []
-
-            dirs_to_explore.append(str(nimbus_datadir))
-            
-            while len(dirs_to_explore) > 0:
-                next_dir = dirs_to_explore.pop()
-
-                with os.scandir(next_dir) as it:
-                    for entry in it:
-                        if entry.is_dir():
-                            dirs_to_explore.append(entry.path)
-                        elif entry.is_file():
-                            subprocess.run([
-                                'icacls', entry.path, '/remove:g', 'Everyone'
-                            ])
-
-                dirs_explored.append(next_dir)
-            
-            for directory in reversed(dirs_explored):
-                subprocess.run([
-                    'icacls', directory, '/remove:g', 'Everyone'
-                ])
-
-            if len(public_keys) < 1:
-                log.error('No key imported into Nimbus.')
-                return False
-    
-            log.info(
-f'''
-We found {len(public_keys)} key(s) imported into Nimbus.
-'''
-            )
-
-            return public_keys
+            return True
         
         # User wants to proceed, make sure the Nimbus service is stopped first
         subprocess.run([
@@ -2540,8 +2490,7 @@ includes a beacon node and a validator client in the same binary
 distribution.
 
 It will download the official Nimbus binary distribution from GitHub and
-it will extract it for easy use. You will be invited to provide an
-initial state to fast-track syncing.
+it will extract it for easy use.
 
 Once installed locally, it will create a service that will automatically
 start Nimbus on reboot or if it crashes. The Nimbus client will be
@@ -2799,24 +2748,6 @@ Do you want to remove this directory first and start from nothing?
             ])
             shutil.rmtree(nimbus_datadir)
 
-    result = button_dialog(
-        title='Nimbus validators',
-        text=(HTML(
-'''
-This next step will import your keystore(s) to be used with Nimbus.
-
-During the importation process, you will be asked to enter the password
-you typed during the keys generation step. It is not your mnemonic.
-'''     )),
-        buttons=[
-            ('Import', True),
-            ('Quit', False)
-        ]
-    ).run()
-
-    if not result:
-        return result
-
     # Setup Nimbus directory
     nimbus_datadir.mkdir(parents=True, exist_ok=True)
 
@@ -2859,59 +2790,6 @@ you typed during the keys generation step. It is not your mnemonic.
         subprocess.run([
             'icacls', directory, '/remove:g', system_identity
         ])
-
-    # Import validator keys into nimbus
-    subprocess.run([
-        'icacls', keys['validator_keys_path'], '/grant:r', 'Everyone:(F)', '/t'
-    ])
-
-    if len(keys['keystore_paths']) > 0:
-        process_result = subprocess.run([
-            str(nimbus_path),
-            'deposits', 'import',
-            f'--data-dir={nimbus_datadir}',
-            keys['validator_keys_path']
-        ])
-        if process_result.returncode != 0:
-            log.error('Unable to import keystore(s) with Nimbus.')
-            return False
-        
-    else:
-        log.warning('No keystore files found to import. We\'ll guess they were already imported '
-            'for now.')
-        time.sleep(5)
-
-    # Check for correct keystore(s) import
-    public_keys = []
-
-    if not nimbus_validators_path.is_dir():
-        log.error('There is no imported keystore files for Nimbus. We cannot continue.')
-        return False
-
-    with os.scandir(nimbus_validators_path) as it:
-        for entry in it:
-            if entry.is_dir():
-                result = re.search(r'0x[0-9a-f]{96}', entry.name)
-                if result:
-                    public_keys.append(result.group(0))
-
-    if len(public_keys) < 1:
-        log.error('No key imported into Nimbus.')
-        return False
-
-    # Clean up generated keys
-    for keystore_path in keys['keystore_paths']:
-        os.unlink(keystore_path)
-    
-    subprocess.run([
-        'icacls', keys['validator_keys_path'], '/remove:g', 'Everyone', '/t'
-    ])
-    
-    log.info(
-f'''
-We found {len(public_keys)} key(s) imported into Nimbus.
-'''
-    )
 
     # Perform checkpoint sync
     if consensus_checkpoint_url != '':
@@ -3023,7 +2901,6 @@ Unable to create JWT token file in {jwt_token_path}
             return False
         
         nimbus_arguments.append(f'--jwt-secret={jwt_token_path}')
-        nimbus_arguments.append(f'--suggested-fee-recipient={fee_recipient_address}')
 
     local_eth1_endpoint = 'http://127.0.0.1:8545'
     eth1_endpoints_flag = '--web3-url='
@@ -3465,7 +3342,7 @@ Connected Peers: {result['bn_connected_peers']}
 ''' )
     time.sleep(5)
 
-    return public_keys
+    return True
 
 def install_teku(base_directory, network, eth1_fallbacks, consensus_checkpoint_url, ports,
     mevboost_installed):
@@ -3513,58 +3390,7 @@ Do you want to skip installing teku and its service?
             return result
         
         if result == 1:
-            public_keys = []
-
-            subprocess.run([
-                'icacls', keys['validator_keys_path'], '/grant', 'Everyone:(R,RD)', '/t'
-            ])
-
-            with os.scandir(keys['validator_keys_path']) as it:
-                for entry in it:
-                    if not entry.is_file():
-                        continue
-
-                    if not entry.name.startswith('keystore'):
-                        continue
-
-                    if not entry.name.endswith('.json'):
-                        continue
-
-                    with open(entry.path, 'r') as keystore_file:
-                        keystore = json.loads(keystore_file.read(204800))
-                
-                        if 'pubkey' not in keystore:
-                            log.error(f'No pubkey found in keystore file {entry.path}')
-                            continue
-                        
-                        public_key = keystore['pubkey']
-                        public_keys.append('0x' + public_key)
-
-            dirs_to_explore = []
-            dirs_explored = []
-
-            dirs_to_explore.append(keys['validator_keys_path'])
-            
-            while len(dirs_to_explore) > 0:
-                next_dir = dirs_to_explore.pop()
-
-                with os.scandir(next_dir) as it:
-                    for entry in it:
-                        if entry.is_dir():
-                            dirs_to_explore.append(entry.path)
-                        elif entry.is_file():
-                            subprocess.run([
-                                'icacls', entry.path, '/remove:g', 'Everyone'
-                            ])
-
-                dirs_explored.append(next_dir)
-            
-            for directory in reversed(dirs_explored):
-                subprocess.run([
-                    'icacls', directory, '/remove:g', 'Everyone'
-                ])
-
-            return public_keys
+            return True
         
         # User wants to proceed, make sure the teku service is stopped first
         subprocess.run([
@@ -3580,8 +3406,7 @@ distribution.
 
 It will install AdoptOpenJDK, a Java Runtime Environment, it will download
 the official Teku binary distribution from GitHub, it will verify its
-checksum and it will extract it for easy use. You will be invited to
-provide an initial state to fast-track syncing.
+checksum and it will extract it for easy use.
 
 Once installed locally, it will create a service that will automatically
 start Teku on reboot or if it crashes. The Teku client will be started and
@@ -3932,8 +3757,6 @@ Unable to create JWT token file in {jwt_token_path}
             return False
         
         teku_arguments.append(f'--ee-jwt-secret-file="{jwt_token_path}"')
-        teku_arguments.append(
-            f'--validators-proposer-default-fee-recipient={fee_recipient_address}')
 
     local_eth1_endpoint = 'http://127.0.0.1:8545'
     eth1_endpoints_flag = '--eth1-endpoints'
@@ -3945,7 +3768,6 @@ Unable to create JWT token file in {jwt_token_path}
     
     teku_arguments.append(f'{eth1_endpoints_flag}=' + ','.join(eth1_endpoints))
     teku_arguments.append(f'--data-path="{teku_datadir}"')
-    teku_arguments.append(f'--validator-keys="{keys["validator_keys_path"]}";"{keys["validator_keys_path"]}"')
     if consensus_checkpoint_url != '':
         base_url = urlbuilder.URIBuilder.from_uri(consensus_checkpoint_url)
         initial_state_url = base_url.add_path(BN_FINALIZED_STATE_URL).finalize().unsplit()
@@ -3996,28 +3818,6 @@ Unable to create JWT token file in {jwt_token_path}
 
     if not (
         service_details['status'] == WINDOWS_SERVICE_RUNNING):
-
-        # Check for evidence of wrong password file
-        if teku_stderr_log_path.is_file():
-            log_part = ''
-            with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
-                log_part = log_file.read(1024)
-            result = re.search(r'Failed to decrypt', log_part)
-            if result:
-                subprocess.run([
-                    str(nssm_binary), 'stop', teku_service_name])
-                
-                log.error(
-f'''
-Your password file contains the wrong password. Teku cannot be started. You
-might need to generate your keys again or fix your password file. We cannot
-continue.
-
-Your password files are the .txt files in:
-
-{keys['validator_keys_path']}
-'''             )
-                return False
 
         result = button_dialog(
             title='Teku service not running properly',
@@ -4081,32 +3881,6 @@ To examine your teku service logs, inspect the following files:
             response = httpx.get(teku_query_url, headers=headers)
         except httpx.RequestError as exception:
             last_exception = exception
-
-            # Check for evidence of wrong password file
-            if teku_stderr_log_path.is_file():
-                log_part = ''
-                try:
-                    with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
-                        log_part = log_file.read(1024 * 100)
-                except OSError as os_exception:
-                    log.warning(f'Unable to read Teku log file in {teku_stderr_log_path}. '
-                        f'{os_exception}')
-                result = re.search(r'Failed to decrypt', log_part)
-                if result:
-                    subprocess.run([
-                        str(nssm_binary), 'stop', teku_service_name])
-                    
-                    log.error(
-f'''
-Your password file contains the wrong password. Teku cannot be started. You
-might need to generate your keys again or fix your password file. We cannot
-continue.
-
-Your password files are the .txt files in:
-
-{keys['validator_keys_path']}
-'''                 )
-                    return False
             
             log.warning(f'Exception {exception} when trying to connect to teku HTTP server on '
                 f'{teku_query_url}')
@@ -4430,58 +4204,7 @@ Connected Peers: {result['bn_connected_peers']}
 ''' )
     time.sleep(5)
 
-    public_keys = []
-
-    subprocess.run([
-        'icacls', keys['validator_keys_path'], '/grant:r', 'Everyone:(R,RD)', '/t'
-    ])
-
-    with os.scandir(keys['validator_keys_path']) as it:
-        for entry in it:
-            if not entry.is_file():
-                continue
-
-            if not entry.name.startswith('keystore'):
-                continue
-
-            if not entry.name.endswith('.json'):
-                continue
-
-            with open(entry.path, 'r') as keystore_file:
-                keystore = json.loads(keystore_file.read(204800))
-        
-                if 'pubkey' not in keystore:
-                    log.error(f'No pubkey found in keystore file {entry.path}')
-                    continue
-                
-                public_key = keystore['pubkey']
-                public_keys.append('0x' + public_key)
-
-    dirs_to_explore = []
-    dirs_explored = []
-
-    dirs_to_explore.append(str(keys['validator_keys_path']))
-    
-    while len(dirs_to_explore) > 0:
-        next_dir = dirs_to_explore.pop()
-
-        with os.scandir(next_dir) as it:
-            for entry in it:
-                if entry.is_dir():
-                    dirs_to_explore.append(entry.path)
-                elif entry.is_file():
-                    subprocess.run([
-                        'icacls', entry.path, '/remove:g', 'Everyone'
-                    ])
-
-        dirs_explored.append(next_dir)
-    
-    for directory in reversed(dirs_explored):
-        subprocess.run([
-            'icacls', directory, '/remove:g', 'Everyone'
-        ])
-
-    return public_keys
+    return True
 
 def install_lighthouse(base_directory, network, eth1_fallbacks, consensus_checkpoint_url, ports,
     mevboost_installed):
@@ -4493,7 +4216,949 @@ def install_lighthouse(base_directory, network, eth1_fallbacks, consensus_checkp
     if not nssm_binary:
         return False
 
-    # TODO: Implement
+    lighthouse_datadir = base_directory.joinpath('var', 'lib', 'lighthouse')
+
+    # Check for existing service
+    lighthouse_service_exists = False
+    lighthouse_service_name = 'lighthousebeacon'
+
+    service_details = get_service_details(nssm_binary, lighthouse_service_name)
+
+    if service_details is not None:
+        lighthouse_service_exists = True
+    
+    if lighthouse_service_exists:
+        result = button_dialog(
+            title='Lighthouse beacon node service found',
+            text=(
+f'''
+The Lighthouse beacon node service seems to have already been created.
+Here are some details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+Do you want to skip installing Lighthouse and its service?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            return True
+        
+        # User wants to proceed, make sure the Lighthouse service is stopped first
+        subprocess.run([
+            str(nssm_binary), 'stop', lighthouse_service_name])
+    
+    result = button_dialog(
+        title='Lighthouse installation',
+        text=(
+'''
+This next step will install Lighthouse, an Ethereum consensus client that
+includes a beacon node and a validator client in the same binary.
+
+It will download the official binary from GitHub, verify its PGP signature
+and extract it for easy use.
+
+Once installed locally, it will create a service that will automatically
+start the Lighthouse beacon node on reboot or if it crashes. The beacon
+node will be started and you will slowly start syncing with the Ethereum
+network. This syncing process can take a few hours or days even with good
+hardware and good internet if you did not select a working checkpoint
+sync endpoint.
+'''     ),
+        buttons=[
+            ('Install', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+
+    # Check if Lighthouse is already installed
+    lighthouse_path = base_directory.joinpath('bin', 'lighthouse.exe')
+
+    lighthouse_found = False
+    lighthouse_version = 'unknown'
+
+    if lighthouse_path.is_file():
+        try:
+            process_result = subprocess.run([str(lighthouse_path), '--version'],
+                capture_output=True, text=True)
+            lighthouse_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'Lighthouse v?(?P<version>[^-]+)', process_output)
+            if result:
+                lighthouse_version = result.group('version').strip()
+
+        except FileNotFoundError:
+            pass
+    
+    install_lighthouse_binary = True
+
+    if lighthouse_found:
+        result = button_dialog(
+            title='Lighthouse binary found',
+            text=(
+f'''
+The Lighthouse binary seems to have already been installed. Here are some
+details found:
+
+Version: {lighthouse_version}
+Location: {lighthouse_path}
+
+Do you want to skip installing the Lighthouse binary?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        install_lighthouse_binary = (result == 2)
+    
+    if install_lighthouse_binary:
+        # Getting latest Lighthouse release files
+        lighthouse_gh_release_url = GITHUB_REST_API_URL + LIGHTHOUSE_LATEST_RELEASE
+        headers = {'Accept': GITHUB_API_VERSION}
+        try:
+            response = httpx.get(lighthouse_gh_release_url, headers=headers,
+                follow_redirects=True)
+        except httpx.RequestError as exception:
+            log.error(f'Exception while downloading Lighthouse binary. {exception}')
+            return False
+
+        if response.status_code != 200:
+            log.error(f'HTTP error while downloading Lighthouse binary. '
+                f'Status code {response.status_code}')
+            return False
+        
+        release_json = response.json()
+
+        if 'assets' not in release_json:
+            log.error('No assets in Github release for Lighthouse.')
+            return False
+        
+        binary_asset = None
+        signature_asset = None
+
+        archive_filename_comp = 'x86_64-windows.tar.gz'
+
+        use_optimized_binary = is_adx_supported(base_directory, log)
+        if not use_optimized_binary:
+            log.warning('CPU does not support ADX instructions. '
+                'Using the portable version for Lighthouse.')
+            archive_filename_comp = 'x86_64-windows-portable.tar.gz'
+        
+        archive_filename_sig_comp = archive_filename_comp + '.asc'
+
+        for asset in release_json['assets']:
+            if 'name' not in asset:
+                continue
+            if 'browser_download_url' not in asset:
+                continue
+        
+            file_name = asset['name']
+            file_url = asset['browser_download_url']
+
+            if file_name.endswith(archive_filename_comp):
+                binary_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+            elif file_name.endswith(archive_filename_sig_comp):
+                signature_asset = {
+                    'file_name': file_name,
+                    'file_url': file_url
+                }
+
+        if binary_asset is None or signature_asset is None:
+            log.error('Could not find binary or signature asset in Github release.')
+            return False
+        
+        # Downloading latest Lighthouse release files
+        download_path = base_directory.joinpath('downloads')
+        download_path.mkdir(parents=True, exist_ok=True)
+
+        binary_path = Path(download_path, binary_asset['file_name'])
+
+        try:
+            with open(binary_path, 'wb') as binary_file:
+                with httpx.stream('GET', binary_asset['file_url'],
+                    follow_redirects=True) as http_stream:
+                    if http_stream.status_code != 200:
+                        log.error(f'HTTP error while downloading Lighthouse binary from Github. '
+                            f'Status code {http_stream.status_code}')
+                        return False
+                    for data in http_stream.iter_bytes():
+                        binary_file.write(data)
+        except httpx.RequestError as exception:
+            log.error(f'Exception while downloading Lighthouse binary from Github. {exception}')
+            return False
+        
+        signature_path = Path(download_path, signature_asset['file_name'])
+
+        try:
+            with open(signature_path, 'wb') as signature_file:
+                with httpx.stream('GET', signature_asset['file_url'],
+                    follow_redirects=True) as http_stream:
+                    if http_stream.status_code != 200:
+                        log.error(f'HTTP error while downloading Lighthouse signature from Github. '
+                            f'Status code {http_stream.status_code}')
+                        return False
+                    for data in http_stream.iter_bytes():
+                        signature_file.write(data)
+        except httpx.RequestError as exception:
+            log.error(f'Exception while downloading Lighthouse signature from Github. {exception}')
+            return False
+        
+        if not install_gpg(base_directory):
+            return False
+        
+        # Verify PGP signature
+        gpg_binary_path = base_directory.joinpath('bin', 'gpg.exe')
+
+        retry_index = 0
+        retry_count = 15
+
+        key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+        log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
+        command_line = [str(gpg_binary_path), '--keyserver', key_server,
+            '--recv-keys', LIGHTHOUSE_PRIME_PGP_KEY_ID]
+        process_result = subprocess.run(command_line)
+
+        if process_result.returncode != 0:
+            # GPG failed to download PGP key, let's wait and retry a few times
+            while process_result.returncode != 0 and retry_index < retry_count:
+                retry_index = retry_index + 1
+                delay = 5
+                log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
+                    f'and try again from a different server.')
+                time.sleep(delay)
+
+                key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+                log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
+                command_line = [str(gpg_binary_path), '--keyserver', key_server,
+                    '--recv-keys', LIGHTHOUSE_PRIME_PGP_KEY_ID]
+
+                process_result = subprocess.run(command_line)
+        
+        if process_result.returncode != 0:
+            log.warning(
+f'''
+We failed to download the Sigma Prime's PGP key to verify the Lighthouse
+archive after {retry_count} retries. We will skip signature verification.
+'''
+            )
+        else:
+            process_result = subprocess.run([
+                str(gpg_binary_path), '--verify', str(signature_path)])
+            if process_result.returncode != 0:
+                log.error('The Lighthouse archive signature is wrong. We\'ll stop here to protect you.')
+                return False
+        
+        # Remove download leftovers
+        signature_path.unlink()
+
+        bin_path = base_directory.joinpath('bin')
+        bin_path.mkdir(parents=True, exist_ok=True)
+        
+        # Extracting the Lighthouse binary archive
+        subprocess.run([
+            'tar', 'xvf', binary_path, '--directory', bin_path])
+        
+        # Remove download leftovers
+        binary_path.unlink()
+
+        # Get Lighthouse version
+        try:
+            process_result = subprocess.run([str(lighthouse_path), '--version'],
+                capture_output=True, text=True)
+            lighthouse_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'Lighthouse v?(?P<version>[^-]+)', process_output)
+            if result:
+                lighthouse_version = result.group('version').strip()
+        except FileNotFoundError:
+            pass
+
+    # TODO: Finish implementation
+
+    return False
+
+    # Check if Lighthouse directory already exists
+    if nimbus_datadir.is_dir():
+
+        # Correct permissions for reading
+        subprocess.run([
+            'icacls', str(nimbus_datadir), '/grant:r', 'Everyone:(F)', '/t'
+        ])
+
+        nimbus_datadir_size = sizeof_fmt(get_dir_size(nimbus_datadir))
+
+        # Removing these added permissions
+        dirs_to_explore = []
+        dirs_explored = []
+
+        dirs_to_explore.append(str(nimbus_datadir))
+        
+        while len(dirs_to_explore) > 0:
+            next_dir = dirs_to_explore.pop()
+
+            with os.scandir(next_dir) as it:
+                for entry in it:
+                    if entry.is_dir():
+                        dirs_to_explore.append(entry.path)
+                    elif entry.is_file():
+                        subprocess.run([
+                            'icacls', entry.path, '/remove:g', 'Everyone'
+                        ])
+
+            dirs_explored.append(next_dir)
+        
+        for directory in reversed(dirs_explored):
+            subprocess.run([
+                'icacls', directory, '/remove:g', 'Everyone'
+            ])
+
+        result = button_dialog(
+            title='Nimbus data directory found',
+            text=(
+f'''
+An existing Nimbus data directory has been found. Here are some
+details found:
+
+Location: {nimbus_datadir}
+Size: {nimbus_datadir_size}
+
+Do you want to remove this directory first and start from nothing?
+'''         ),
+            buttons=[
+                ('Remove', 1),
+                ('Keep', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            subprocess.run([
+                'icacls', str(nimbus_datadir), '/grant', 'Everyone:(F)', '/t'
+            ])
+            shutil.rmtree(nimbus_datadir)
+
+    # Setup Nimbus directory
+    nimbus_datadir.mkdir(parents=True, exist_ok=True)
+
+    # Setup Nimbus data directory permission
+    current_username = os.environ['USERNAME']
+    current_userdomain = os.environ['USERDOMAIN']
+    current_identity = f'{current_userdomain}\\{current_username}'
+    datadir_perm = f'{current_identity}:(OI)(CI)(F)'
+    datadir_perm_file = f'{current_identity}:(F)'
+
+    subprocess.run([
+        'icacls', str(nimbus_datadir), '/inheritance:r', '/grant:r', datadir_perm, '/t'
+    ])
+
+    # Rework preexisting permissions
+    system_identity = 'SYSTEM'
+    dirs_to_explore = []
+    dirs_explored = []
+
+    dirs_to_explore.append(str(nimbus_datadir))
+    
+    while len(dirs_to_explore) > 0:
+        next_dir = dirs_to_explore.pop()
+
+        with os.scandir(next_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    dirs_to_explore.append(entry.path)
+                elif entry.is_file():
+                    subprocess.run([
+                        'icacls', entry.path, '/inheritance:r', '/grant:r', datadir_perm_file
+                    ])
+                    subprocess.run([
+                        'icacls', entry.path, '/remove:g', system_identity
+                    ])
+
+        dirs_explored.append(next_dir)
+    
+    for directory in reversed(dirs_explored):
+        subprocess.run([
+            'icacls', directory, '/remove:g', system_identity
+        ])
+
+    # Perform checkpoint sync
+    if consensus_checkpoint_url != '':
+        # Perform checkpoint sync with the trustedNodeSync command
+        log.info('Initializing Nimbus with a checkpoint sync endpoint.')
+        process_result = subprocess.run([
+            str(nimbus_path),
+            'trustedNodeSync',
+            f'--network={network}',
+            f'--data-dir={nimbus_datadir}',
+            f'--trusted-node-url={consensus_checkpoint_url}',
+            '--backfill=false'
+        ])
+        if process_result.returncode != 0:
+            log.error('Unable to initialize Nimbus with a checkpoint sync endpoint.')
+            return False
+
+    # Protect imported keystore files and secrets
+    datadir_perm = f'{system_identity}:(OI)(CI)(F)'
+    secrets_perm = f'{system_identity}:(F)'
+    
+    # Set correct ACL permissions on data directory.
+    data_dirs_to_explore = []
+    data_dirs_explored = []
+
+    data_dirs_to_explore.append(str(nimbus_datadir))
+
+    while len(data_dirs_to_explore) > 0:
+        next_dir = data_dirs_to_explore.pop()
+
+        with os.scandir(next_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    data_dirs_to_explore.append(entry.path)
+                elif entry.is_file():
+                    subprocess.run([
+                        'icacls', entry.path, '/inheritance:r', '/grant:r', secrets_perm
+                    ])
+
+        data_dirs_explored.append(next_dir)
+    
+    for directory in reversed(data_dirs_explored):
+        subprocess.run([
+            'icacls', directory, '/inheritance:r', '/grant:r', datadir_perm
+        ])
+    
+    # Remove current identity permissions
+    dirs_to_explore = []
+    dirs_explored = []
+
+    dirs_to_explore.append(str(nimbus_datadir))
+
+    while len(dirs_to_explore) > 0:
+        next_dir = dirs_to_explore.pop()
+
+        with os.scandir(next_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    dirs_to_explore.append(entry.path)
+                elif entry.is_file():
+                    subprocess.run([
+                        'icacls', entry.path, '/remove:g', current_identity
+                    ])
+
+        dirs_explored.append(next_dir)
+    
+    for directory in reversed(dirs_explored):
+        subprocess.run([
+            'icacls', directory, '/remove:g', current_identity
+        ])
+
+    # Setup Nimbus service
+    log_path = base_directory.joinpath('var', 'log')
+    log_path.mkdir(parents=True, exist_ok=True)
+
+    nimbus_stdout_log_path = log_path.joinpath('nimbus-service-stdout.log')
+    nimbus_stderr_log_path = log_path.joinpath('nimbus-service-stderr.log')
+
+    if nimbus_stdout_log_path.is_file():
+        nimbus_stdout_log_path.unlink()
+    if nimbus_stderr_log_path.is_file():
+        nimbus_stderr_log_path.unlink()
+
+    # Check if merge ready
+    merge_ready = False
+
+    result = re.search(r'([^-]+)', nimbus_version)
+    if result:
+        cleaned_nimbus_version = parse_version(result.group(1).strip())
+        target_nimbus_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][CONSENSUS_CLIENT_NIMBUS])
+
+        if cleaned_nimbus_version >= target_nimbus_version:
+            merge_ready = True
+
+    nimbus_arguments = NIMBUS_ARGUMENTS[network]
+
+    if merge_ready:
+        jwt_token_dir = base_directory.joinpath('var', 'lib', 'ethereum')
+        jwt_token_path = jwt_token_dir.joinpath('jwttoken')
+
+        if not setup_jwt_token_file(base_directory):
+            log.error(
+f'''
+Unable to create JWT token file in {jwt_token_path}
+'''
+            )
+
+            return False
+        
+        nimbus_arguments.append(f'--jwt-secret={jwt_token_path}')
+
+    local_eth1_endpoint = 'http://127.0.0.1:8545'
+    eth1_endpoints_flag = '--web3-url='
+    if merge_ready:
+        local_eth1_endpoint = 'http://127.0.0.1:8551'
+
+    eth1_endpoints = [local_eth1_endpoint] + eth1_fallbacks
+
+    for endpoint in eth1_endpoints:
+        nimbus_arguments.append(f'{eth1_endpoints_flag}{endpoint}')
+
+    nimbus_arguments.append(f'--data-dir={nimbus_datadir}')
+
+    if ports['eth2_bn'] != DEFAULT_NIMBUS_BN_PORT:
+        nimbus_arguments.append(f'--tcp-port={ports["eth2_bn"]}')
+        nimbus_arguments.append(f'--udp-port={ports["eth2_bn"]}')
+
+    if mevboost_installed:
+        nimbus_arguments.append('--payload-builder=true')
+        nimbus_arguments.append('--payload-builder-url=http://127.0.0.1:18550')
+
+    parameters = {
+        'DisplayName': NIMBUS_SERVICE_DISPLAY_NAME[network],
+        'AppRotateFiles': '1',
+        'AppRotateSeconds': '86400',
+        'AppRotateBytes': '10485760',
+        'AppStdout': str(nimbus_stdout_log_path),
+        'AppStderr': str(nimbus_stderr_log_path),
+        'AppStopMethodConsole': '1500'
+    }
+
+    if not create_service(nssm_binary, nimbus_service_name, str(nimbus_path), nimbus_arguments,
+        parameters):
+        log.error('There was an issue creating the Nimbus service. We cannot continue.')
+        return False
+
+    log.info('Starting Nimbus service...')
+    process_result = subprocess.run([
+        str(nssm_binary), 'start', nimbus_service_name
+    ])
+
+    delay = 30
+    log.info(f'We are giving {delay} seconds for the Nimbus service to start properly.')
+    time.sleep(delay)
+
+    # Verify proper Nimbus service installation
+    service_details = get_service_details(nssm_binary, nimbus_service_name)
+    if not service_details:
+        log.error('We could not find the Nimbus service we just created. '
+            'We cannot continue.')
+        return False
+
+    if not (service_details['status'] == WINDOWS_SERVICE_RUNNING):
+
+        result = button_dialog(
+            title='Nimbus service not running properly',
+            text=(
+f'''
+The Nimbus service we just created seems to have issues. Here are some
+details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+We cannot proceed if the Nimbus service cannot be started properly. Make
+sure to check the logs and fix any issue found there. You can see the
+logs in:
+
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        # Stop the service to prevent indefinite restart attempts
+        subprocess.run([
+            str(nssm_binary), 'stop', nimbus_service_name])
+
+        log.info(
+f'''
+To examine your Nimbus service logs, inspect the following files:
+
+{nimbus_stdout_log_path}
+{nimbus_stdout_log_path}
+'''
+        )
+
+        return False
+
+    # Verify proper Nimbus installation and syncing
+    local_nimbus_http_base = 'http://127.0.0.1:5052'
+    
+    cc_version_query = BN_VERSION_EP
+    cc_query_url = local_nimbus_http_base + cc_version_query
+    headers = {
+        'accept': 'application/json'
+    }
+
+    keep_retrying = True
+
+    retry_index = 0
+    retry_count = 10
+    retry_delay = 30
+    retry_delay_increase = 15
+    last_exception = None
+    last_status_code = None
+
+    while keep_retrying and retry_index < retry_count:
+        try:
+            response = httpx.get(cc_query_url, headers=headers)
+        except httpx.RequestError as exception:
+            last_exception = exception
+            
+            log.warning(f'Exception {exception} when trying to connect to Nimbus HTTP server on '
+                f'{cc_query_url}')
+
+            retry_index = retry_index + 1
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            retry_delay = retry_delay + retry_delay_increase
+            continue
+
+        if response.status_code != 200:
+            last_status_code = response.status_code
+
+            log.error(f'Error code {response.status_code} when trying to connect to Nimbus HTTP '
+                f'server on {cc_query_url}')
+            
+            retry_index = retry_index + 1
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            retry_delay = retry_delay + retry_delay_increase
+            continue
+        
+        keep_retrying = False
+        last_exception = None
+        last_status_code = None
+    
+    if keep_retrying:
+        if last_exception is not None:
+            result = button_dialog(
+                title='Cannot connect to Nimbus',
+                text=(
+f'''
+We could not connect to Nimbus HTTP server. Here are some details for
+this last test we tried to perform:
+
+URL: {cc_query_url}
+Method: GET
+Headers: {headers}
+Exception: {last_exception}
+
+We cannot proceed if the Nimbus HTTP server is not responding properly.
+Make sure to check the logs and fix any issue found there. You can see
+the logs in:
+
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            log.info(
+f'''
+To examine your Nimbus service logs, inspect the following files:
+
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
+'''
+            )
+
+            return False
+        elif last_status_code is not None:
+            result = button_dialog(
+                title='Cannot connect to Nimbus',
+                text=(
+f'''
+We could not connect to Nimbus HTTP server. Here are some details for
+this last test we tried to perform:
+
+URL: {cc_query_url}
+Method: GET
+Headers: {headers}
+Status code: {last_status_code}
+
+We cannot proceed if the Nimbus HTTP server is not responding properly.
+Make sure to check the logs and fix any issue found there. You can see
+the logs in:
+
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            log.info(
+f'''
+To examine your Nimbus service logs, inspect the following files:
+
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
+'''
+            )
+
+            return False
+
+    # Verify proper Nimbus syncing
+    def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
+        bn_is_working = False
+        bn_is_syncing = False
+        bn_has_few_peers = False
+        bn_connected_peers = 0
+        bn_head_slot = UNKNOWN_VALUE
+        bn_sync_distance = UNKNOWN_VALUE
+
+        set_result({
+            'bn_is_working': bn_is_working,
+            'bn_is_syncing': bn_is_syncing,
+            'bn_head_slot': bn_head_slot,
+            'bn_sync_distance': bn_sync_distance,
+            'bn_connected_peers': bn_connected_peers
+        })
+
+        set_percentage(10)
+
+        out_log_read_index = 0
+        err_log_read_index = 0
+
+        while True:
+
+            if get_exited():
+                return {
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                }
+
+            # Output logs
+            out_log_text = ''
+            with open(nimbus_stdout_log_path, 'r', encoding='utf8') as log_file:
+                log_file.seek(out_log_read_index)
+                out_log_text = log_file.read()
+                out_log_read_index = log_file.tell()
+            
+            err_log_text = ''
+            with open(nimbus_stderr_log_path, 'r', encoding='utf8') as log_file:
+                log_file.seek(err_log_read_index)
+                err_log_text = log_file.read()
+                err_log_read_index = log_file.tell()
+            
+            out_log_length = len(out_log_text)
+            if out_log_length > 0:
+                log_text(out_log_text)
+
+            err_log_length = len(err_log_text)
+            if err_log_length > 0:
+                log_text(err_log_text)
+
+            time.sleep(1)
+            
+            cc_syncing_query = BN_SYNCING_EP
+            cc_query_url = local_nimbus_http_base + cc_syncing_query
+            headers = {
+                'accept': 'application/json'
+            }
+            try:
+                response = httpx.get(cc_query_url, headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Nimbus.')
+                continue
+
+            if response.status_code != 200:
+                log_text(f'Status code: {response.status_code} while querying Nimbus.')
+                continue
+        
+            response_json = response.json()
+            syncing_json = response_json
+
+            cc_peers_query = BN_PEERS_EP
+            cc_query_url = local_nimbus_http_base + cc_peers_query
+            headers = {
+                'accept': 'application/json'
+            }
+            try:
+                response = httpx.get(cc_query_url, headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Nimbus.')
+                continue
+
+            if response.status_code != 200:
+                log_text(f'Status code: {response.status_code} while querying Nimbus.')
+                continue
+
+            response_json = response.json()
+            peers_json = response_json
+
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'is_syncing' in syncing_json['data']
+                ):
+                bn_is_syncing = bool(syncing_json['data']['is_syncing'])
+            else:
+                bn_is_syncing = False
+            
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'head_slot' in syncing_json['data']
+                ):
+                bn_head_slot = syncing_json['data']['head_slot']
+            else:
+                bn_head_slot = UNKNOWN_VALUE
+
+            if (
+                syncing_json and
+                'data' in syncing_json and
+                'sync_distance' in syncing_json['data']
+                ):
+                bn_sync_distance = syncing_json['data']['sync_distance']
+            else:
+                bn_sync_distance = UNKNOWN_VALUE
+
+            bn_connected_peers = 0
+            if (
+                peers_json and
+                'data' in peers_json and
+                type(peers_json['data']) is list
+                ):
+                for peer in peers_json['data']:
+                    if 'state' not in peer:
+                        continue
+                    if peer['state'] == 'connected':
+                        bn_connected_peers = bn_connected_peers + 1
+            
+            bn_has_few_peers = bn_connected_peers >= BN_MIN_FEW_PEERS
+
+            if bn_is_syncing or bn_has_few_peers:
+                set_percentage(100)
+            else:
+                set_percentage(10 + round(min(bn_connected_peers / BN_MIN_FEW_PEERS, 1.0) * 90.0))
+
+            change_status((
+f'''
+Syncing: {bn_is_syncing} (Head slot: {bn_head_slot}, Sync distance: {bn_sync_distance})
+Connected Peers: {bn_connected_peers}
+'''         ).strip())
+
+            if bn_is_syncing or bn_has_few_peers:
+                bn_is_working = True
+                return {
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                }
+            else:
+                set_result({
+                    'bn_is_working': bn_is_working,
+                    'bn_is_syncing': bn_is_syncing,
+                    'bn_head_slot': bn_head_slot,
+                    'bn_sync_distance': bn_sync_distance,
+                    'bn_connected_peers': bn_connected_peers
+                })
+
+    result = progress_log_dialog(
+        title='Verifying proper Nimbus service installation',
+        text=(
+f'''
+We are waiting for Nimbus to sync or find enough peers to confirm that it
+is working properly.
+'''     ),
+        status_text=(
+'''
+Syncing: Unknown (Head slot: Unknown, Sync distance: Unknown)
+Connected Peers: Unknown
+'''
+        ).strip(),
+        run_callback=verifying_callback
+    ).run()
+    
+    if not result:
+        log.warning('Nimbus service installation verification was cancelled.')
+        return False
+
+    if not result['bn_is_working']:
+        # We could not get a proper result from the Nimbus
+        result = button_dialog(
+            title='Nimbus service installation verification interrupted',
+            text=(
+f'''
+We were interrupted before we could fully verify the Nimbus service
+installation. Here are some results for the last tests we performed:
+
+Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
+Connected Peers: {result['bn_connected_peers']}
+
+We cannot proceed if the Nimbus service is not installed properly. Make
+sure to check the logs and fix any issue found there. You can see the
+logs in:
+
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your Nimbus service logs, inspect the following files:
+
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
+'''
+        )
+
+        return False
+
+    log.info(
+f'''
+Nimbus is installed and working properly.
+
+Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
+Connected Peers: {result['bn_connected_peers']}
+''' )
+    time.sleep(5)
 
     return True
 

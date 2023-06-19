@@ -28,6 +28,8 @@ SPEEDTEST_SCRIPT_URL = 'https://raw.githubusercontent.com/sivel/speedtest-cli/ma
 
 STAKEHOUSE_PORT_CHECKER_URL = 'https://port-checker.vercel.app/api/checker'
 
+COREINFO_DOWNLOAD_URL = 'https://download.sysinternals.com/files/Coreinfo.zip'
+
 MIN_AVAILABLE_DISK_SPACE_GB = {
     NETWORK_MAINNET: 1700.0,
     NETWORK_GOERLI: 300.0
