@@ -426,10 +426,14 @@ Do you want add a consensus checkpoint provider?
             if len(checkpoint_endpoints) <= 0:
                 log.error(f'No endpoint found in checkpoint YAML file from {checkpoint_yaml_file}')
                 return False
-            
-            log.info(f'{len(checkpoint_endpoints)} checkpoint sync endpoints to choose from.')
 
             is_invalid = True
+
+            # Filter out endpoints that do not provide verification
+            checkpoint_endpoints = list(filter(lambda x: (bool(x.get('verification', False))),
+                checkpoint_endpoints))
+
+            log.info(f'{len(checkpoint_endpoints)} checkpoint sync endpoints to choose from.')
 
             # Select a random endpoint from the YAML file
             while is_invalid:
