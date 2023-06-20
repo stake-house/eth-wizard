@@ -2414,7 +2414,7 @@ Do you want to skip installing the lighthouse binary?
                         LIGHTHOUSE_PRIME_PGP_KEY_ID]
 
                     process_result = subprocess.run(command_line)
-            
+
             if process_result.returncode != 0:
                 log.error(
 f'''

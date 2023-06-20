@@ -1992,7 +1992,7 @@ Unable to create JWT token file in {jwt_token_path}
     
     teku_service_name = 'teku'
 
-    teku_arguments = client_details['bn_exec']['argv']
+    teku_arguments = client_details['exec']['argv']
 
     # JWT token configuration (--ee-jwt-secret-file)
     has_jwt_config = False

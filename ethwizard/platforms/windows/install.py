@@ -4,6 +4,7 @@ import httpx
 import humanize
 import re
 import os
+import shlex
 import shutil
 import json
 import hashlib
@@ -5063,13 +5064,317 @@ def install_nimbus_validator(base_directory, network, keys, fee_recipient_addres
     # Import keystore(s) and configure the Nimbus validator client (as part of the same service)
     # Returns a list of public keys when done
 
-    # TODO: Implement
+    base_directory = Path(base_directory)
 
-    return False
+    nssm_binary = get_nssm_binary()
+    if not nssm_binary:
+        return False
+
+    nimbus_path = base_directory.joinpath('bin', 'nimbus_beacon_node.exe')
+    nimbus_datadir = base_directory.joinpath('var', 'lib', 'nimbus')
+    nimbus_validators_path = nimbus_datadir.joinpath('validators')
+
+    # Check for existing service
+    nimbus_service_exists = False
+    nimbus_service_name = 'nimbus'
+
+    service_details = get_service_details(nssm_binary, nimbus_service_name)
+
+    if service_details is not None:
+        nimbus_service_exists = True
+    
+    if not nimbus_service_exists:
+        log.error('The Nimbus service is missing. You might need to reinstall it.')
+        return False
+
+    # Import validator keys into Nimbus
+    result = button_dialog(
+        title='Nimbus validators',
+        text=(HTML(
+'''
+This next step will import your keystore(s) to be used with Nimbus.
+
+During the importation process, you will be asked to enter the password
+you typed during the keys generation step. It is not your mnemonic.
+'''     )),
+        buttons=[
+            ('Import', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+
+    # Stop the Nimbus service
+    subprocess.run([
+        str(nssm_binary), 'stop', nimbus_service_name])
+
+    # Import validator keys into nimbus
+    subprocess.run([
+        'icacls', keys['validator_keys_path'], '/grant:r', 'Everyone:(F)', '/t'
+    ])
+
+    # Correct permissions for reading and importing keys
+    system_identity = 'SYSTEM'
+    current_username = os.environ['USERNAME']
+    current_userdomain = os.environ['USERDOMAIN']
+    current_identity = f'{current_userdomain}\\{current_username}'
+    datadir_perm = f'{current_identity}:(OI)(CI)(F)'
+    datadir_perm_file = f'{current_identity}:(F)'
+
+    subprocess.run([
+        'icacls', str(nimbus_datadir), '/grant', 'Everyone:(F)', '/t'
+    ])
+
+    dirs_to_explore = []
+    dirs_explored = []
+
+    dirs_to_explore.append(str(nimbus_datadir))
+
+    while len(dirs_to_explore) > 0:
+        next_dir = dirs_to_explore.pop()
+
+        with os.scandir(next_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    dirs_to_explore.append(entry.path)
+                elif entry.is_file():
+                    subprocess.run([
+                        'icacls', entry.path, '/inheritance:r', '/grant:r', datadir_perm_file
+                    ])
+                    subprocess.run([
+                        'icacls', entry.path, '/remove:g', system_identity
+                    ])
+                    subprocess.run([
+                        'icacls', entry.path, '/remove:g', 'Everyone'
+                    ])
+
+        dirs_explored.append(next_dir)
+
+    for directory in reversed(dirs_explored):
+        subprocess.run([
+            'icacls', directory, '/inheritance:r', '/grant:r', datadir_perm
+        ])
+        subprocess.run([
+            'icacls', directory, '/remove:g', system_identity
+        ])
+        subprocess.run([
+            'icacls', directory, '/remove:g', 'Everyone'
+        ])
+
+    if len(keys['keystore_paths']) > 0:
+        process_result = subprocess.run([
+            str(nimbus_path),
+            'deposits', 'import',
+            f'--data-dir={nimbus_datadir}',
+            keys['validator_keys_path']
+        ])
+        if process_result.returncode != 0:
+            log.error('Unable to import keystore(s) with Nimbus.')
+            return False
+
+    else:
+        log.warning('No keystore files found to import. We\'ll guess they were already imported '
+            'for now.')
+        time.sleep(5)
+
+    # Check for correct keystore(s) import
+    public_keys = []
+
+    if not nimbus_validators_path.is_dir():
+        log.error('There is no imported keystore files for Nimbus. We cannot continue.')
+        return False
+
+    with os.scandir(nimbus_validators_path) as it:
+        for entry in it:
+            if entry.is_dir():
+                result = re.search(r'0x[0-9a-f]{96}', entry.name)
+                if result:
+                    public_keys.append(result.group(0))
+
+    if len(public_keys) < 1:
+        log.error('No key imported into Nimbus.')
+        return False
+
+    # Clean up generated keys
+    for keystore_path in keys['keystore_paths']:
+        os.unlink(keystore_path)
+
+    subprocess.run([
+        'icacls', keys['validator_keys_path'], '/remove:g', 'Everyone', '/t'
+    ])
+
+    log.info(
+f'''
+We found {len(public_keys)} key(s) imported into Nimbus.
+'''
+    )
+
+     # Protect imported keystore files and secrets
+    datadir_perm = f'{system_identity}:(OI)(CI)(F)'
+    secrets_perm = f'{system_identity}:(F)'
+
+    # Set correct ACL permissions on data directory.
+    data_dirs_to_explore = []
+    data_dirs_explored = []
+
+    data_dirs_to_explore.append(str(nimbus_datadir))
+
+    while len(data_dirs_to_explore) > 0:
+        next_dir = data_dirs_to_explore.pop()
+
+        with os.scandir(next_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    data_dirs_to_explore.append(entry.path)
+                elif entry.is_file():
+                    subprocess.run([
+                        'icacls', entry.path, '/inheritance:r', '/grant:r', secrets_perm
+                    ])
+
+        data_dirs_explored.append(next_dir)
+
+    for directory in reversed(data_dirs_explored):
+        subprocess.run([
+            'icacls', directory, '/inheritance:r', '/grant:r', datadir_perm
+        ])
+
+    # Remove current identity permissions
+    dirs_to_explore = []
+    dirs_explored = []
+
+    dirs_to_explore.append(str(nimbus_datadir))
+
+    while len(dirs_to_explore) > 0:
+        next_dir = dirs_to_explore.pop()
+
+        with os.scandir(next_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    dirs_to_explore.append(entry.path)
+                elif entry.is_file():
+                    subprocess.run([
+                        'icacls', entry.path, '/remove:g', current_identity
+                    ])
+
+        dirs_explored.append(next_dir)
+
+    for directory in reversed(dirs_explored):
+        subprocess.run([
+            'icacls', directory, '/remove:g', current_identity
+        ])
+    
+    # Adding configuration to the Nimbus service
+
+    nimbus_arguments = shlex.split(service_details['parameters']['AppParameters'], posix=False)
+
+    # Fee recipient configuration (--suggested-fee-recipient)
+    has_fee_recipient_config = False
+
+    replaced_index = None
+    replaced_arg = None
+    replace_next = False
+
+    for index, arg in enumerate(nimbus_arguments):
+        if replace_next:
+            replaced_index = index
+            replaced_arg = f'{fee_recipient_address}'
+            break
+        elif arg.lower().startswith('--suggested-fee-recipient'):
+            has_fee_recipient_config = True
+            if '=' in arg:
+                replaced_index = index
+                replaced_arg = f'--suggested-fee-recipient={fee_recipient_address}'
+                break
+            else:
+                replace_next = True
+
+    if not has_fee_recipient_config:
+        log.info('Adding fee recipient to Nimbus...')
+
+        nimbus_arguments.append(f'--suggested-fee-recipient={fee_recipient_address}')
+    else:
+        log.warning('Nimbus was already configured with a fee recipient. We will try to update or make '
+            'sure the configuration is correct.')
+        
+        if replaced_index is None or replaced_arg is None:
+            log.error('No replacement found for fee recipient argument.')
+            return False
+        
+        nimbus_arguments[replaced_index] = replaced_arg
+    
+    # Updating Nimbus service configuration
+    if not set_service_param(nssm_binary, nimbus_service_name, 'AppParameters', nimbus_arguments):
+        return False
+
+    log.info('Starting Nimbus service...')
+    process_result = subprocess.run([
+        str(nssm_binary), 'start', nimbus_service_name
+    ])
+
+    delay = 30
+    log.info(f'We are giving {delay} seconds for the Nimbus service to start properly.')
+    time.sleep(delay)
+
+    # Verify proper Nimbus service installation
+    service_details = get_service_details(nssm_binary, nimbus_service_name)
+    if not service_details:
+        log.error('We could not find the Nimbus service we just created. '
+            'We cannot continue.')
+        return False
+
+    log_path = base_directory.joinpath('var', 'log')
+    nimbus_stdout_log_path = log_path.joinpath('nimbus-service-stdout.log')
+    nimbus_stderr_log_path = log_path.joinpath('nimbus-service-stderr.log')
+
+    if not (service_details['status'] == WINDOWS_SERVICE_RUNNING):
+
+        result = button_dialog(
+            title='Nimbus service not running properly',
+            text=(
+f'''
+The Nimbus service we just configured seems to have issues. Here are some
+details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+We cannot proceed if the Nimbus service cannot be started properly. Make
+sure to check the logs and fix any issue found there. You can see the
+logs in:
+
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        # Stop the service to prevent indefinite restart attempts
+        subprocess.run([
+            str(nssm_binary), 'stop', nimbus_service_name])
+
+        log.info(
+f'''
+To examine your Nimbus service logs, inspect the following files:
+
+{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
+'''
+        )
+
+        return False
+
+    return public_keys
 
 def install_lighthouse_validator(base_directory, network, keys, fee_recipient_address,
     mevboost_installed):
-    # Import keystore(s) and configure the Nimbus validator client (as part of the same service)
+    # Import keystore(s) and configure the Lighthouse validator client (as part of a different service)
     # Returns a list of public keys when done
 
     # TODO: Implement
