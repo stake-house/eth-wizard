@@ -1645,38 +1645,51 @@ Do you want to skip installing the geth binary?
         # Verify PGP signature
         gpg_binary_path = base_directory.joinpath('bin', 'gpg.exe')
 
-        retry_index = 0
-        retry_count = 15
-
-        key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
-        log.info(f'Downloading Geth Windows Builder PGP key from {key_server} ...')
-        command_line = [str(gpg_binary_path), '--keyserver', key_server,
-            '--recv-keys', GETH_WINDOWS_PGP_KEY_ID]
+        command_line = [str(gpg_binary_path), '--list-keys', '--with-colons',
+            GETH_WINDOWS_PGP_KEY_ID]
         process_result = subprocess.run(command_line)
+        pgp_key_found = process_result.returncode == 0
 
-        if process_result.returncode != 0:
-            # GPG failed to download Geth Windows Builder PGP key, let's wait and retry a few times
-            while process_result.returncode != 0 and retry_index < retry_count:
-                retry_index = retry_index + 1
-                delay = 5
-                log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
-                    f'and try again from a different server.')
-                time.sleep(delay)
+        if not pgp_key_found:
 
-                key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
-                log.info(f'Downloading Geth Windows Builder PGP key from {key_server} ...')
-                command_line = [str(gpg_binary_path), '--keyserver', key_server,
-                    '--recv-keys', GETH_WINDOWS_PGP_KEY_ID]
+            retry_index = 0
+            retry_count = 15
 
-                process_result = subprocess.run(command_line)
-        
-        if process_result.returncode != 0:
-            log.warning(
+            key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+            log.info(f'Downloading Geth Windows Builder PGP key from {key_server} ...')
+            command_line = [str(gpg_binary_path), '--keyserver', key_server,
+                '--recv-keys', GETH_WINDOWS_PGP_KEY_ID]
+            process_result = subprocess.run(command_line)
+
+            if process_result.returncode != 0:
+                # GPG failed to download Geth Windows Builder PGP key, let's wait and retry a few times
+                while process_result.returncode != 0 and retry_index < retry_count:
+                    retry_index = retry_index + 1
+                    delay = 5
+                    log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
+                        f'and try again from a different server.')
+                    time.sleep(delay)
+
+                    key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+                    log.info(f'Downloading Geth Windows Builder PGP key from {key_server} ...')
+                    command_line = [str(gpg_binary_path), '--keyserver', key_server,
+                        '--recv-keys', GETH_WINDOWS_PGP_KEY_ID]
+
+                    process_result = subprocess.run(command_line)
+
+            if process_result.returncode != 0:
+                log.warning(
 f'''
 We failed to download the Geth Windows Builder PGP key to verify the geth
 archive after {retry_count} retries. We will skip signature verification.
 '''
-            )
+                )
+            else:
+                process_result = subprocess.run([
+                    str(gpg_binary_path), '--verify', str(geth_archive_sig_path)])
+                if process_result.returncode != 0:
+                    log.error('The geth archive signature is wrong. We\'ll stop here to protect you.')
+                    return False
         else:
             process_result = subprocess.run([
                 str(gpg_binary_path), '--verify', str(geth_archive_sig_path)])
@@ -4479,7 +4492,6 @@ archive after {retry_count} retries. We will skip signature verification.
                 if process_result.returncode != 0:
                     log.error('The Lighthouse archive signature is wrong. We\'ll stop here to protect you.')
                     return False
-        
         else:
             process_result = subprocess.run([
                 str(gpg_binary_path), '--verify', str(signature_path)])
