@@ -402,4 +402,11 @@ def is_adx_supported(base_directory, log):
     # Extracting the ADX line
     result = re.search(r'\nADX\s+\*', process_output)
 
-    return result is not None
+    adx_support = (result is not None)
+
+    if adx_support:
+        log.info('ADX instructions set is supported on this CPU.')
+    else:
+        log.warn('ADX instructions set is NOT supported on this CPU.')
+
+    return adx_support

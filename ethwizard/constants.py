@@ -308,6 +308,16 @@ NIMBUS_ARGUMENTS = {
     NETWORK_GOERLI: ['--network=goerli', '--rest=true', '--metrics=true', '--enr-auto-update=true']
 }
 
+LIGHTHOUSE_BN_SERVICE_DISPLAY_NAME = {
+    NETWORK_MAINNET: 'Lighthouse Ethereum Client - Beacon Node (Mainnet)',
+    NETWORK_GOERLI: 'Lighthouse Ethereum Client - Beacon Node (Görli)'
+}
+
+LIGHTHOUSE_BN_ARGUMENTS = {
+    NETWORK_MAINNET: ['bn', '--network', 'mainnet', '--staking', '--validator-monitor-auto', '--metrics'],
+    NETWORK_GOERLI: ['bn', '--network', 'goerli', '--staking', '--validator-monitor-auto', '--metrics']
+}
+
 WINDOWS_SERVICE_RUNNING = 'SERVICE_RUNNING'
 WINDOWS_SERVICE_START_PENDING = 'SERVICE_START_PENDING'
 

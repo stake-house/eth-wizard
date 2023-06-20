@@ -2989,7 +2989,7 @@ f'''
 To examine your Nimbus service logs, inspect the following files:
 
 {nimbus_stdout_log_path}
-{nimbus_stdout_log_path}
+{nimbus_stderr_log_path}
 '''
         )
 
@@ -4434,38 +4434,52 @@ Do you want to skip installing the Lighthouse binary?
         # Verify PGP signature
         gpg_binary_path = base_directory.joinpath('bin', 'gpg.exe')
 
-        retry_index = 0
-        retry_count = 15
-
-        key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
-        log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
-        command_line = [str(gpg_binary_path), '--keyserver', key_server,
-            '--recv-keys', LIGHTHOUSE_PRIME_PGP_KEY_ID]
+        command_line = [str(gpg_binary_path), '--list-keys', '--with-colons',
+            LIGHTHOUSE_PRIME_PGP_KEY_ID]
         process_result = subprocess.run(command_line)
+        pgp_key_found = process_result.returncode == 0
 
-        if process_result.returncode != 0:
-            # GPG failed to download PGP key, let's wait and retry a few times
-            while process_result.returncode != 0 and retry_index < retry_count:
-                retry_index = retry_index + 1
-                delay = 5
-                log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
-                    f'and try again from a different server.')
-                time.sleep(delay)
+        if not pgp_key_found:
 
-                key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
-                log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
-                command_line = [str(gpg_binary_path), '--keyserver', key_server,
-                    '--recv-keys', LIGHTHOUSE_PRIME_PGP_KEY_ID]
+            retry_index = 0
+            retry_count = 15
 
-                process_result = subprocess.run(command_line)
-        
-        if process_result.returncode != 0:
-            log.warning(
+            key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+            log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
+            command_line = [str(gpg_binary_path), '--keyserver', key_server,
+                '--recv-keys', LIGHTHOUSE_PRIME_PGP_KEY_ID]
+            process_result = subprocess.run(command_line)
+
+            if process_result.returncode != 0:
+                # GPG failed to download PGP key, let's wait and retry a few times
+                while process_result.returncode != 0 and retry_index < retry_count:
+                    retry_index = retry_index + 1
+                    delay = 5
+                    log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
+                        f'and try again from a different server.')
+                    time.sleep(delay)
+
+                    key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+                    log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
+                    command_line = [str(gpg_binary_path), '--keyserver', key_server,
+                        '--recv-keys', LIGHTHOUSE_PRIME_PGP_KEY_ID]
+
+                    process_result = subprocess.run(command_line)
+
+            if process_result.returncode != 0:
+                log.warning(
 f'''
 We failed to download the Sigma Prime's PGP key to verify the Lighthouse
 archive after {retry_count} retries. We will skip signature verification.
 '''
-            )
+                )
+            else:
+                process_result = subprocess.run([
+                    str(gpg_binary_path), '--verify', str(signature_path)])
+                if process_result.returncode != 0:
+                    log.error('The Lighthouse archive signature is wrong. We\'ll stop here to protect you.')
+                    return False
+        
         else:
             process_result = subprocess.run([
                 str(gpg_binary_path), '--verify', str(signature_path)])
@@ -4499,54 +4513,20 @@ archive after {retry_count} retries. We will skip signature verification.
         except FileNotFoundError:
             pass
 
-    # TODO: Finish implementation
-
-    return False
-
     # Check if Lighthouse directory already exists
-    if nimbus_datadir.is_dir():
+    if lighthouse_datadir.is_dir():
 
-        # Correct permissions for reading
-        subprocess.run([
-            'icacls', str(nimbus_datadir), '/grant:r', 'Everyone:(F)', '/t'
-        ])
-
-        nimbus_datadir_size = sizeof_fmt(get_dir_size(nimbus_datadir))
-
-        # Removing these added permissions
-        dirs_to_explore = []
-        dirs_explored = []
-
-        dirs_to_explore.append(str(nimbus_datadir))
-        
-        while len(dirs_to_explore) > 0:
-            next_dir = dirs_to_explore.pop()
-
-            with os.scandir(next_dir) as it:
-                for entry in it:
-                    if entry.is_dir():
-                        dirs_to_explore.append(entry.path)
-                    elif entry.is_file():
-                        subprocess.run([
-                            'icacls', entry.path, '/remove:g', 'Everyone'
-                        ])
-
-            dirs_explored.append(next_dir)
-        
-        for directory in reversed(dirs_explored):
-            subprocess.run([
-                'icacls', directory, '/remove:g', 'Everyone'
-            ])
+        lighthouse_datadir_size = sizeof_fmt(get_dir_size(lighthouse_datadir))
 
         result = button_dialog(
-            title='Nimbus data directory found',
+            title='Lighthouse data directory found',
             text=(
 f'''
-An existing Nimbus data directory has been found. Here are some
+An existing Lighthouse data directory has been found. Here are some
 details found:
 
-Location: {nimbus_datadir}
-Size: {nimbus_datadir_size}
+Location: {lighthouse_datadir}
+Size: {lighthouse_datadir_size}
 
 Do you want to remove this directory first and start from nothing?
 '''         ),
@@ -4561,149 +4541,36 @@ Do you want to remove this directory first and start from nothing?
             return result
         
         if result == 1:
-            subprocess.run([
-                'icacls', str(nimbus_datadir), '/grant', 'Everyone:(F)', '/t'
-            ])
-            shutil.rmtree(nimbus_datadir)
+            shutil.rmtree(lighthouse_datadir)
 
-    # Setup Nimbus directory
-    nimbus_datadir.mkdir(parents=True, exist_ok=True)
+    # Setup Lighthouse directory
+    lighthouse_datadir.mkdir(parents=True, exist_ok=True)
 
-    # Setup Nimbus data directory permission
-    current_username = os.environ['USERNAME']
-    current_userdomain = os.environ['USERDOMAIN']
-    current_identity = f'{current_userdomain}\\{current_username}'
-    datadir_perm = f'{current_identity}:(OI)(CI)(F)'
-    datadir_perm_file = f'{current_identity}:(F)'
-
-    subprocess.run([
-        'icacls', str(nimbus_datadir), '/inheritance:r', '/grant:r', datadir_perm, '/t'
-    ])
-
-    # Rework preexisting permissions
-    system_identity = 'SYSTEM'
-    dirs_to_explore = []
-    dirs_explored = []
-
-    dirs_to_explore.append(str(nimbus_datadir))
-    
-    while len(dirs_to_explore) > 0:
-        next_dir = dirs_to_explore.pop()
-
-        with os.scandir(next_dir) as it:
-            for entry in it:
-                if entry.is_dir():
-                    dirs_to_explore.append(entry.path)
-                elif entry.is_file():
-                    subprocess.run([
-                        'icacls', entry.path, '/inheritance:r', '/grant:r', datadir_perm_file
-                    ])
-                    subprocess.run([
-                        'icacls', entry.path, '/remove:g', system_identity
-                    ])
-
-        dirs_explored.append(next_dir)
-    
-    for directory in reversed(dirs_explored):
-        subprocess.run([
-            'icacls', directory, '/remove:g', system_identity
-        ])
-
-    # Perform checkpoint sync
-    if consensus_checkpoint_url != '':
-        # Perform checkpoint sync with the trustedNodeSync command
-        log.info('Initializing Nimbus with a checkpoint sync endpoint.')
-        process_result = subprocess.run([
-            str(nimbus_path),
-            'trustedNodeSync',
-            f'--network={network}',
-            f'--data-dir={nimbus_datadir}',
-            f'--trusted-node-url={consensus_checkpoint_url}',
-            '--backfill=false'
-        ])
-        if process_result.returncode != 0:
-            log.error('Unable to initialize Nimbus with a checkpoint sync endpoint.')
-            return False
-
-    # Protect imported keystore files and secrets
-    datadir_perm = f'{system_identity}:(OI)(CI)(F)'
-    secrets_perm = f'{system_identity}:(F)'
-    
-    # Set correct ACL permissions on data directory.
-    data_dirs_to_explore = []
-    data_dirs_explored = []
-
-    data_dirs_to_explore.append(str(nimbus_datadir))
-
-    while len(data_dirs_to_explore) > 0:
-        next_dir = data_dirs_to_explore.pop()
-
-        with os.scandir(next_dir) as it:
-            for entry in it:
-                if entry.is_dir():
-                    data_dirs_to_explore.append(entry.path)
-                elif entry.is_file():
-                    subprocess.run([
-                        'icacls', entry.path, '/inheritance:r', '/grant:r', secrets_perm
-                    ])
-
-        data_dirs_explored.append(next_dir)
-    
-    for directory in reversed(data_dirs_explored):
-        subprocess.run([
-            'icacls', directory, '/inheritance:r', '/grant:r', datadir_perm
-        ])
-    
-    # Remove current identity permissions
-    dirs_to_explore = []
-    dirs_explored = []
-
-    dirs_to_explore.append(str(nimbus_datadir))
-
-    while len(dirs_to_explore) > 0:
-        next_dir = dirs_to_explore.pop()
-
-        with os.scandir(next_dir) as it:
-            for entry in it:
-                if entry.is_dir():
-                    dirs_to_explore.append(entry.path)
-                elif entry.is_file():
-                    subprocess.run([
-                        'icacls', entry.path, '/remove:g', current_identity
-                    ])
-
-        dirs_explored.append(next_dir)
-    
-    for directory in reversed(dirs_explored):
-        subprocess.run([
-            'icacls', directory, '/remove:g', current_identity
-        ])
-
-    # Setup Nimbus service
+    # Setup Lighthouse service
     log_path = base_directory.joinpath('var', 'log')
     log_path.mkdir(parents=True, exist_ok=True)
 
-    nimbus_stdout_log_path = log_path.joinpath('nimbus-service-stdout.log')
-    nimbus_stderr_log_path = log_path.joinpath('nimbus-service-stderr.log')
+    lighthouse_stdout_log_path = log_path.joinpath('lighthouse-service-stdout.log')
+    lighthouse_stderr_log_path = log_path.joinpath('lighthouse-service-stderr.log')
 
-    if nimbus_stdout_log_path.is_file():
-        nimbus_stdout_log_path.unlink()
-    if nimbus_stderr_log_path.is_file():
-        nimbus_stderr_log_path.unlink()
+    if lighthouse_stdout_log_path.is_file():
+        lighthouse_stdout_log_path.unlink()
+    if lighthouse_stderr_log_path.is_file():
+        lighthouse_stderr_log_path.unlink()
 
     # Check if merge ready
     merge_ready = False
 
-    result = re.search(r'([^-]+)', nimbus_version)
+    result = re.search(r'([^-]+)', lighthouse_version)
     if result:
-        cleaned_nimbus_version = parse_version(result.group(1).strip())
-        target_nimbus_version = parse_version(
-            MIN_CLIENT_VERSION_FOR_MERGE[network][CONSENSUS_CLIENT_NIMBUS])
+        cleaned_lighthouse_version = parse_version(result.group(1).strip())
+        target_lighthouse_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][CONSENSUS_CLIENT_LIGHTHOUSE])
 
-        if cleaned_nimbus_version >= target_nimbus_version:
+        if cleaned_lighthouse_version >= target_lighthouse_version:
             merge_ready = True
 
-    nimbus_arguments = NIMBUS_ARGUMENTS[network]
+    lighthouse_bn_arguments = LIGHTHOUSE_BN_ARGUMENTS[network]
 
     if merge_ready:
         jwt_token_dir = base_directory.joinpath('var', 'lib', 'ethereum')
@@ -4717,68 +4584,76 @@ Unable to create JWT token file in {jwt_token_path}
             )
 
             return False
-        
-        nimbus_arguments.append(f'--jwt-secret={jwt_token_path}')
+
+        lighthouse_bn_arguments.append('--execution-jwt')
+        lighthouse_bn_arguments.append(f'{jwt_token_path}')
 
     local_eth1_endpoint = 'http://127.0.0.1:8545'
-    eth1_endpoints_flag = '--web3-url='
+    eth1_endpoints_flag = '--eth1-endpoints'
     if merge_ready:
         local_eth1_endpoint = 'http://127.0.0.1:8551'
-
+        eth1_endpoints_flag = '--execution-endpoint'
+    
     eth1_endpoints = [local_eth1_endpoint] + eth1_fallbacks
+    eth1_endpoints_string = ','.join(eth1_endpoints)
 
-    for endpoint in eth1_endpoints:
-        nimbus_arguments.append(f'{eth1_endpoints_flag}{endpoint}')
+    lighthouse_bn_arguments.append(f'{eth1_endpoints_flag}')
+    lighthouse_bn_arguments.append(f'{eth1_endpoints_string}')
 
-    nimbus_arguments.append(f'--data-dir={nimbus_datadir}')
+    lighthouse_bn_arguments.append('--datadir')
+    lighthouse_bn_arguments.append(f'{lighthouse_datadir}')
 
-    if ports['eth2_bn'] != DEFAULT_NIMBUS_BN_PORT:
-        nimbus_arguments.append(f'--tcp-port={ports["eth2_bn"]}')
-        nimbus_arguments.append(f'--udp-port={ports["eth2_bn"]}')
+    if ports['eth2_bn'] != DEFAULT_LIGHTHOUSE_BN_PORT:
+        lighthouse_bn_arguments.append('--port')
+        lighthouse_bn_arguments.append(f'{ports["eth2_bn"]}')
+    
+    if consensus_checkpoint_url != '':
+        lighthouse_bn_arguments.append('--checkpoint-sync-url')
+        lighthouse_bn_arguments.append(f'{consensus_checkpoint_url}')
 
     if mevboost_installed:
-        nimbus_arguments.append('--payload-builder=true')
-        nimbus_arguments.append('--payload-builder-url=http://127.0.0.1:18550')
+        lighthouse_bn_arguments.append('--builder')
+        lighthouse_bn_arguments.append('http://127.0.0.1:18550')
 
     parameters = {
-        'DisplayName': NIMBUS_SERVICE_DISPLAY_NAME[network],
+        'DisplayName': LIGHTHOUSE_BN_SERVICE_DISPLAY_NAME[network],
         'AppRotateFiles': '1',
         'AppRotateSeconds': '86400',
         'AppRotateBytes': '10485760',
-        'AppStdout': str(nimbus_stdout_log_path),
-        'AppStderr': str(nimbus_stderr_log_path),
+        'AppStdout': str(lighthouse_stdout_log_path),
+        'AppStderr': str(lighthouse_stderr_log_path),
         'AppStopMethodConsole': '1500'
     }
 
-    if not create_service(nssm_binary, nimbus_service_name, str(nimbus_path), nimbus_arguments,
+    if not create_service(nssm_binary, lighthouse_service_name, str(lighthouse_path), lighthouse_bn_arguments,
         parameters):
-        log.error('There was an issue creating the Nimbus service. We cannot continue.')
+        log.error('There was an issue creating the Lighthouse service. We cannot continue.')
         return False
 
-    log.info('Starting Nimbus service...')
+    log.info('Starting Lighthouse service...')
     process_result = subprocess.run([
-        str(nssm_binary), 'start', nimbus_service_name
+        str(nssm_binary), 'start', lighthouse_service_name
     ])
 
     delay = 30
-    log.info(f'We are giving {delay} seconds for the Nimbus service to start properly.')
+    log.info(f'We are giving {delay} seconds for the Lighthouse service to start properly.')
     time.sleep(delay)
 
-    # Verify proper Nimbus service installation
-    service_details = get_service_details(nssm_binary, nimbus_service_name)
+    # Verify proper Lighthouse service installation
+    service_details = get_service_details(nssm_binary, lighthouse_service_name)
     if not service_details:
-        log.error('We could not find the Nimbus service we just created. '
+        log.error('We could not find the Lighthouse service we just created. '
             'We cannot continue.')
         return False
 
     if not (service_details['status'] == WINDOWS_SERVICE_RUNNING):
 
         result = button_dialog(
-            title='Nimbus service not running properly',
+            title='Lighthouse service not running properly',
             text=(
 f'''
-The Nimbus service we just created seems to have issues. Here are some
-details found:
+The Lighthouse service we just created seems to have issues. Here are
+some details found:
 
 Display name: {service_details['parameters'].get('DisplayName')}
 Status: {service_details['status']}
@@ -4786,12 +4661,12 @@ Binary: {service_details['install']}
 App parameters: {service_details['parameters'].get('AppParameters')}
 App directory: {service_details['parameters'].get('AppDirectory')}
 
-We cannot proceed if the Nimbus service cannot be started properly. Make
-sure to check the logs and fix any issue found there. You can see the
-logs in:
+We cannot proceed if the Lighthouse service cannot be started properly.
+Make sure to check the logs and fix any issue found there. You can see
+the logs in:
 
-{nimbus_stdout_log_path}
-{nimbus_stderr_log_path}
+{lighthouse_stdout_log_path}
+{lighthouse_stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -4800,24 +4675,24 @@ logs in:
 
         # Stop the service to prevent indefinite restart attempts
         subprocess.run([
-            str(nssm_binary), 'stop', nimbus_service_name])
+            str(nssm_binary), 'stop', lighthouse_service_name])
 
         log.info(
 f'''
-To examine your Nimbus service logs, inspect the following files:
+To examine your Lighthouse service logs, inspect the following files:
 
-{nimbus_stdout_log_path}
-{nimbus_stdout_log_path}
+{lighthouse_stdout_log_path}
+{lighthouse_stderr_log_path}
 '''
         )
 
         return False
 
-    # Verify proper Nimbus installation and syncing
-    local_nimbus_http_base = 'http://127.0.0.1:5052'
+    # Verify proper Lighthouse installation and syncing
+    local_lighthouse_http_base = 'http://127.0.0.1:5052'
     
     cc_version_query = BN_VERSION_EP
-    cc_query_url = local_nimbus_http_base + cc_version_query
+    cc_query_url = local_lighthouse_http_base + cc_version_query
     headers = {
         'accept': 'application/json'
     }
@@ -4837,7 +4712,7 @@ To examine your Nimbus service logs, inspect the following files:
         except httpx.RequestError as exception:
             last_exception = exception
             
-            log.warning(f'Exception {exception} when trying to connect to Nimbus HTTP server on '
+            log.warning(f'Exception {exception} when trying to connect to Lighthouse HTTP server on '
                 f'{cc_query_url}')
 
             retry_index = retry_index + 1
@@ -4849,7 +4724,7 @@ To examine your Nimbus service logs, inspect the following files:
         if response.status_code != 200:
             last_status_code = response.status_code
 
-            log.error(f'Error code {response.status_code} when trying to connect to Nimbus HTTP '
+            log.error(f'Error code {response.status_code} when trying to connect to Lighthouse HTTP '
                 f'server on {cc_query_url}')
             
             retry_index = retry_index + 1
@@ -4865,10 +4740,10 @@ To examine your Nimbus service logs, inspect the following files:
     if keep_retrying:
         if last_exception is not None:
             result = button_dialog(
-                title='Cannot connect to Nimbus',
+                title='Cannot connect to Lighthouse',
                 text=(
 f'''
-We could not connect to Nimbus HTTP server. Here are some details for
+We could not connect to Lighthouse HTTP server. Here are some details for
 this last test we tried to perform:
 
 URL: {cc_query_url}
@@ -4876,12 +4751,12 @@ Method: GET
 Headers: {headers}
 Exception: {last_exception}
 
-We cannot proceed if the Nimbus HTTP server is not responding properly.
-Make sure to check the logs and fix any issue found there. You can see
-the logs in:
+We cannot proceed if the Lighthouse HTTP server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in:
 
-{nimbus_stdout_log_path}
-{nimbus_stderr_log_path}
+{lighthouse_stdout_log_path}
+{lighthouse_stderr_log_path}
 '''             ),
                 buttons=[
                     ('Quit', False)
@@ -4890,20 +4765,20 @@ the logs in:
 
             log.info(
 f'''
-To examine your Nimbus service logs, inspect the following files:
+To examine your Lighthouse service logs, inspect the following files:
 
-{nimbus_stdout_log_path}
-{nimbus_stderr_log_path}
+{lighthouse_stdout_log_path}
+{lighthouse_stderr_log_path}
 '''
             )
 
             return False
         elif last_status_code is not None:
             result = button_dialog(
-                title='Cannot connect to Nimbus',
+                title='Cannot connect to Lighthouse',
                 text=(
 f'''
-We could not connect to Nimbus HTTP server. Here are some details for
+We could not connect to Lighthouse HTTP server. Here are some details for
 this last test we tried to perform:
 
 URL: {cc_query_url}
@@ -4911,12 +4786,12 @@ Method: GET
 Headers: {headers}
 Status code: {last_status_code}
 
-We cannot proceed if the Nimbus HTTP server is not responding properly.
-Make sure to check the logs and fix any issue found there. You can see
-the logs in:
+We cannot proceed if the Lighthouse HTTP server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in:
 
-{nimbus_stdout_log_path}
-{nimbus_stderr_log_path}
+{lighthouse_stdout_log_path}
+{lighthouse_stderr_log_path}
 '''             ),
                 buttons=[
                     ('Quit', False)
@@ -4925,16 +4800,16 @@ the logs in:
 
             log.info(
 f'''
-To examine your Nimbus service logs, inspect the following files:
+To examine your Lighthouse service logs, inspect the following files:
 
-{nimbus_stdout_log_path}
-{nimbus_stderr_log_path}
+{lighthouse_stdout_log_path}
+{lighthouse_stderr_log_path}
 '''
             )
 
             return False
 
-    # Verify proper Nimbus syncing
+    # Verify proper Lighthouse syncing
     def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
         bn_is_working = False
         bn_is_syncing = False
@@ -4969,13 +4844,13 @@ To examine your Nimbus service logs, inspect the following files:
 
             # Output logs
             out_log_text = ''
-            with open(nimbus_stdout_log_path, 'r', encoding='utf8') as log_file:
+            with open(lighthouse_stdout_log_path, 'r', encoding='utf8') as log_file:
                 log_file.seek(out_log_read_index)
                 out_log_text = log_file.read()
                 out_log_read_index = log_file.tell()
             
             err_log_text = ''
-            with open(nimbus_stderr_log_path, 'r', encoding='utf8') as log_file:
+            with open(lighthouse_stderr_log_path, 'r', encoding='utf8') as log_file:
                 log_file.seek(err_log_read_index)
                 err_log_text = log_file.read()
                 err_log_read_index = log_file.tell()
@@ -4991,36 +4866,36 @@ To examine your Nimbus service logs, inspect the following files:
             time.sleep(1)
             
             cc_syncing_query = BN_SYNCING_EP
-            cc_query_url = local_nimbus_http_base + cc_syncing_query
+            cc_query_url = local_lighthouse_http_base + cc_syncing_query
             headers = {
                 'accept': 'application/json'
             }
             try:
                 response = httpx.get(cc_query_url, headers=headers)
             except httpx.RequestError as exception:
-                log_text(f'Exception: {exception} while querying Nimbus.')
+                log_text(f'Exception: {exception} while querying Lighthouse.')
                 continue
 
             if response.status_code != 200:
-                log_text(f'Status code: {response.status_code} while querying Nimbus.')
+                log_text(f'Status code: {response.status_code} while querying Lighthouse.')
                 continue
         
             response_json = response.json()
             syncing_json = response_json
 
             cc_peers_query = BN_PEERS_EP
-            cc_query_url = local_nimbus_http_base + cc_peers_query
+            cc_query_url = local_lighthouse_http_base + cc_peers_query
             headers = {
                 'accept': 'application/json'
             }
             try:
                 response = httpx.get(cc_query_url, headers=headers)
             except httpx.RequestError as exception:
-                log_text(f'Exception: {exception} while querying Nimbus.')
+                log_text(f'Exception: {exception} while querying Lighthouse.')
                 continue
 
             if response.status_code != 200:
-                log_text(f'Status code: {response.status_code} while querying Nimbus.')
+                log_text(f'Status code: {response.status_code} while querying Lighthouse.')
                 continue
 
             response_json = response.json()
@@ -5097,11 +4972,11 @@ Connected Peers: {bn_connected_peers}
                 })
 
     result = progress_log_dialog(
-        title='Verifying proper Nimbus service installation',
+        title='Verifying proper Lighthouse service installation',
         text=(
 f'''
-We are waiting for Nimbus to sync or find enough peers to confirm that it
-is working properly.
+We are waiting for Lighthouse to sync or find enough peers to confirm
+that it is working properly.
 '''     ),
         status_text=(
 '''
@@ -5113,27 +4988,27 @@ Connected Peers: Unknown
     ).run()
     
     if not result:
-        log.warning('Nimbus service installation verification was cancelled.')
+        log.warning('Lighthouse service installation verification was cancelled.')
         return False
 
     if not result['bn_is_working']:
-        # We could not get a proper result from the Nimbus
+        # We could not get a proper result from the Lighthouse
         result = button_dialog(
-            title='Nimbus service installation verification interrupted',
+            title='Lighthouse service installation verification interrupted',
             text=(
 f'''
-We were interrupted before we could fully verify the Nimbus service
+We were interrupted before we could fully verify the Lighthouse service
 installation. Here are some results for the last tests we performed:
 
 Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
 Connected Peers: {result['bn_connected_peers']}
 
-We cannot proceed if the Nimbus service is not installed properly. Make
+We cannot proceed if the Lighthouse service is not installed properly. Make
 sure to check the logs and fix any issue found there. You can see the
 logs in:
 
-{nimbus_stdout_log_path}
-{nimbus_stderr_log_path}
+{lighthouse_stdout_log_path}
+{lighthouse_stderr_log_path}
 '''         ),
             buttons=[
                 ('Quit', False)
@@ -5142,10 +5017,10 @@ logs in:
 
         log.info(
 f'''
-To examine your Nimbus service logs, inspect the following files:
+To examine your Lighthouse service logs, inspect the following files:
 
-{nimbus_stdout_log_path}
-{nimbus_stderr_log_path}
+{lighthouse_stdout_log_path}
+{lighthouse_stderr_log_path}
 '''
         )
 
@@ -5153,7 +5028,7 @@ To examine your Nimbus service logs, inspect the following files:
 
     log.info(
 f'''
-Nimbus is installed and working properly.
+Lighthouse is installed and working properly.
 
 Syncing: {result['bn_is_syncing']} (Head slot: {result['bn_head_slot']}, Sync distance: {result['bn_sync_distance']})
 Connected Peers: {result['bn_connected_peers']}
