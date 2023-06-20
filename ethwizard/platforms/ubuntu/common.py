@@ -145,7 +145,15 @@ def is_adx_supported():
             result = re.search(r'flags\s+\:\s*(.*)', line)
             if result:
                 cpuflags = set(result.group(1).strip().lower().split(' '))
-                return 'adx' in cpuflags
+
+                adx_support = ('adx' in cpuflags)
+
+                if adx_support:
+                    log.info('ADX instructions set is supported on this CPU.')
+                else:
+                    log.warn('ADX instructions set is NOT supported on this CPU.')
+
+                return adx_support
             line = cpuinfo_file.readline()
         
         log.warning('No CPU flags found in /proc/cpuinfo. '
