@@ -40,7 +40,8 @@ from ethwizard.platforms.windows.common import (
     is_stable_windows_amd64_archive,
     install_gpg,
     set_service_param,
-    setup_jwt_token_file
+    setup_jwt_token_file,
+    is_adx_supported
 )
 
 from ethwizard.constants import (
@@ -71,6 +72,8 @@ from ethwizard.constants import (
     MEVBOOST_LATEST_RELEASE,
     TEKU_LATEST_RELEASE,
     NIMBUS_LATEST_RELEASE,
+    LIGHTHOUSE_LATEST_RELEASE,
+    LIGHTHOUSE_PRIME_PGP_KEY_ID,
     GETH_STORE_BUILDS_PARAMS,
     GETH_STORE_BUILDS_URL,
     GETH_BUILDS_BASE_URL,
@@ -1332,6 +1335,41 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
 
         elif consensus_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
             log.warning('TODO: Reinstalling client is to be implemented.')
+    
+    elif consensus_client == CONSENSUS_CLIENT_LIGHTHOUSE:
+        # Lighthouse maintenance tasks
+        lighthouse_bn_service_name = 'lighthousebeacon'
+        lighthouse_vc_service_name = 'lighthousevalidator'
+
+        if consensus_client_details['next_step'] == MAINTENANCE_RESTART_SERVICE:
+            log.info('Restarting Lighthouse services...')
+
+            subprocess.run([str(nssm_binary), 'restart', lighthouse_bn_service_name])
+            subprocess.run([str(nssm_binary), 'restart', lighthouse_vc_service_name])
+
+        elif consensus_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT:
+            if not upgrade_lighthouse(base_directory, nssm_binary):
+                log.error('We could not upgrade the Lighthouse client.')
+                return False
+        
+        elif consensus_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT_MERGE:
+            log.warning('Upgrading Lighthouse client for merge is not implemented. This should '
+                'not be needed as Lighthouse support was added after the merge.')
+            return False
+    
+        elif consensus_client_details['next_step'] == MAINTENANCE_CONFIG_CLIENT_MERGE:
+            log.warning('Configuring Lighthouse client for merge is not implemented. This should '
+                'not be needed as Lighthouse support was added after the merge.')
+            return False
+            
+        elif consensus_client_details['next_step'] == MAINTENANCE_START_SERVICE:
+            log.info('Starting Lighthouse services...')
+
+            subprocess.run([str(nssm_binary), 'start', lighthouse_bn_service_name])
+            subprocess.run([str(nssm_binary), 'start', lighthouse_vc_service_name])
+
+        elif consensus_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
+            log.warning('TODO: Reinstalling client is to be implemented.')
 
     else:
         log.error(f'Unknown consensus client {consensus_client}.')
@@ -1929,6 +1967,211 @@ def upgrade_nimbus(base_directory, nssm_binary):
         log.info(f'Nimbus version {nimbus_version} installed.')
 
     subprocess.run([str(nssm_binary), 'start', nimbus_service_name])
+
+    return True
+
+def upgrade_lighthouse(base_directory, nssm_binary):
+    # Upgrade the Lighthouse client
+    log.info('Upgrading Lighthouse client...')
+
+    lighthouse_gh_release_url = GITHUB_REST_API_URL + LIGHTHOUSE_LATEST_RELEASE
+    headers = {'Accept': GITHUB_API_VERSION}
+    try:
+        response = httpx.get(lighthouse_gh_release_url, headers=headers,
+            follow_redirects=True)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading Lighthouse binary. {exception}')
+        return False
+
+    if response.status_code != 200:
+        log.error(f'HTTP error while downloading Lighthouse binary. '
+            f'Status code {response.status_code}')
+        return False
+    
+    release_json = response.json()
+
+    if 'assets' not in release_json:
+        log.error('No assets in Github release for Lighthouse.')
+        return False
+    
+    binary_asset = None
+    signature_asset = None
+
+    archive_filename_comp = 'x86_64-windows.tar.gz'
+
+    use_optimized_binary = is_adx_supported(base_directory, log)
+    if not use_optimized_binary:
+        log.warning('CPU does not support ADX instructions. '
+            'Using the portable version for Lighthouse.')
+        archive_filename_comp = 'x86_64-windows-portable.tar.gz'
+    
+    archive_filename_sig_comp = archive_filename_comp + '.asc'
+
+    for asset in release_json['assets']:
+        if 'name' not in asset:
+            continue
+        if 'browser_download_url' not in asset:
+            continue
+    
+        file_name = asset['name']
+        file_url = asset['browser_download_url']
+
+        if file_name.endswith(archive_filename_comp):
+            binary_asset = {
+                'file_name': file_name,
+                'file_url': file_url
+            }
+        elif file_name.endswith(archive_filename_sig_comp):
+            signature_asset = {
+                'file_name': file_name,
+                'file_url': file_url
+            }
+
+    if binary_asset is None or signature_asset is None:
+        log.error('Could not find binary or signature asset in Github release.')
+        return False
+    
+    # Downloading latest Lighthouse release files
+    download_path = base_directory.joinpath('downloads')
+    download_path.mkdir(parents=True, exist_ok=True)
+
+    binary_path = Path(download_path, binary_asset['file_name'])
+
+    try:
+        with open(binary_path, 'wb') as binary_file:
+            with httpx.stream('GET', binary_asset['file_url'],
+                follow_redirects=True) as http_stream:
+                if http_stream.status_code != 200:
+                    log.error(f'HTTP error while downloading Lighthouse binary from Github. '
+                        f'Status code {http_stream.status_code}')
+                    return False
+                for data in http_stream.iter_bytes():
+                    binary_file.write(data)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading Lighthouse binary from Github. {exception}')
+        return False
+    
+    signature_path = Path(download_path, signature_asset['file_name'])
+
+    try:
+        with open(signature_path, 'wb') as signature_file:
+            with httpx.stream('GET', signature_asset['file_url'],
+                follow_redirects=True) as http_stream:
+                if http_stream.status_code != 200:
+                    log.error(f'HTTP error while downloading Lighthouse signature from Github. '
+                        f'Status code {http_stream.status_code}')
+                    return False
+                for data in http_stream.iter_bytes():
+                    signature_file.write(data)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading Lighthouse signature from Github. {exception}')
+        return False
+    
+    if not install_gpg(base_directory):
+        return False
+    
+    # Verify PGP signature
+    gpg_binary_path = base_directory.joinpath('bin', 'gpg.exe')
+
+    command_line = [str(gpg_binary_path), '--list-keys', '--with-colons',
+        LIGHTHOUSE_PRIME_PGP_KEY_ID]
+    process_result = subprocess.run(command_line)
+    pgp_key_found = process_result.returncode == 0
+
+    if not pgp_key_found:
+
+        retry_index = 0
+        retry_count = 15
+
+        key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+        log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
+        command_line = [str(gpg_binary_path), '--keyserver', key_server,
+            '--recv-keys', LIGHTHOUSE_PRIME_PGP_KEY_ID]
+        process_result = subprocess.run(command_line)
+
+        if process_result.returncode != 0:
+            # GPG failed to download PGP key, let's wait and retry a few times
+            while process_result.returncode != 0 and retry_index < retry_count:
+                retry_index = retry_index + 1
+                delay = 5
+                log.warning(f'GPG failed to download the PGP key. We will wait {delay} seconds '
+                    f'and try again from a different server.')
+                time.sleep(delay)
+
+                key_server = PGP_KEY_SERVERS[retry_index % len(PGP_KEY_SERVERS)]
+                log.info(f'Downloading Sigma Prime\'s PGP key from {key_server} ...')
+                command_line = [str(gpg_binary_path), '--keyserver', key_server,
+                    '--recv-keys', LIGHTHOUSE_PRIME_PGP_KEY_ID]
+
+                process_result = subprocess.run(command_line)
+
+        if process_result.returncode != 0:
+            log.warning(
+f'''
+We failed to download the Sigma Prime's PGP key to verify the Lighthouse
+archive after {retry_count} retries. We will skip signature verification.
+'''
+            )
+        else:
+            process_result = subprocess.run([
+                str(gpg_binary_path), '--verify', str(signature_path)])
+            if process_result.returncode != 0:
+                log.error('The Lighthouse archive signature is wrong. We\'ll stop here to protect you.')
+                return False
+    else:
+        process_result = subprocess.run([
+            str(gpg_binary_path), '--verify', str(signature_path)])
+        if process_result.returncode != 0:
+            log.error('The Lighthouse archive signature is wrong. We\'ll stop here to protect you.')
+            return False
+    
+    # Remove download leftovers
+    signature_path.unlink()
+
+    bin_path = base_directory.joinpath('bin')
+    bin_path.mkdir(parents=True, exist_ok=True)
+
+    lighthouse_bn_service_name = 'lighthousebeacon'
+    lighthouse_vc_service_name = 'lighthousevalidator'
+    
+    subprocess.run([str(nssm_binary), 'stop', lighthouse_bn_service_name])
+    subprocess.run([str(nssm_binary), 'stop', lighthouse_vc_service_name])
+
+    # Extracting the Lighthouse binary archive
+    subprocess.run([
+        'tar', 'xvf', binary_path, '--directory', bin_path])
+    
+    subprocess.run([str(nssm_binary), 'start', lighthouse_bn_service_name])
+    subprocess.run([str(nssm_binary), 'start', lighthouse_vc_service_name])
+    
+    # Remove download leftovers
+    binary_path.unlink()
+
+    lighthouse_path = base_directory.joinpath('bin', 'lighthouse.exe')
+
+    lighthouse_found = False
+    lighthouse_version = 'unknown'
+
+    if lighthouse_path.is_file():
+        try:
+            process_result = subprocess.run([str(lighthouse_path), '--version'],
+                capture_output=True, text=True)
+            lighthouse_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'Lighthouse v?(?P<version>[^-]+)', process_output)
+            if result:
+                lighthouse_version = result.group('version').strip()
+
+        except FileNotFoundError:
+            pass
+
+    if not lighthouse_found:
+        log.error(f'We could not find the Lighthouse binary from the installed archive '
+            f'in {lighthouse_path}. We cannot continue.')
+        return False
+    else:
+        log.info(f'Lighthouse version {lighthouse_version} installed.')
 
     return True
 
