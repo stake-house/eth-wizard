@@ -318,6 +318,16 @@ LIGHTHOUSE_BN_ARGUMENTS = {
     NETWORK_GOERLI: ['bn', '--network', 'goerli', '--staking', '--validator-monitor-auto', '--metrics']
 }
 
+LIGHTHOUSE_VC_SERVICE_DISPLAY_NAME = {
+    NETWORK_MAINNET: 'Lighthouse Ethereum Client - Validator Client (Mainnet)',
+    NETWORK_GOERLI: 'Lighthouse Ethereum Client - Validator Client (Görli)'
+}
+
+LIGHTHOUSE_VC_ARGUMENTS = {
+    NETWORK_MAINNET: ['vc', '--network', 'mainnet', '--metrics'],
+    NETWORK_GOERLI: ['vc', '--network', 'goerli', '--metrics']
+}
+
 WINDOWS_SERVICE_RUNNING = 'SERVICE_RUNNING'
 WINDOWS_SERVICE_START_PENDING = 'SERVICE_START_PENDING'
 

@@ -15,6 +15,8 @@ from pathlib import Path
 
 from packaging.version import parse as parse_version
 
+from yaml import safe_load
+
 from urllib.parse import urljoin, urlparse
 
 from datetime import datetime, timedelta
@@ -4563,8 +4565,8 @@ Do you want to remove this directory first and start from nothing?
     log_path = base_directory.joinpath('var', 'log')
     log_path.mkdir(parents=True, exist_ok=True)
 
-    lighthouse_stdout_log_path = log_path.joinpath('lighthouse-service-stdout.log')
-    lighthouse_stderr_log_path = log_path.joinpath('lighthouse-service-stderr.log')
+    lighthouse_stdout_log_path = log_path.joinpath('lighthouse-beacon-service-stdout.log')
+    lighthouse_stderr_log_path = log_path.joinpath('lighthouse-beacon-service-stderr.log')
 
     if lighthouse_stdout_log_path.is_file():
         lighthouse_stdout_log_path.unlink()
@@ -4638,18 +4640,19 @@ Unable to create JWT token file in {jwt_token_path}
         'AppStopMethodConsole': '1500'
     }
 
-    if not create_service(nssm_binary, lighthouse_service_name, str(lighthouse_path), lighthouse_bn_arguments,
-        parameters):
-        log.error('There was an issue creating the Lighthouse service. We cannot continue.')
+    if not create_service(nssm_binary, lighthouse_service_name, str(lighthouse_path),
+        lighthouse_bn_arguments, parameters):
+        log.error('There was an issue creating the Lighthouse beacon node service. '
+            'We cannot continue.')
         return False
 
-    log.info('Starting Lighthouse service...')
+    log.info('Starting Lighthouse beacon node service...')
     process_result = subprocess.run([
         str(nssm_binary), 'start', lighthouse_service_name
     ])
 
     delay = 30
-    log.info(f'We are giving {delay} seconds for the Lighthouse service to start properly.')
+    log.info(f'We are giving {delay} seconds for the Lighthouse beacon node service to start properly.')
     time.sleep(delay)
 
     # Verify proper Lighthouse service installation
@@ -5626,9 +5629,456 @@ def install_lighthouse_validator(base_directory, network, keys, fee_recipient_ad
     # Import keystore(s) and configure the Lighthouse validator client (as part of a different service)
     # Returns a list of public keys when done
 
-    # TODO: Implement
+    base_directory = Path(base_directory)
 
-    return False
+    nssm_binary = get_nssm_binary()
+    if not nssm_binary:
+        return False
+
+    lighthouse_datadir = base_directory.joinpath('var', 'lib', 'lighthouse')
+    lighthouse_validators_dir = lighthouse_datadir.joinpath('validators')
+
+    # Check if Lighthouse is already installed
+    lighthouse_path = base_directory.joinpath('bin', 'lighthouse.exe')
+
+    lighthouse_found = False
+    lighthouse_version = 'unknown'
+
+    if lighthouse_path.is_file():
+        try:
+            process_result = subprocess.run([str(lighthouse_path), '--version'],
+                capture_output=True, text=True)
+            lighthouse_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'Lighthouse v?(?P<version>[^-]+)', process_output)
+            if result:
+                lighthouse_version = result.group('version').strip()
+
+        except FileNotFoundError:
+            pass
+    
+    if not lighthouse_found:
+        log.error('The Lighthouse binary is missing. We cannot continue.')
+        return False
+
+    # Check for existing service
+    lighthouse_vc_service_exists = False
+    lighthouse_vc_service_name = 'lighthousevalidator'
+
+    service_details = get_service_details(nssm_binary, lighthouse_vc_service_name)
+
+    if service_details is not None:
+        lighthouse_vc_service_exists = True
+    
+    if lighthouse_vc_service_exists:
+        result = button_dialog(
+            title='Lighthouse validator client service found',
+            text=(
+f'''
+The Lighthouse validator client service seems to have already been
+created. Here are some details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+Do you want to skip installing the Lighthouse validator client service?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            public_keys = []
+
+            subprocess.run([
+                'icacls', str(lighthouse_validators_dir), '/grant:r', 'Everyone:(F)', '/t'
+            ])
+
+            if lighthouse_validators_dir.is_dir():                
+
+                process_result = subprocess.run([
+                    str(lighthouse_path), '--network', network, 'account', 'validator', 'list',
+                    '--datadir', lighthouse_datadir
+                    ], capture_output=True, text=True)
+                if process_result.returncode == 0:
+                    process_output = process_result.stdout
+                    public_keys = re.findall(r'0x[0-9a-f]{96}', process_output)
+                    public_keys = list(map(lambda x: x.strip(), public_keys))
+                
+                dirs_to_explore = []
+                dirs_explored = []
+
+                dirs_to_explore.append(str(lighthouse_validators_dir))
+                
+                while len(dirs_to_explore) > 0:
+                    next_dir = dirs_to_explore.pop()
+
+                    with os.scandir(next_dir) as it:
+                        for entry in it:
+                            if entry.is_dir():
+                                dirs_to_explore.append(entry.path)
+                            elif entry.is_file():
+                                subprocess.run([
+                                    'icacls', entry.path, '/remove:g', 'Everyone'
+                                ])
+
+                    dirs_explored.append(next_dir)
+                
+                for directory in reversed(dirs_explored):
+                    subprocess.run([
+                        'icacls', directory, '/remove:g', 'Everyone'
+                    ])
+            
+            if len(public_keys) < 1:
+                log.error('There is no keystore imported for the Lighthouse validator client to '
+                    'perform its duties. We cannot continue.')
+                return False
+            
+            return public_keys
+        
+        # User wants to proceed, make sure the Lighthouse service is stopped first
+        subprocess.run([
+            str(nssm_binary), 'stop', lighthouse_vc_service_name])
+
+    passwordless_check = True
+    public_keys = []
+
+    while passwordless_check:
+
+        result = button_dialog(
+            title='Lighthouse validator client installation',
+            text=(HTML(
+'''
+This next step will import your keystore(s) to be used with the Lighthouse
+validator client and it will configure the Lighthouse validator client.
+
+During the importation process, you will be asked to enter the password
+you typed during the keys generation step. It is not your mnemonic. <style bg="red" fg="black">Do not
+omit typing your password during this importation process.</style>
+
+It will create a service that will automatically start the Lighthouse
+validator client on reboot or if it crashes. The validator client will be
+started, it will connect to your beacon node and it will be ready to
+start validating once your validator(s) get activated.
+'''     )),
+            buttons=[
+                ('Configure', True),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        # Check if lighthouse validators client directory already exists
+        subprocess.run([
+            'icacls', str(lighthouse_validators_dir), '/grant:r', 'Everyone:(F)', '/t'
+        ])
+
+        if lighthouse_validators_dir.is_dir():
+            lighthouse_validators_dir_size = sizeof_fmt(get_dir_size(lighthouse_validators_dir))
+
+            result = button_dialog(
+                title='Lighthouse validator client data directory found',
+                text=(
+f'''
+An existing lighthouse validator client data directory has been found.
+Here are some details found:
+
+Location: {lighthouse_validators_dir}
+Size: {lighthouse_validators_dir_size}
+
+Do you want to remove this directory first and start from nothing?
+Removing this directory will also remove any key imported previously.
+'''         ),
+                buttons=[
+                    ('Remove', 1),
+                    ('Keep', 2),
+                    ('Quit', False)
+                ]
+            ).run()
+
+            if not result:
+                return result
+            
+            if result == 1:
+                shutil.rmtree(lighthouse_validators_dir)
+        
+        subprocess.run([
+            'icacls', keys['validator_keys_path'], '/grant:r', 'Everyone:(F)', '/t'
+        ])
+
+        # Import keystore(s) if we have some
+        if len(keys['keystore_paths']) > 0:
+            subprocess.run([
+                str(lighthouse_path), '--network', network, 'account', 'validator', 'import',
+                '--directory', keys['validator_keys_path'], '--datadir', lighthouse_datadir])
+        else:
+            log.warning('No keystore files found to import. We\'ll guess they were already imported '
+                'for now.')
+            time.sleep(5)
+
+        # Check for correct keystore(s) import
+        public_keys = []
+
+        process_result = subprocess.run([
+            LIGHTHOUSE_INSTALLED_PATH, '--network', network, 'account', 'validator', 'list',
+            '--datadir', lighthouse_datadir
+            ], capture_output=True, text=True)
+        if process_result.returncode == 0:
+            process_output = process_result.stdout
+            public_keys = re.findall(r'0x[0-9a-f]{96}', process_output)
+            public_keys = list(map(lambda x: x.strip(), public_keys))
+            
+        if len(public_keys) == 0:
+            # We have no key imported
+
+            result = button_dialog(
+                title='No validator key imported',
+                text=(
+f'''
+It seems like no validator key has been imported.
+
+We cannot continue here without validator keys imported by the Lighthouse
+validator client.
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            return False
+
+        # Check for imported keystore without a password
+
+        vc_definitions_path = lighthouse_validators_dir.joinpath('validator_definitions.yml')
+
+        if not vc_definitions_path.is_file():
+            log.error('No validator_definitions.yml found after importing keystores.')
+            return False
+
+        vc_validators = []
+
+        with open(vc_definitions_path, 'r') as vc_definitions_file:
+            vc_validators = safe_load(vc_definitions_file)
+        
+        passwordless_keystore = []
+
+        for vc_validator in vc_validators:
+            if (
+                'voting_keystore_password' not in vc_validator and
+                'voting_keystore_password_path' not in vc_validator
+            ):
+                passwordless_keystore.append(vc_validator['voting_public_key'])
+        
+        if len(passwordless_keystore) > 0:
+
+            # Remove imported validators
+            shutil.rmtree(lighthouse_validators_dir)
+
+            plural = ''
+            verb_plural = 'was'
+            if len(passwordless_keystore) > 1:
+                plural = 's'
+                verb_plural = 'were'
+
+            result = button_dialog(
+                title='Keystore imported without a password',
+                text=(
+f'''
+It seems like {len(passwordless_keystore)} keystore{plural} {verb_plural} imported without a password.
+
+The lighthouse validator client will not be able to start automatically
+if the keystore is imported without a password. Please try again.
+'''             ),
+                buttons=[
+                    ('Retry', 1),
+                    ('Quit', False)
+                ]
+            ).run()
+
+            if not result:
+                return False
+        else:
+            passwordless_check = False
+
+    # Clean up generated keys
+    for keystore_path in keys['keystore_paths']:
+        os.unlink(keystore_path)
+    
+    subprocess.run([
+        'icacls', keys['validator_keys_path'], '/remove:g', 'Everyone', '/t'
+    ])
+
+    # Protect the imported keys and the validators directory
+    system_identity = 'SYSTEM'
+    datadir_perm = f'{system_identity}:(OI)(CI)(F)'
+    secrets_perm = f'{system_identity}:(F)'
+    
+    data_dirs_to_explore = []
+    data_dirs_explored = []
+
+    data_dirs_to_explore.append(str(lighthouse_validators_dir))
+
+    while len(data_dirs_to_explore) > 0:
+        next_dir = data_dirs_to_explore.pop()
+
+        with os.scandir(next_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    data_dirs_to_explore.append(entry.path)
+                elif entry.is_file():
+                    subprocess.run([
+                        'icacls', entry.path, '/inheritance:r', '/grant:r', secrets_perm
+                    ])
+                    subprocess.run([
+                        'icacls', entry.path, '/remove:g', 'Everyone'
+                    ])
+
+        data_dirs_explored.append(next_dir)
+    
+    for directory in reversed(data_dirs_explored):
+        subprocess.run([
+            'icacls', directory, '/inheritance:r', '/grant:r', datadir_perm
+        ])
+        subprocess.run([
+            'icacls', directory, '/remove:g', 'Everyone'
+        ])
+    
+    log.info(
+f'''
+We found {len(public_keys)} key(s) imported into the lighthouse validator client.
+'''
+    )
+
+    lighthouse_vc_arguments = LIGHTHOUSE_VC_ARGUMENTS[network]
+
+    # Setup Lighthouse validator client service
+    log_path = base_directory.joinpath('var', 'log')
+    log_path.mkdir(parents=True, exist_ok=True)
+
+    lighthouse_stdout_log_path = log_path.joinpath('lighthouse-validator-service-stdout.log')
+    lighthouse_stderr_log_path = log_path.joinpath('lighthouse-validator-service-stderr.log')
+
+    if lighthouse_stdout_log_path.is_file():
+        lighthouse_stdout_log_path.unlink()
+    if lighthouse_stderr_log_path.is_file():
+        lighthouse_stderr_log_path.unlink()
+
+    # Check if merge ready
+    merge_ready = False
+
+    result = re.search(r'([^-]+)', lighthouse_version)
+    if result:
+        cleaned_lighthouse_version = parse_version(result.group(1).strip())
+        target_lighthouse_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][CONSENSUS_CLIENT_LIGHTHOUSE])
+
+        if cleaned_lighthouse_version >= target_lighthouse_version:
+            merge_ready = True
+
+    if merge_ready:
+        lighthouse_vc_arguments.append('--suggested-fee-recipient')
+        lighthouse_vc_arguments.append(f'{fee_recipient_address}')
+    
+    if mevboost_installed:
+        lighthouse_vc_arguments.append(f'--builder-proposals')
+    
+    lighthouse_vc_arguments.append('--datadir')
+    lighthouse_vc_arguments.append(f'{lighthouse_datadir}')
+
+    # Create Lighthouse validator client service
+    parameters = {
+        'DisplayName': LIGHTHOUSE_VC_SERVICE_DISPLAY_NAME[network],
+        'AppRotateFiles': '1',
+        'AppRotateSeconds': '86400',
+        'AppRotateBytes': '10485760',
+        'AppStdout': str(lighthouse_stdout_log_path),
+        'AppStderr': str(lighthouse_stderr_log_path),
+        'AppStopMethodConsole': '1500'
+    }
+
+    if not create_service(nssm_binary, lighthouse_vc_service_name, str(lighthouse_path),
+        lighthouse_vc_arguments, parameters):
+        log.error('There was an issue creating the Lighthouse validator client service. '
+            'We cannot continue.')
+        return False
+
+    log.info('Starting Lighthouse validator client service...')
+    process_result = subprocess.run([
+        str(nssm_binary), 'start', lighthouse_vc_service_name
+    ])
+
+    # Verify proper Lighthouse validator client installation
+    delay = 6
+    log.info(
+f'''
+We are giving the Lighthouse validator client {delay} seconds to start before
+testing it.
+'''
+    )
+    time.sleep(delay)
+    
+    # Verify proper Lighthouse validator client service installation
+    service_details = get_service_details(nssm_binary, lighthouse_vc_service_name)
+    if not service_details:
+        log.error('We could not find the Lighthouse validator client service we just created. '
+            'We cannot continue.')
+        return False
+
+    if not (service_details['status'] == WINDOWS_SERVICE_RUNNING):
+
+        result = button_dialog(
+            title='Lighthouse validator client service not running properly',
+            text=(
+f'''
+The Lighthouse validator client service we just created seems to have
+issues. Here are some details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+We cannot proceed if the Lighthouse validator client service cannot be
+started properly. Make sure to check the logs and fix any issue found
+there. You can see the logs in:
+
+{lighthouse_stdout_log_path}
+{lighthouse_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        # Stop the service to prevent indefinite restart attempts
+        subprocess.run([
+            str(nssm_binary), 'stop', lighthouse_vc_service_name])
+
+        log.info(
+f'''
+To examine your Lighthouse validator client service logs, inspect the following files:
+
+{lighthouse_stdout_log_path}
+{lighthouse_stderr_log_path}
+'''
+        )
+
+        return False
+
+    return public_keys
 
 def obtain_keys(base_directory, network, consensus_client):
     # Obtain validator keys for the selected network
