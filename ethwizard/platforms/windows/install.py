@@ -6800,7 +6800,7 @@ To examine your teku service logs, inspect the following files:
         stdout_log_path = nimbus_stdout_log_path
         stderr_log_path = nimbus_stderr_log_path
 
-        # Check if Teku service is still running
+        # Check if Nimbus service is still running
         service_details = get_service_details(nssm_binary, nimbus_service_name)
         if not service_details:
             log.error('We could not find the Nimbus service we created. '
@@ -6841,6 +6841,63 @@ To examine your teku service logs, inspect the following files:
 
 {nimbus_stdout_log_path}
 {nimbus_stderr_log_path}
+'''
+            )
+
+            return False
+    
+    elif consensus_client == CONSENSUS_CLIENT_LIGHTHOUSE:
+
+        lighthouse_bn_service_name = 'lighthousebeacon'
+        log_path = base_directory.joinpath('var', 'log')
+
+        lighthouse_bn_stdout_log_path = log_path.joinpath('lighthouse-beacon-service-stdout.log')
+        lighthouse_bn_stderr_log_path = log_path.joinpath('lighthouse-beacon-service-stderr.log')
+
+        stdout_log_path = lighthouse_bn_stdout_log_path
+        stderr_log_path = lighthouse_bn_stderr_log_path
+
+        # Check if Lighthouse beacon node service is still running
+        service_details = get_service_details(nssm_binary, lighthouse_bn_service_name)
+        if not service_details:
+            log.error('We could not find the Lighthouse beacon node service we created. '
+                'We cannot continue.')
+            return False
+
+        if not (
+            service_details['status'] == WINDOWS_SERVICE_RUNNING):
+
+            result = button_dialog(
+                title='Lighthouse beacon node service not running properly',
+                text=(
+f'''
+The Lighthouse beacon node service we created seems to have issues. Here
+are some details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+We cannot proceed if the Nimbus service cannot be started properly. Make
+sure to check the logs and fix any issue found there. You can see the
+logs in:
+
+{lighthouse_bn_stdout_log_path}
+{lighthouse_bn_stderr_log_path}
+'''             ),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            log.info(
+f'''
+To examine your teku service logs, inspect the following files:
+
+{lighthouse_bn_stdout_log_path}
+{lighthouse_bn_stderr_log_path}
 '''
             )
 
