@@ -5832,7 +5832,7 @@ Removing this directory will also remove any key imported previously.
         public_keys = []
 
         process_result = subprocess.run([
-            LIGHTHOUSE_INSTALLED_PATH, '--network', network, 'account', 'validator', 'list',
+            str(lighthouse_path), '--network', network, 'account', 'validator', 'list',
             '--datadir', lighthouse_datadir
             ], capture_output=True, text=True)
         if process_result.returncode == 0:
