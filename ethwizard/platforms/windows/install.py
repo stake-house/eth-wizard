@@ -5055,9 +5055,259 @@ def install_teku_validator(base_directory, network, keys, fee_recipient_address,
     # Import keystore(s) and configure the Teku validator client (as part of the same service)
     # Returns a list of public keys when done
 
-    # TODO: Implement
+    base_directory = Path(base_directory)
 
-    return False
+    nssm_binary = get_nssm_binary()
+    if not nssm_binary:
+        return False
+
+    # Check for existing service
+    teku_service_exists = False
+    teku_service_name = 'teku'
+
+    service_details = get_service_details(nssm_binary, teku_service_name)
+
+    if service_details is not None:
+        teku_service_exists = True
+    
+    if not teku_service_exists:
+        log.error('The Teku service is missing. You might need to reinstall it.')
+        return False
+
+    # Stop the Teku service
+    subprocess.run([
+        str(nssm_binary), 'stop', teku_service_name])
+
+    # List validator keys
+    public_keys = []
+
+    subprocess.run([
+        'icacls', keys['validator_keys_path'], '/grant:r', 'Everyone:(F)', '/t'
+    ])
+
+    if len(keys['keystore_paths']) > 0:
+        with os.scandir(keys['validator_keys_path']) as it:
+            for entry in it:
+                if not entry.is_file():
+                    continue
+
+                if not entry.name.startswith('keystore'):
+                    continue
+
+                if not entry.name.endswith('.json'):
+                    continue
+
+                with open(entry.path, 'r') as keystore_file:
+                    keystore = json.loads(keystore_file.read(204800))
+            
+                    if 'pubkey' not in keystore:
+                        log.error(f'No pubkey found in keystore file {entry.path}')
+                        continue
+                    
+                    public_key = keystore['pubkey']
+                    public_keys.append('0x' + public_key)
+
+    else:
+        log.error('No keystore files found. Teku will not be able to run any validator.'
+            ' You will need to import or generate new validator keys.')
+        return False
+
+    if len(public_keys) < 1:
+        log.error('No key found for Teku to run.')
+        return False
+
+    # Secure keys permission
+    dirs_to_explore = []
+    dirs_explored = []
+
+    dirs_to_explore.append(keys['validator_keys_path'])
+    
+    while len(dirs_to_explore) > 0:
+        next_dir = dirs_to_explore.pop()
+
+        with os.scandir(next_dir) as it:
+            for entry in it:
+                if entry.is_dir():
+                    dirs_to_explore.append(entry.path)
+                elif entry.is_file():
+                    subprocess.run([
+                        'icacls', entry.path, '/remove:g', 'Everyone'
+                    ])
+
+        dirs_explored.append(next_dir)
+    
+    for directory in reversed(dirs_explored):
+        subprocess.run([
+            'icacls', directory, '/remove:g', 'Everyone'
+        ])
+
+    log.info(
+f'''
+We found {len(public_keys)} key(s) for Teku.
+'''
+    )
+    
+    # Adding configuration to the Teku service
+    teku_arguments = shlex.split(service_details['parameters']['AppParameters'], posix=False)
+
+    # Fee recipient configuration (--validators-proposer-default-fee-recipient)
+    has_fee_recipient_config = False
+
+    replaced_index = None
+    replaced_arg = None
+    replace_next = False
+
+    for index, arg in enumerate(teku_arguments):
+        if replace_next:
+            replaced_index = index
+            replaced_arg = f'{fee_recipient_address}'
+            break
+        elif arg.lower().startswith('--validators-proposer-default-fee-recipient'):
+            has_fee_recipient_config = True
+            if '=' in arg:
+                replaced_index = index
+                replaced_arg = f'--validators-proposer-default-fee-recipient={fee_recipient_address}'
+                break
+            else:
+                replace_next = True
+
+    if not has_fee_recipient_config:
+        log.info('Adding fee recipient to Teku...')
+
+        teku_arguments.append(f'--validators-proposer-default-fee-recipient={fee_recipient_address}')
+    else:
+        log.warning('Teku was already configured with a fee recipient. We will try to update or make '
+            'sure the configuration is correct.')
+        
+        if replaced_index is None or replaced_arg is None:
+            log.error('No replacement found for fee recipient argument.')
+            return False
+        
+        teku_arguments[replaced_index] = replaced_arg
+    
+    # Validator keys configuration (--validator-keys)
+    has_validator_keys_config = False
+
+    replaced_index = None
+    replaced_arg = None
+    replace_next = False
+
+    for index, arg in enumerate(teku_arguments):
+        if replace_next:
+            replaced_index = index
+            replaced_arg = f'"{keys["validator_keys_path"]}";"{keys["validator_keys_path"]}"'
+            break
+        elif arg.lower().startswith('--validator-keys'):
+            has_validator_keys_config = True
+            if '=' in arg:
+                replaced_index = index
+                replaced_arg = f'--validator-keys="{keys["validator_keys_path"]}";"{keys["validator_keys_path"]}"'
+                break
+            else:
+                replace_next = True
+
+    if not has_validator_keys_config:
+        log.info('Adding validator keys to Teku...')
+
+        teku_arguments.append(f'--validator-keys="{keys["validator_keys_path"]}";"{keys["validator_keys_path"]}"')
+    else:
+        log.warning('Teku was already configured with a fee recipient. We will try to update or make '
+            'sure the configuration is correct.')
+        
+        if replaced_index is None or replaced_arg is None:
+            log.error('No replacement found for fee recipient argument.')
+            return False
+        
+        teku_arguments[replaced_index] = replaced_arg
+    
+    # Updating Teku service configuration
+    if not set_service_param(nssm_binary, teku_service_name, 'AppParameters', teku_arguments):
+        return False
+
+    log.info('Starting Teku service...')
+    subprocess.run([
+        str(nssm_binary), 'start', teku_service_name])
+
+    delay = 45
+    log.info(f'We are giving {delay} seconds for the Teku service to start properly.')
+    time.sleep(delay)
+
+    # Verify proper Teku service installation
+    service_details = get_service_details(nssm_binary, teku_service_name)
+    if not service_details:
+        log.error('We could not find the Teku service we just modified. '
+            'We cannot continue.')
+        return False
+
+    log_path = base_directory.joinpath('var', 'log')
+    teku_stdout_log_path = log_path.joinpath('teku-service-stdout.log')
+    teku_stderr_log_path = log_path.joinpath('teku-service-stderr.log')
+
+    if not (service_details['status'] == WINDOWS_SERVICE_RUNNING):
+
+        # Check for evidence of wrong password file
+        if teku_stderr_log_path.is_file():
+            log_part = ''
+            with open(teku_stderr_log_path, 'r', encoding='utf8') as log_file:
+                log_part = log_file.read(1024)
+            result = re.search(r'Failed to decrypt', log_part)
+            if result:
+                subprocess.run([
+                    str(nssm_binary), 'stop', teku_service_name])
+                
+                log.error(
+f'''
+Your password file contains the wrong password. Teku cannot be started. You
+might need to generate your keys again or fix your password file. We cannot
+continue.
+
+Your password files are the .txt files in:
+
+{keys['validator_keys_path']}
+'''             )
+                return False
+
+        result = button_dialog(
+            title='Teku service not running properly',
+            text=(
+f'''
+The Teku service we just configured seems to have issues. Here are some
+details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+We cannot proceed if the Teku service cannot be started properly. Make
+sure to check the logs and fix any issue found there. You can see the
+logs in:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        # Stop the service to prevent indefinite restart attempts
+        subprocess.run([
+            str(nssm_binary), 'stop', teku_service_name])
+
+        log.info(
+f'''
+To examine your Teku service logs, inspect the following files:
+
+{teku_stdout_log_path}
+{teku_stderr_log_path}
+'''
+        )
+
+        return False
+
+    return public_keys
 
 def install_nimbus_validator(base_directory, network, keys, fee_recipient_address,
     mevboost_installed):
@@ -5266,7 +5516,6 @@ We found {len(public_keys)} key(s) imported into Nimbus.
         ])
     
     # Adding configuration to the Nimbus service
-
     nimbus_arguments = shlex.split(service_details['parameters']['AppParameters'], posix=False)
 
     # Fee recipient configuration (--suggested-fee-recipient)
@@ -5947,8 +6196,7 @@ Do you want to skip installing the staking-deposit-cli binary?
             title='Enter your keystore password',
             text=(
 f'''
-Please enter the password you used to create your keystore with the
-staking-deposit-cli tool:
+Please enter the password you used to create your keystore:
 
 The password will be stored in a text file so that Teku can access your
 validator keys when starting. Permissions will be changed so that only
