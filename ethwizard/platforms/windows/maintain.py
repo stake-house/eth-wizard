@@ -27,7 +27,8 @@ from ethwizard.platforms.common import (
     get_geth_running_version,
     get_geth_latest_version,
     get_mevboost_latest_version,
-    get_nimbus_latest_version
+    get_nimbus_latest_version,
+    get_lighthouse_latest_version
 )
 
 from ethwizard.platforms.windows.common import (
@@ -51,6 +52,7 @@ from ethwizard.constants import (
     EXECUTION_CLIENT_GETH,
     CONSENSUS_CLIENT_TEKU,
     CONSENSUS_CLIENT_NIMBUS,
+    CONSENSUS_CLIENT_LIGHTHOUSE,
     WIZARD_COMPLETED_STEP_ID,
     UNKNOWN_VALUE,
     MAINTENANCE_DO_NOTHING,
@@ -751,6 +753,106 @@ def get_consensus_client_details(base_directory, consensus_client):
 
         return details
 
+    elif consensus_client == CONSENSUS_CLIENT_LIGHTHOUSE:
+
+        details = {
+            'bn_service': {
+                'found': False,
+                'status': UNKNOWN_VALUE,
+                'binary': UNKNOWN_VALUE,
+                'parameters': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE
+            },
+            'vc_service': {
+                'found': False,
+                'status': UNKNOWN_VALUE,
+                'binary': UNKNOWN_VALUE,
+                'parameters': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE
+            },
+            'versions': {
+                'installed': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE,
+                'latest': UNKNOWN_VALUE
+            },
+            'bn_exec': {
+                'path': UNKNOWN_VALUE,
+                'argv': []
+            },
+            'vc_exec': {
+                'path': UNKNOWN_VALUE,
+                'argv': []
+            },
+            'is_bn_merge_configured': UNKNOWN_VALUE,
+            'is_vc_merge_configured': UNKNOWN_VALUE,
+            'single_service': False,
+        }
+        
+        # Check for existing services
+        lighthouse_bn_service_exists = False
+        lighthouse_bn_service_name = 'lighthousebeacon'
+
+        service_details = get_service_details(nssm_binary, lighthouse_bn_service_name)
+
+        if service_details is not None:
+            lighthouse_bn_service_exists = True
+        
+        if not lighthouse_bn_service_exists:
+            return details
+
+        details['bn_service']['found'] = True
+        details['bn_service']['status'] = service_details['status']
+        details['bn_service']['binary'] = service_details['install']
+        details['bn_service']['parameters'] = service_details['parameters']['AppParameters']
+        details['bn_service']['running'] = is_service_running(service_details)
+
+        details['bn_exec']['path'] = service_details['install']
+        details['bn_exec']['argv'] = shlex.split(service_details['parameters']['AppParameters'], posix=False)
+
+        execution_jwt_flag_found = False
+        execution_endpoint_flag_found = False
+        for arg in details['bn_exec']['argv']:
+            if arg.lower().startswith('--execution-jwt'):
+                execution_jwt_flag_found = True
+            if arg.lower().startswith('--execution-endpoint'):
+                execution_endpoint_flag_found = True
+            if execution_jwt_flag_found and execution_endpoint_flag_found:
+                break
+        
+        details['is_bn_merge_configured'] = (
+            execution_jwt_flag_found and execution_endpoint_flag_found)
+        
+        lighthouse_vc_service_exists = False
+        lighthouse_vc_service_name = 'lighthousevalidator'
+
+        service_details = get_service_details(nssm_binary, lighthouse_vc_service_name)
+
+        if service_details is not None:
+            lighthouse_vc_service_exists = True
+        
+        if not lighthouse_vc_service_exists:
+            return details
+
+        details['vc_service']['found'] = True
+        details['vc_service']['status'] = service_details['status']
+        details['vc_service']['binary'] = service_details['install']
+        details['vc_service']['parameters'] = service_details['parameters']['AppParameters']
+        details['vc_service']['running'] = is_service_running(service_details)
+
+        details['vc_exec']['path'] = service_details['install']
+        details['vc_exec']['argv'] = shlex.split(service_details['parameters']['AppParameters'], posix=False)
+
+        for arg in details['vc_exec']['argv']:
+            if arg.lower().startswith('--suggested-fee-recipient'):
+                details['is_vc_merge_configured'] = True
+                break
+
+        details['versions']['installed'] = get_lighthouse_installed_version(base_directory)
+        details['versions']['running'] = get_lighthouse_running_version()
+        details['versions']['latest'] = get_lighthouse_latest_version(log)
+
+        return details
+
     else:
         log.error(f'Unknown consensus client {consensus_client}.')
         return False
@@ -877,6 +979,83 @@ def get_nimbus_installed_version(base_directory):
         log.info(f'Nimbus installed version is {nimbus_version}')
 
         return nimbus_version
+    
+    return UNKNOWN_VALUE
+
+def get_lighthouse_running_version():
+    # Get the running version for Lighthouse
+
+    log.info('Getting Lighthouse running version...')
+
+    local_lighthouse_bn_version_url = 'http://127.0.0.1:5052' + BN_VERSION_EP
+
+    try:
+        response = httpx.get(local_lighthouse_bn_version_url)
+    except httpx.RequestError as exception:
+        log.error(f'Cannot connect to Nimbus. Exception: {exception}')
+        return UNKNOWN_VALUE
+
+    if response.status_code != 200:
+        log.error(f'Unexpected status code from {local_lighthouse_bn_version_url}. Status code: '
+            f'{response.status_code}')
+        return UNKNOWN_VALUE
+    
+    response_json = response.json()
+
+    if 'data' not in response_json or 'version' not in response_json['data']:
+        log.error(f'Unexpected JSON response from {local_lighthouse_bn_version_url}. result not found.')
+        return UNKNOWN_VALUE
+    
+    version_agent = response_json['data']['version']
+
+    # Version agent should look like: Lighthouse/v2.0.1-aaa5344/x86_64-linux
+    result = re.search(r'Lighthouse/v?(?P<version>[^-/]+)(-(?P<commit>[^-/]+))?',
+        version_agent)
+    if not result:
+        log.error(f'Cannot parse {version_agent} for Lighthouse version.')
+        return UNKNOWN_VALUE
+
+    running_version = result.group('version')
+
+    log.info(f'Lighthouse running version is {running_version}')
+
+    return running_version
+
+def get_lighthouse_installed_version(base_directory):
+    # Get the installed version for Lighthouse
+
+    log.info('Getting Lighthouse installed version...')
+
+    lighthouse_path = base_directory.joinpath('bin', 'lighthouse.exe')
+
+    lighthouse_found = False
+    lighthouse_version = 'unknown'
+
+    if lighthouse_path.is_file():
+        try:
+            process_result = subprocess.run([str(lighthouse_path), '--version'],
+                capture_output=True, text=True)
+            lighthouse_found = True
+
+            if process_result.returncode != 0:
+                log.error(f'Unexpected return code from Lighthouse. Return code: '
+                    f'{process_result.returncode}')
+                return UNKNOWN_VALUE
+
+            process_output = process_result.stdout
+            result = re.search(r'Lighthouse v?(?P<version>[^-]+)', process_output)
+            if result:
+                lighthouse_version = result.group('version').strip()
+            else:
+                log.error(f'We could not parse Lighthouse version from output: {process_result.stdout}')
+
+        except FileNotFoundError:
+            pass
+
+    if lighthouse_found:
+        log.info(f'Lighthouse installed version is {lighthouse_version}')
+
+        return lighthouse_version
     
     return UNKNOWN_VALUE
 

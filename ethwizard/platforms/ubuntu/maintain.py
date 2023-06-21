@@ -18,7 +18,8 @@ from ethwizard.platforms.common import (
     get_geth_running_version,
     get_geth_latest_version,
     get_mevboost_latest_version,
-    get_nimbus_latest_version
+    get_nimbus_latest_version,
+    get_lighthouse_latest_version
 )
 
 from ethwizard.platforms.ubuntu.common import (
@@ -774,7 +775,7 @@ def get_consensus_client_details(consensus_client):
 
         details['versions']['installed'] = get_lighthouse_installed_version()
         details['versions']['running'] = get_lighthouse_running_version()
-        details['versions']['latest'] = get_lighthouse_latest_version()
+        details['versions']['latest'] = get_lighthouse_latest_version(log)
 
         return details
     
@@ -955,7 +956,7 @@ def get_lighthouse_running_version():
     version_agent = response_json['data']['version']
 
     # Version agent should look like: Lighthouse/v2.0.1-aaa5344/x86_64-linux
-    result = re.search(r'Lighthouse/v(?P<version>[^-/]+)(-(?P<commit>[^-/]+))?',
+    result = re.search(r'Lighthouse/v?(?P<version>[^-/]+)(-(?P<commit>[^-/]+))?',
         version_agent)
     if not result:
         log.error(f'Cannot parse {version_agent} for Lighthouse version.')
@@ -966,44 +967,6 @@ def get_lighthouse_running_version():
     log.info(f'Lighthouse running version is {running_version}')
 
     return running_version
-
-def get_lighthouse_latest_version():
-    # Get the latest version for Lighthouse
-
-    log.info('Getting Lighthouse latest version...')
-
-    lighthouse_gh_release_url = GITHUB_REST_API_URL + LIGHTHOUSE_LATEST_RELEASE
-    headers = {'Accept': GITHUB_API_VERSION}
-    try:
-        response = httpx.get(lighthouse_gh_release_url, headers=headers,
-            follow_redirects=True)
-    except httpx.RequestError as exception:
-        log.error(f'Exception while getting the latest stable version for Lighthouse. {exception}')
-        return UNKNOWN_VALUE
-
-    if response.status_code != 200:
-        log.error(f'HTTP error while getting the latest stable version for Lighthouse. '
-            f'Status code {response.status_code}')
-        return UNKNOWN_VALUE
-    
-    release_json = response.json()
-
-    if 'tag_name' not in release_json or not isinstance(release_json['tag_name'], str):
-        log.error(f'Unable to find tag name in Github response while getting the latest stable '
-            f'version for Lighthouse.')
-        return UNKNOWN_VALUE
-    
-    tag_name = release_json['tag_name']
-    result = re.search(r'v?(?P<version>.+)', tag_name)
-    if not result:
-        log.error(f'Cannot parse tag name {tag_name} for Lighthouse version.')
-        return UNKNOWN_VALUE
-    
-    latest_version = result.group('version')
-
-    log.info(f'Lighthouse latest version is {latest_version}')
-
-    return latest_version
 
 def perform_maintenance(execution_client, execution_client_details, consensus_client,
     consensus_client_details, mevboost_details):
