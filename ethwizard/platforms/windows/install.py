@@ -9022,6 +9022,13 @@ providers:
         nimbus_dashboard_file = grafana_dashboard_dir.joinpath('nimbus.json')
         with open(nimbus_dashboard_file, 'w', encoding='utf8') as dashboard_file:
             dashboard_file.write(NIMBUS_GRAFANA_DASHBOARD)
+    elif consensus_client == CONSENSUS_CLIENT_LIGHTHOUSE:
+        lighthouse_summary_dashboard_file = grafana_dashboard_dir.joinpath('lighthouse-summary.json')
+        with open(lighthouse_summary_dashboard_file, 'w', encoding='utf8') as dashboard_file:
+            dashboard_file.write(LIGHTHOUSE_SUMMARY_GRAFANA_DASHBOARD)
+        lighthouse_vc_dashboard_file = grafana_dashboard_dir.joinpath('lighthouse-vc.json')
+        with open(lighthouse_vc_dashboard_file, 'w', encoding='utf8') as dashboard_file:
+            dashboard_file.write(LIGHTHOUSE_VC_GRAFANA_DASHBOARD)
     
     home_dashboard_file = grafana_dashboard_dir.joinpath('home.json')
     with open(home_dashboard_file, 'w', encoding='utf8') as dashboard_file:
