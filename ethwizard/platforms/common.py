@@ -1949,3 +1949,30 @@ Which consensus client would you like to use?
     ).run()
 
     return result
+
+def select_execution_client(execution_clients_available):
+
+    result = radiolist_dialog(
+        title='Execution client selection',
+        text=(
+'''
+This wizard supports installing and configuring software for various
+Ethereum execution clients. We already selected a client at random, but
+can choose the client you want. We suggest you choose a minority client.
+You can see which clients are popular right now on
+https://clientdiversity.org/ .
+
+Which execution client would you like to use?
+
+* Press the tab key to switch between the controls below
+'''
+        ),
+        values=[
+            (x, x) for x in execution_clients_available
+        ],
+        default=choice(execution_clients_available),
+        ok_text='Use this',
+        cancel_text='Quit'
+    ).run()
+
+    return result

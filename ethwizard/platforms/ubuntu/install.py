@@ -29,6 +29,7 @@ from ethwizard.platforms.common import (
     progress_log_dialog,
     search_for_generated_keys,
     select_consensus_client,
+    select_execution_client,
     select_keys_directory,
     select_fee_recipient_address,
     select_withdrawal_address,
@@ -148,18 +149,21 @@ def installation_steps():
         # Context variables
         selected_ports = CTX_SELECTED_PORTS
         selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
+        selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
 
         if not (
-            test_context_variable(context, selected_consensus_client, log)
+            test_context_variable(context, selected_consensus_client, log) and
+            test_context_variable(context, selected_execution_client, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
         
         consensus_client = context[selected_consensus_client]
+        execution_client = context[selected_execution_client]
 
         if selected_ports not in context:
             context[selected_ports] = {
-                'eth1': DEFAULT_GETH_PORT,
+                'eth1': DEFAULT_EXECUTION_PORT[execution_client],
                 'eth2_bn': DEFAULT_CONSENSUS_PORT[consensus_client]
             }
         
@@ -179,7 +183,7 @@ def installation_steps():
         exc_function=select_custom_ports_function
     )
 
-    def install_geth_function(step, context, step_sequence):
+    def install_execution_function(step, context, step_sequence):
         # Context variables
         selected_network = CTX_SELECTED_NETWORK
         selected_ports = CTX_SELECTED_PORTS
@@ -187,23 +191,32 @@ def installation_steps():
 
         if not (
             test_context_variable(context, selected_network, log) and
-            test_context_variable(context, selected_ports, log)
+            test_context_variable(context, selected_ports, log) and
+            test_context_variable(context, selected_execution_client, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
 
-        if not install_geth(context[selected_network], context[selected_ports]):
-            # User asked to quit or error
-            quit_app()
+        execution_client = context[selected_execution_client]
+
+        if execution_client == EXECUTION_CLIENT_GETH:
+
+            if not install_geth(context[selected_network], context[selected_ports]):
+                # User asked to quit or error
+                quit_app()
         
-        context[selected_execution_client] = EXECUTION_CLIENT_GETH
+        elif execution_client == EXECUTION_CLIENT_NETHERMIND:
+        
+            if not install_nethermind(context[selected_network], context[selected_ports]):
+                # User asked to quit or error
+                quit_app()
         
         return context
     
-    install_geth_step = Step(
-        step_id=INSTALL_GETH_STEP_ID,
-        display_name='Geth installation',
-        exc_function=install_geth_function
+    install_execution_step = Step(
+        step_id=INSTALL_EXECUTION_STEP_ID,
+        display_name='Execution client installation',
+        exc_function=install_execution_function
     )
 
     def install_mevboost_function(step, context, step_sequence):
@@ -620,9 +633,29 @@ def installation_steps():
         exc_function=select_consensus_client_function
     )
 
+    def select_execution_client_function(step, context, step_sequence):
+        # Context variables
+        selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
+
+        execution_client = select_execution_client(SUPPORTED_LINUX_EXECUTION_CLIENTS)
+
+        if not execution_client:
+            quit_app()
+        
+        context[selected_execution_client] = execution_client
+
+        return context
+    
+    select_execution_client_step = Step(
+        step_id=SELECT_EXECUTION_CLIENT_STEP_ID,
+        display_name='Select execution client',
+        exc_function=select_execution_client_function
+    )
+
     return [
         select_network_step,
         select_consensus_client_step,
+        select_execution_client_step,
         test_system_step,
         install_mevboost_step,
         select_custom_ports_step,
@@ -630,7 +663,7 @@ def installation_steps():
         select_consensus_checkpoint_url_step,
         select_eth1_fallbacks_step,
         install_consensus_step,
-        install_geth_step,
+        install_execution_step,
         test_open_ports_step,
         obtain_keys_step,
         select_fee_recipient_address_step,
@@ -2137,6 +2170,11 @@ Connected Peers: {result['exe_connected_peers']}
     time.sleep(5)
 
     return True
+
+def install_nethermind(network, ports):
+    # TODO: Install Nethermind for the selected network
+
+    return False
 
 def detect_merge_ready(network):
     is_merge_ready = True
