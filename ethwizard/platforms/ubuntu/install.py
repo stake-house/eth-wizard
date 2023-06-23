@@ -2223,8 +2223,9 @@ Do you want to skip installing Nethermind and its service?
 '''
 This next step will install Nethermind, an Ethereum execution client.
 
-It uses the Nethermind (PPA) meaning that it gets integrated with the
-normal updates for Ubuntu and its related tools like APT.
+It uses the Nethermind Personal Package Archive (PPA) meaning that it
+gets integrated with the normal updates for Ubuntu and its related tools
+like APT.
 
 Once the installation is completed, it will create a systemd service that
 will automatically start Nethermind on reboot or if it crashes.
