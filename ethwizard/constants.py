@@ -53952,12 +53952,12 @@ TimeoutStopSec=180
 WorkingDirectory=/var/lib/nethermind
 Environment="DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/nethermind"
 ExecStart=/usr/share/nethermind/Nethermind.Runner \\
-  --config mainnet \\
-  --datadir /var/lib/nethermind 
-  --Metrics.Enabled true \\
-  --Metrics.ExposePort 6061 \\
-  --Sync.SnapSync true \\
-  --JsonRpc.Enabled true{{addparams}}
+    --config mainnet \\
+    --datadir /var/lib/nethermind \\
+    --Metrics.Enabled true \\
+    --Metrics.ExposePort 6061 \\
+    --Sync.SnapSync true \\
+    --JsonRpc.Enabled true{{addparams}}
 
 [Install]
 WantedBy=multi-user.target
@@ -53979,12 +53979,12 @@ TimeoutStopSec=180
 WorkingDirectory=/var/lib/nethermind
 Environment="DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/nethermind"
 ExecStart=/usr/share/nethermind/Nethermind.Runner \\
-  --config goerli \\
-  --datadir /var/lib/nethermind 
-  --Metrics.Enabled true \\
-  --Metrics.ExposePort 6061 \\
-  --Sync.SnapSync true \\
-  --JsonRpc.Enabled true{{addparams}}
+    --config goerli \\
+    --datadir /var/lib/nethermind \\
+    --Metrics.Enabled true \\
+    --Metrics.ExposePort 6061 \\
+    --Sync.SnapSync true \\
+    --JsonRpc.Enabled true{{addparams}}
 
 [Install]
 WantedBy=multi-user.target
