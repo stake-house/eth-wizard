@@ -53957,6 +53957,7 @@ ExecStart=/usr/share/nethermind/Nethermind.Runner \\
     --Metrics.Enabled true \\
     --Metrics.ExposePort 6061 \\
     --Sync.SnapSync true \\
+    --HealthChecks.Enabled true \\
     --JsonRpc.Enabled true{{addparams}}
 
 [Install]
@@ -53984,6 +53985,7 @@ ExecStart=/usr/share/nethermind/Nethermind.Runner \\
     --Metrics.Enabled true \\
     --Metrics.ExposePort 6061 \\
     --Sync.SnapSync true \\
+    --HealthChecks.Enabled true \\
     --JsonRpc.Enabled true{{addparams}}
 
 [Install]
