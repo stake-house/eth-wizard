@@ -186,12 +186,14 @@ VERY_LARGE_VERSION_NUMBER = '500.0.0'
 MIN_CLIENT_VERSION_FOR_MERGE = {
   NETWORK_MAINNET: {
     EXECUTION_CLIENT_GETH: '1.10.22',
+    EXECUTION_CLIENT_NETHERMIND: '1.14.1',
     CONSENSUS_CLIENT_LIGHTHOUSE: '3.0.0',
     CONSENSUS_CLIENT_TEKU: '22.8.1',
     CONSENSUS_CLIENT_NIMBUS: '22.9.0',
   },
   NETWORK_GOERLI: {
     EXECUTION_CLIENT_GETH: '1.10.21',
+    EXECUTION_CLIENT_NETHERMIND: '1.13.5',
     CONSENSUS_CLIENT_LIGHTHOUSE: '2.4.0',
     CONSENSUS_CLIENT_TEKU: '22.7.0',
     CONSENSUS_CLIENT_NIMBUS: '22.7.0',
@@ -237,6 +239,7 @@ BEACONCHA_VALIDATOR_DEPOSITS_API_URL = '/api/v1/validator/{indexOrPubkey}/deposi
 BEACONCHA_VALIDATOR_QUEUE_API_URL = '/api/v1/validators/queue'
 
 ETHEREUM_APT_SOURCE_URL = 'http://ppa.launchpad.net/ethereum/ethereum/ubuntu'
+NETHERMIND_APT_SOURCE_URL = 'https://ppa.launchpadcontent.net/nethermindeth/nethermind/ubuntu'
 
 GETH_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Go Ethereum Client - Geth (Mainnet)',
@@ -261,6 +264,8 @@ GETH_ARGUMENTS = {
 }
 
 GETH_SYSTEMD_SERVICE_NAME = 'geth.service'
+
+NETHERMIND_SYSTEMD_SERVICE_NAME = 'nethermind.service'
 
 MEVBOOST_SYSTEMD_SERVICE_NAME = 'mevboost.service'
 MEVBOOST_INSTALLED_DIRECTORY = '/usr/local/bin'
@@ -53926,6 +53931,63 @@ ExecStart=geth --goerli --syncmode=snap --http --datadir /var/lib/goethereum --m
 
 [Install]
 WantedBy=default.target
+''')
+}
+
+NETHERMIND_SERVICE_DEFINITION = {
+    NETWORK_MAINNET: (
+f'''
+[Unit]
+Description=Nethermind Ethereum Client (Mainnet)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=nethermind
+Group=nethermind
+Type=simple
+Restart=always
+RestartSec=5
+TimeoutStopSec=180
+WorkingDirectory=/var/lib/nethermind
+Environment="DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/nethermind"
+ExecStart=/usr/share/nethermind/Nethermind.Runner \\
+  --config mainnet \\
+  --datadir /var/lib/nethermind 
+  --Metrics.Enabled true \\
+  --Metrics.ExposePort 6061 \\
+  --Sync.SnapSync true \\
+  --JsonRpc.Enabled true{{addparams}}
+
+[Install]
+WantedBy=multi-user.target
+'''),
+    NETWORK_GOERLI: (
+f'''
+[Unit]
+Description=Nethermind Ethereum Client (Görli)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=nethermind
+Group=nethermind
+Type=simple
+Restart=always
+RestartSec=5
+TimeoutStopSec=180
+WorkingDirectory=/var/lib/nethermind
+Environment="DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/nethermind"
+ExecStart=/usr/share/nethermind/Nethermind.Runner \\
+  --config goerli \\
+  --datadir /var/lib/nethermind 
+  --Metrics.Enabled true \\
+  --Metrics.ExposePort 6061 \\
+  --Sync.SnapSync true \\
+  --JsonRpc.Enabled true{{addparams}}
+
+[Install]
+WantedBy=multi-user.target
 ''')
 }
 

@@ -1515,7 +1515,7 @@ MEV-Boost version {mevboost_version} is installed and working properly.
     return installed_value
 
 def install_geth(network, ports):
-    # Install geth for the selected network
+    # Install Geth for the selected network
 
     # Check for existing systemd service
     geth_service_exists = False
@@ -1531,7 +1531,7 @@ def install_geth(network, ports):
             title='Geth service found',
             text=(
 f'''
-The geth service seems to have already been created. Here are some details
+The Geth service seems to have already been created. Here are some details
 found:
 
 Description: {service_details['Description']}
@@ -1541,7 +1541,7 @@ ExecStart: {service_details['ExecStart']}
 ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
 FragmentPath: {service_details['FragmentPath']}
 
-Do you want to skip installing geth and its service?
+Do you want to skip installing Geth and its service?
 '''         ),
             buttons=[
                 ('Skip', 1),
@@ -1556,7 +1556,7 @@ Do you want to skip installing geth and its service?
         if result == 1:
             return True
         
-        # User wants to proceed, make sure the geth service is stopped first
+        # User wants to proceed, make sure the Geth service is stopped first
         subprocess.run([
             'systemctl', 'stop', geth_service_name])
 
@@ -1643,7 +1643,7 @@ properly.
             title='Geth binary found',
             text=(
 f'''
-The geth binary seems to have already been installed. Here are some
+The Geth binary seems to have already been installed. Here are some
 details found:
 
 Version: {geth_version}
@@ -1651,7 +1651,7 @@ Location: {geth_location}
 Installed from package: {geth_package_installed}
 Installed from official Ethereum PPA: {installed_from_ppa}
 
-Do you want to skip installing the geth binary?
+Do you want to skip installing the Geth binary?
 '''         ),
             buttons=[
                 ('Skip', 1),
@@ -1714,7 +1714,7 @@ Do you want to skip installing the geth binary?
             title='Geth data directory found',
             text=(
 f'''
-An existing geth data directory has been found. Here are some
+An existing Geth data directory has been found. Here are some
 details found:
 
 Location: {geth_datadir}
@@ -1811,7 +1811,7 @@ Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
             title='Geth service not running properly',
             text=(
 f'''
-The geth service we just created seems to have issues. Here are some
+The Geth service we just created seems to have issues. Here are some
 details found:
 
 Description: {service_details['Description']}
@@ -1821,7 +1821,7 @@ ExecStart: {service_details['ExecStart']}
 ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
 FragmentPath: {service_details['FragmentPath']}
 
-We cannot proceed if the geth service cannot be started properly. Make sure
+We cannot proceed if the Geth service cannot be started properly. Make sure
 to check the logs and fix any issue found there. You can see the logs with:
 
 $ sudo journalctl -ru {geth_service_name}
@@ -1833,7 +1833,7 @@ $ sudo journalctl -ru {geth_service_name}
 
         log.info(
 f'''
-To examine your geth service logs, type the following command:
+To examine your Geth service logs, type the following command:
 
 $ sudo journalctl -ru {geth_service_name}
 '''
@@ -1858,7 +1858,7 @@ $ sudo journalctl -ru {geth_service_name}
             title='Cannot connect to Geth',
             text=(
 f'''
-We could not connect to geth HTTP-RPC server. Here are some details for
+We could not connect to Geth HTTP-RPC server. Here are some details for
 this last test we tried to perform:
 
 URL: {local_geth_jsonrpc_url}
@@ -1867,7 +1867,7 @@ Headers: {headers}
 JSON payload: {json.dumps(request_json)}
 Exception: {exception}
 
-We cannot proceed if the geth HTTP-RPC server is not responding properly.
+We cannot proceed if the Geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
 logs with:
 
@@ -1880,7 +1880,7 @@ $ sudo journalctl -ru {geth_service_name}
 
         log.info(
 f'''
-To examine your geth service logs, type the following command:
+To examine your Geth service logs, type the following command:
 
 $ sudo journalctl -ru {geth_service_name}
 '''
@@ -1893,7 +1893,7 @@ $ sudo journalctl -ru {geth_service_name}
             title='Cannot connect to Geth',
             text=(
 f'''
-We could not connect to geth HTTP-RPC server. Here are some details for
+We could not connect to Geth HTTP-RPC server. Here are some details for
 this last test we tried to perform:
 
 URL: {local_geth_jsonrpc_url}
@@ -1902,7 +1902,7 @@ Headers: {headers}
 JSON payload: {json.dumps(request_json)}
 Status code: {response.status_code}
 
-We cannot proceed if the geth HTTP-RPC server is not responding properly.
+We cannot proceed if the Geth HTTP-RPC server is not responding properly.
 Make sure to check the logs and fix any issue found there. You can see the
 logs with:
 
@@ -1915,7 +1915,7 @@ $ sudo journalctl -ru {geth_service_name}
 
         log.info(
 f'''
-To examine your geth service logs, type the following command:
+To examine your Geth service logs, type the following command:
 
 $ sudo journalctl -ru {geth_service_name}
 '''
@@ -2152,7 +2152,7 @@ $ sudo journalctl -ru {geth_service_name}
 
         log.info(
 f'''
-To examine your geth service logs, type the following command:
+To examine your Geth service logs, type the following command:
 
 $ sudo journalctl -ru {geth_service_name}
 '''
@@ -2172,9 +2172,664 @@ Connected Peers: {result['exe_connected_peers']}
     return True
 
 def install_nethermind(network, ports):
-    # TODO: Install Nethermind for the selected network
+    # Install Nethermind for the selected network
 
-    return False
+    # Check for existing systemd service
+    nethermind_service_exists = False
+    nethermind_service_name = NETHERMIND_SYSTEMD_SERVICE_NAME
+
+    service_details = get_systemd_service_details(nethermind_service_name)
+
+    if service_details['LoadState'] == 'loaded':
+        nethermind_service_exists = True
+    
+    if nethermind_service_exists:
+        result = button_dialog(
+            title='Nethermind service found',
+            text=(
+f'''
+The Nethermind service seems to have already been created. Here are some details
+found:
+
+Description: {service_details['Description']}
+States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+UnitFilePreset: {service_details['UnitFilePreset']}
+ExecStart: {service_details['ExecStart']}
+ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
+FragmentPath: {service_details['FragmentPath']}
+
+Do you want to skip installing Nethermind and its service?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            return True
+        
+        # User wants to proceed, make sure the Nethermind service is stopped first
+        subprocess.run([
+            'systemctl', 'stop', nethermind_service_name])
+
+    result = button_dialog(
+        title='Nethermind installation',
+        text=(
+'''
+This next step will install Nethermind, an Ethereum execution client.
+
+It uses the Nethermind (PPA) meaning that it gets integrated with the
+normal updates for Ubuntu and its related tools like APT.
+
+Once the installation is completed, it will create a systemd service that
+will automatically start Nethermind on reboot or if it crashes.
+Nethermind will be started and you will slowly start syncing with the
+Ethereum network. This syncing process can take a few hours or days even
+with good hardware and good internet. We will perform a few tests to make
+sure Nethermind is running properly.
+'''     ),
+        buttons=[
+            ('Install', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+    
+    # Check if Nethermind is already installed
+    nethermind_found = False
+    nethermind_package_installed = False
+    installed_from_ppa = False
+    nethermind_version = 'unknown'
+    nethermind_location = 'unknown'
+
+    try:
+        process_result = subprocess.run([
+            'nethermind', '--version'
+            ], capture_output=True, text=True)
+        nethermind_found = True
+
+        process_output = process_result.stdout
+        result = re.search(r'Version: (?P<version>[^-\+]+)', process_output)
+        if result:
+            nethermind_version = result.group('version').strip()
+        
+        process_result = subprocess.run([
+            'whereis', 'nethermind'
+            ], capture_output=True, text=True)
+
+        process_output = process_result.stdout
+        result = re.search(r'nethermind: (\S+)', process_output)
+        if result:
+            nethermind_location = result.group(1).strip()
+
+        nethermind_package_installed = False
+        try:
+            nethermind_package_installed = is_package_installed('nethermind')
+        except Exception:
+            return False
+
+        if nethermind_package_installed:
+            # Nethermind package is installed
+            process_result = subprocess.run([
+                'apt', 'show', 'nethermind'
+                ], capture_output=True, text=True)
+            
+            process_output = process_result.stdout
+            result = re.search(r'APT-Sources: (.*?)\n', process_output)
+            if result:
+                apt_sources = result.group(1).strip()
+                apt_sources_splits = apt_sources.split(' ')
+                if apt_sources_splits[0] == NETHERMIND_APT_SOURCE_URL:
+                    installed_from_ppa = True
+
+    except FileNotFoundError:
+        pass
+    
+    install_nethermind_binary = True
+
+    if nethermind_found:
+        result = button_dialog(
+            title='Nethermind binary found',
+            text=(
+f'''
+The Nethermind binary seems to have already been installed. Here are some
+details found:
+
+Version: {nethermind_version}
+Location: {nethermind_location}
+Installed from package: {nethermind_package_installed}
+Installed from Nethermind PPA: {installed_from_ppa}
+
+Do you want to skip installing the Nethermind binary?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        install_nethermind_binary = (result == 2)
+
+    if install_nethermind_binary:
+        # Install Nethermind from PPA
+        spc_package_installed = False
+        try:
+            spc_package_installed = is_package_installed('software-properties-common')
+        except Exception:
+            return False
+        
+        if not spc_package_installed:
+            subprocess.run([
+                'apt', '-y', 'update'])
+            subprocess.run([
+                'apt', '-y', 'install', 'software-properties-common'])
+
+        subprocess.run([
+            'add-apt-repository', '-y', 'ppa:nethermindeth/nethermind'])
+        subprocess.run([
+            'apt', '-y', 'update'])
+        subprocess.run([
+            'apt', '-y', 'install', 'nethermind'])
+        
+        # Get Nethermind version
+        try:
+            process_result = subprocess.run([
+                'nethermind', '--version'
+                ], capture_output=True, text=True)
+            nethermind_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'Version: (?P<version>[^-\+]+)', process_output)
+            if result:
+                nethermind_version = result.group('version').strip()
+        except FileNotFoundError:
+            pass
+    
+    # Check if Nethermind user or directory already exists
+    nethermind_datadir = Path('/var/lib/nethermind')
+    if nethermind_datadir.is_dir():
+        process_result = subprocess.run([
+            'du', '-sh', nethermind_datadir
+            ], capture_output=True, text=True)
+        
+        process_output = process_result.stdout
+        nethermind_datadir_size = process_output.split('\t')[0]
+
+        result = button_dialog(
+            title='Nethermind data directory found',
+            text=(
+f'''
+An existing Nethermind data directory has been found. Here are some
+details found:
+
+Location: {nethermind_datadir}
+Size: {nethermind_datadir_size}
+
+Do you want to remove this directory first and start from nothing?
+'''         ),
+            buttons=[
+                ('Remove', 1),
+                ('Keep', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            shutil.rmtree(nethermind_datadir)
+
+    nethermind_user_exists = False
+    process_result = subprocess.run([
+        'id', '-u', 'nethermind'
+    ])
+    nethermind_user_exists = (process_result.returncode == 0)
+
+    # Setup Nethermind user and directory
+    if not nethermind_user_exists:
+        subprocess.run([
+            'useradd', '--no-create-home', '--shell', '/bin/false', 'nethermind'])
+    subprocess.run([
+        'mkdir', '-p', nethermind_datadir])
+    subprocess.run([
+        'chown', '-R', 'nethermind:nethermind', nethermind_datadir])
+
+    addparams = []
+
+    # Check if merge ready
+    merge_ready = False
+
+    result = re.search(r'([^-]+)', nethermind_version)
+    if result:
+        cleaned_nethermind_version = parse_version(result.group(1).strip())
+        target_nethermind_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][EXECUTION_CLIENT_NETHERMIND])
+        
+        if cleaned_nethermind_version >= target_nethermind_version:
+            merge_ready = True
+    
+    if merge_ready:
+        if not setup_jwt_token_file():
+            log.error(
+f'''
+Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
+'''
+            )
+
+            return False
+
+        addparams.append(f'--JsonRpc.JwtSecretFile {LINUX_JWT_TOKEN_FILE_PATH}')
+    
+    # Setup Nethermind systemd service
+    if ports['eth1'] != DEFAULT_NETHERMIND_PORT:
+        addparams.append(f'--Network.P2PPort {ports["eth1"]}')
+        addparams.append(f'--Network.DiscoveryPort {ports["eth1"]}')
+    
+    addparams_string = ''
+    if len(addparams) > 0:
+        addparams_string = ' \\\n    ' + ' \\\n    '.join(addparams)
+
+    with open('/etc/systemd/system/' + nethermind_service_name, 'w') as service_file:
+        service_file.write(NETHERMIND_SERVICE_DEFINITION[network].format(addparams=addparams_string))
+    subprocess.run([
+        'systemctl', 'daemon-reload'])
+    subprocess.run([
+        'systemctl', 'start', nethermind_service_name])
+    subprocess.run([
+        'systemctl', 'enable', nethermind_service_name])
+    
+    # Wait a little before checking for Nethermind syncing since it can be slow to start
+    delay = 30
+    log.info(f'We are giving Nethermind {delay} seconds to start before testing it.')
+    time.sleep(delay)
+
+    # Verify proper Nethermind service installation
+    service_details = get_systemd_service_details(nethermind_service_name)
+
+    if not (
+        service_details['LoadState'] == 'loaded' and
+        service_details['ActiveState'] == 'active' and
+        service_details['SubState'] == 'running'
+    ):
+
+        result = button_dialog(
+            title='Nethermind service not running properly',
+            text=(
+f'''
+The Nethermind service we just created seems to have issues. Here are
+some details found:
+
+Description: {service_details['Description']}
+States - Load: {service_details['LoadState']}, Active: {service_details['ActiveState']}, Sub: {service_details['SubState']}
+UnitFilePreset: {service_details['UnitFilePreset']}
+ExecStart: {service_details['ExecStart']}
+ExecMainStartTimestamp: {service_details['ExecMainStartTimestamp']}
+FragmentPath: {service_details['FragmentPath']}
+
+We cannot proceed if the Nethermind service cannot be started properly.
+Make sure to check the logs and fix any issue found there. You can see
+the logs with:
+
+$ sudo journalctl -ru {nethermind_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your Nethermind service logs, type the following command:
+
+$ sudo journalctl -ru {nethermind_service_name}
+'''
+        )
+
+        return False
+
+    # Verify Nethermind JSON-RPC response
+    local_nethermind_jsonrpc_url = 'http://127.0.0.1:8545'
+    request_json = {
+        'jsonrpc': '2.0',
+        'method': 'web3_clientVersion',
+        'id': 67
+    }
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    try:
+        response = httpx.post(local_nethermind_jsonrpc_url, json=request_json, headers=headers)
+    except httpx.RequestError as exception:
+        result = button_dialog(
+            title='Cannot connect to Nethermind',
+            text=(
+f'''
+We could not connect to Nethermind HTTP-RPC server. Here are some details
+for this last test we tried to perform:
+
+URL: {local_nethermind_jsonrpc_url}
+Method: POST
+Headers: {headers}
+JSON payload: {json.dumps(request_json)}
+Exception: {exception}
+
+We cannot proceed if the Nethermind HTTP-RPC server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs with:
+
+$ sudo journalctl -ru {nethermind_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your Nethermind service logs, type the following command:
+
+$ sudo journalctl -ru {nethermind_service_name}
+'''
+        )
+
+        return False
+
+    if response.status_code != 200:
+        result = button_dialog(
+            title='Cannot connect to Nethermind',
+            text=(
+f'''
+We could not connect to Nethermind HTTP-RPC server. Here are some details
+for this last test we tried to perform:
+
+URL: {local_nethermind_jsonrpc_url}
+Method: POST
+Headers: {headers}
+JSON payload: {json.dumps(request_json)}
+Status code: {response.status_code}
+
+We cannot proceed if the Nethermind HTTP-RPC server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs with:
+
+$ sudo journalctl -ru {nethermind_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your Nethermind service logs, type the following command:
+
+$ sudo journalctl -ru {nethermind_service_name}
+'''
+        )
+
+        return False
+    
+    # Verify proper Nethermind syncing
+    def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
+        exe_is_working = False
+        exe_is_syncing = False
+        exe_has_few_peers = False
+        exe_connected_peers = 0
+        exe_starting_block = UNKNOWN_VALUE
+        exe_current_block = UNKNOWN_VALUE
+        exe_highest_block = UNKNOWN_VALUE
+
+        set_result({
+            'exe_is_working': exe_is_working,
+            'exe_is_syncing': exe_is_syncing,
+            'exe_starting_block': exe_starting_block,
+            'exe_current_block': exe_current_block,
+            'exe_highest_block': exe_highest_block,
+            'exe_connected_peers': exe_connected_peers
+        })
+
+        set_percentage(10)
+
+        journalctl_cursor = None
+
+        while True:
+
+            if get_exited():
+                return {
+                    'exe_is_working': exe_is_working,
+                    'exe_is_syncing': exe_is_syncing,
+                    'exe_starting_block': exe_starting_block,
+                    'exe_current_block': exe_current_block,
+                    'exe_highest_block': exe_highest_block,
+                    'exe_connected_peers': exe_connected_peers
+                }
+
+            # Output logs
+            command = []
+            first_display = True
+            if journalctl_cursor is None:
+                command = ['journalctl', '--no-pager', '--show-cursor', '-q', '-n', '25',
+                    '-o', 'cat', '-u', nethermind_service_name]
+            else:
+                command = ['journalctl', '--no-pager', '--show-cursor', '-q',
+                    '-o', 'cat', '--after-cursor=' + journalctl_cursor, '-u', nethermind_service_name]
+                first_display = False
+
+            process_result = subprocess.run(command, capture_output=True, text=True)
+
+            process_output = ''
+            if process_result.returncode == 0:
+                process_output = process_result.stdout
+            else:
+                log_text(f'Return code: {process_result.returncode} while calling journalctl.')
+
+            # Parse journalctl cursor and remove it from process_output
+            log_length = len(process_output)
+            if log_length > 0:
+                result = re.search(r'-- cursor: (?P<cursor>[^\n]+)', process_output)
+                if result:
+                    journalctl_cursor = result.group('cursor')
+                    process_output = (
+                        process_output[:result.start()] +
+                        process_output[result.end():])
+                    process_output = process_output.rstrip()
+            
+                    log_length = len(process_output)
+
+            if log_length > 0:
+                if not first_display and process_output[0] != '\n':
+                    process_output = '\n' + process_output
+                log_text(process_output)
+
+            time.sleep(1)
+            
+            local_nethermind_jsonrpc_url = 'http://127.0.0.1:8545'
+            request_json = {
+                'jsonrpc': '2.0',
+                'method': 'eth_syncing',
+                'id': 1
+            }
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            try:
+                response = httpx.post(local_nethermind_jsonrpc_url, json=request_json,
+                    headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Nethermind.')
+                continue
+
+            if response.status_code != 200:
+                log_text(
+                    f'Status code: {response.status_code} while querying Nethermind.')
+                continue
+        
+            response_json = response.json()
+            syncing_json = response_json
+
+            local_nethermind_jsonrpc_url = 'http://127.0.0.1:8545'
+            request_json = {
+                'jsonrpc': '2.0',
+                'method': 'net_peerCount',
+                'id': 1
+            }
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            try:
+                response = httpx.post(local_nethermind_jsonrpc_url, json=request_json,
+                    headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Nethermind.')
+                continue
+
+            if response.status_code != 200:
+                log_text(
+                    f'Status code: {response.status_code} while querying Nethermind.')
+                continue
+
+            response_json = response.json()
+            peer_count_json = response_json
+
+            exe_starting_block = UNKNOWN_VALUE
+            exe_current_block = UNKNOWN_VALUE
+            exe_highest_block = UNKNOWN_VALUE
+            if (
+                syncing_json and
+                'result' in syncing_json and
+                syncing_json['result']
+                ):
+                exe_is_syncing = True
+                if 'startingBlock' in syncing_json['result']:
+                    exe_starting_block = int(syncing_json['result']['startingBlock'], 16)
+                if 'currentBlock' in syncing_json['result']:
+                    exe_current_block = int(syncing_json['result']['currentBlock'], 16)
+                if 'highestBlock' in syncing_json['result']:
+                    exe_highest_block = int(syncing_json['result']['highestBlock'], 16)
+            else:
+                exe_is_syncing = False
+
+            exe_connected_peers = 0
+            if (
+                peer_count_json and
+                'result' in peer_count_json and
+                peer_count_json['result']
+                ):
+                exe_connected_peers = int(peer_count_json['result'], 16)
+            
+            exe_has_few_peers = exe_connected_peers >= EXE_MIN_FEW_PEERS
+
+            if exe_is_syncing or exe_has_few_peers:
+                set_percentage(100)
+            else:
+                set_percentage(10 +
+                    round(min(exe_connected_peers / EXE_MIN_FEW_PEERS, 1.0) * 90.0))
+
+            change_status((
+f'''
+Syncing: {exe_is_syncing} (Starting: {exe_starting_block}, Current: {exe_current_block}, Highest: {exe_highest_block})
+Connected Peers: {exe_connected_peers}
+'''         ).strip())
+
+            if exe_is_syncing or exe_has_few_peers:
+                exe_is_working = True
+                return {
+                    'exe_is_working': exe_is_working,
+                    'exe_is_syncing': exe_is_syncing,
+                    'exe_starting_block': exe_starting_block,
+                    'exe_current_block': exe_current_block,
+                    'exe_highest_block': exe_highest_block,
+                    'exe_connected_peers': exe_connected_peers
+                }
+            else:
+                set_result({
+                    'exe_is_working': exe_is_working,
+                    'exe_is_syncing': exe_is_syncing,
+                    'exe_starting_block': exe_starting_block,
+                    'exe_current_block': exe_current_block,
+                    'exe_highest_block': exe_highest_block,
+                    'exe_connected_peers': exe_connected_peers
+                })
+
+    result = progress_log_dialog(
+        title='Verifying proper Nethermind service installation',
+        text=(
+f'''
+We are waiting for Nethermind to sync or find enough peers to confirm that it is
+working properly.
+'''     ),
+        status_text=(
+'''
+Syncing: Unknown (Starting: Unknown, Current: Unknown, Highest: Unknown)
+Connected Peers: Unknown
+'''
+        ).strip(),
+        with_skip=True,
+        run_callback=verifying_callback
+    ).run()
+    
+    if not result:
+        log.warning('Nethermind verification was cancelled.')
+        return False
+
+    if result.get('skipping', False):
+        log.warning('Skipping Nethermind verification.')
+        return True
+
+    if not result['exe_is_working']:
+        # We could not get a proper result from Nethermind
+        result = button_dialog(
+            title='Nethermind verification interrupted',
+            text=(
+f'''
+We were interrupted before we could fully verify the Nethermind
+installation. Here are some results for the last tests we performed:
+
+Syncing: {result['exe_is_syncing']} (Starting: {result['exe_starting_block']}, Current: {result['exe_current_block']}, Highest: {result['exe_highest_block']})
+Connected Peers: {result['exe_connected_peers']}
+
+We cannot proceed if Nethermind is not installed properly. Make sure to
+check the logs and fix any issue found there. You can see the logs with:
+
+$ sudo journalctl -ru {nethermind_service_name}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your Nethermind service logs, type the following command:
+
+$ sudo journalctl -ru {nethermind_service_name}
+'''
+        )
+
+        return False
+    
+    log.info(
+f'''
+Nethermind is installed and working properly.
+
+Syncing: {result['exe_is_syncing']} (Starting: {result['exe_starting_block']}, Current: {result['exe_current_block']}, Highest: {result['exe_highest_block']})
+Connected Peers: {result['exe_connected_peers']}
+''' )
+    time.sleep(5)
+
+    return True
 
 def detect_merge_ready(network):
     is_merge_ready = True
