@@ -1976,3 +1976,11 @@ Which execution client would you like to use?
     ).run()
 
     return result
+
+def format_for_terminal(value: str):
+    # Format a string for a terminal width of 74 characters
+
+    if len(value) <= 74:
+        return value
+    
+    return re.sub(r'(?P<first>.{1,74})\s', r'\g<first>\n', value, 1)

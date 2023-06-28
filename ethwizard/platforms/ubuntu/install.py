@@ -38,7 +38,8 @@ from ethwizard.platforms.common import (
     show_whats_next,
     show_public_keys,
     Step,
-    test_context_variable
+    test_context_variable,
+    format_for_terminal
 )
 
 from ethwizard.platforms.ubuntu.common import (
@@ -2584,21 +2585,21 @@ $ sudo journalctl -ru {nethermind_service_name}
     
     # Verify proper Nethermind syncing
     def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
-        exe_is_working = False
-        exe_is_syncing = False
+        exe_is_healthy = False
         exe_has_few_peers = False
         exe_connected_peers = 0
         exe_starting_block = UNKNOWN_VALUE
         exe_current_block = UNKNOWN_VALUE
         exe_highest_block = UNKNOWN_VALUE
+        exe_health_description = UNKNOWN_VALUE
 
         set_result({
-            'exe_is_working': exe_is_working,
-            'exe_is_syncing': exe_is_syncing,
+            'exe_is_healthy': exe_is_healthy,
             'exe_starting_block': exe_starting_block,
             'exe_current_block': exe_current_block,
             'exe_highest_block': exe_highest_block,
-            'exe_connected_peers': exe_connected_peers
+            'exe_connected_peers': exe_connected_peers,
+            'exe_health_description': exe_health_description
         })
 
         set_percentage(10)
@@ -2609,12 +2610,12 @@ $ sudo journalctl -ru {nethermind_service_name}
 
             if get_exited():
                 return {
-                    'exe_is_working': exe_is_working,
-                    'exe_is_syncing': exe_is_syncing,
+                    'exe_is_healthy': exe_is_healthy,
                     'exe_starting_block': exe_starting_block,
                     'exe_current_block': exe_current_block,
                     'exe_highest_block': exe_highest_block,
-                    'exe_connected_peers': exe_connected_peers
+                    'exe_connected_peers': exe_connected_peers,
+                    'exe_health_description': exe_health_description
                 }
 
             # Output logs
@@ -2712,15 +2713,12 @@ $ sudo journalctl -ru {nethermind_service_name}
                 'result' in syncing_json and
                 syncing_json['result']
                 ):
-                exe_is_syncing = True
                 if 'startingBlock' in syncing_json['result']:
                     exe_starting_block = int(syncing_json['result']['startingBlock'], 16)
                 if 'currentBlock' in syncing_json['result']:
                     exe_current_block = int(syncing_json['result']['currentBlock'], 16)
                 if 'highestBlock' in syncing_json['result']:
                     exe_highest_block = int(syncing_json['result']['highestBlock'], 16)
-            else:
-                exe_is_syncing = False
 
             exe_connected_peers = 0
             if (
@@ -2732,48 +2730,80 @@ $ sudo journalctl -ru {nethermind_service_name}
             
             exe_has_few_peers = exe_connected_peers >= EXE_MIN_FEW_PEERS
 
-            if exe_is_syncing or exe_has_few_peers:
+            exe_is_healthy = False
+            exe_health_description = UNKNOWN_VALUE
+
+            # Query health endpoint
+
+            local_nethermind_health_url = 'http://127.0.0.1:8545/health'
+
+            try:
+                response = httpx.post(local_nethermind_health_url)
+                if response.status_code != 200:
+                    log_text(
+                        f'Status code: {response.status_code} while querying Nethermind Health.')
+                else:
+                    response_json = response.json()
+                    health_json = response_json
+
+                    if 'status' in health_json:
+                        exe_is_healthy = (health_json['status'] == 'Healthy')
+                    
+                    if ('entries' in health_json and
+                        'node-health' in health_json['entries'] and
+                        'description' in health_json['entries']['node-health']):
+                        exe_health_description = health_json['entries']['node-health']['description']
+
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Nethermind Health.')
+
+            if exe_is_healthy or exe_has_few_peers:
                 set_percentage(100)
             else:
                 set_percentage(10 +
                     round(min(exe_connected_peers / EXE_MIN_FEW_PEERS, 1.0) * 90.0))
 
-            change_status((
-f'''
-Syncing: {exe_is_syncing} (Starting: {exe_starting_block}, Current: {exe_current_block}, Highest: {exe_highest_block})
-Connected Peers: {exe_connected_peers}
-'''         ).strip())
+            formatted_description = (
+'''
+Healthy: Unknown
+Connected Peers: Unknown
+'''
+        ).strip()
 
-            if exe_is_syncing or exe_has_few_peers:
-                exe_is_working = True
+            if exe_health_description != UNKNOWN_VALUE:
+                formatted_description = format_for_terminal(exe_health_description)
+
+            change_status(formatted_description)
+
+            if exe_is_healthy or exe_has_few_peers:
                 return {
-                    'exe_is_working': exe_is_working,
-                    'exe_is_syncing': exe_is_syncing,
+                    'exe_is_healthy': exe_is_healthy,
                     'exe_starting_block': exe_starting_block,
                     'exe_current_block': exe_current_block,
                     'exe_highest_block': exe_highest_block,
-                    'exe_connected_peers': exe_connected_peers
+                    'exe_connected_peers': exe_connected_peers,
+                    'exe_health_description': exe_health_description
                 }
             else:
                 set_result({
-                    'exe_is_working': exe_is_working,
-                    'exe_is_syncing': exe_is_syncing,
+                    'exe_is_healthy': exe_is_healthy,
                     'exe_starting_block': exe_starting_block,
                     'exe_current_block': exe_current_block,
                     'exe_highest_block': exe_highest_block,
-                    'exe_connected_peers': exe_connected_peers
+                    'exe_connected_peers': exe_connected_peers,
+                    'exe_health_description': exe_health_description
                 })
 
     result = progress_log_dialog(
         title='Verifying proper Nethermind service installation',
         text=(
 f'''
-We are waiting for Nethermind to sync or find enough peers to confirm that it is
-working properly.
+We are waiting for Nethermind to become healthy or find enough peers to
+confirm that it is working properly.
 '''     ),
         status_text=(
 '''
-Syncing: Unknown (Starting: Unknown, Current: Unknown, Highest: Unknown)
+Healthy: Unknown
 Connected Peers: Unknown
 '''
         ).strip(),
@@ -2821,12 +2851,22 @@ $ sudo journalctl -ru {nethermind_service_name}
 
         return False
     
+    health_description = result['exe_health_description']
+    if health_description != UNKNOWN_VALUE:
+        health_description = format_for_terminal(health_description)
+    else:
+        health_description = (
+'''
+Healthy: Unknown
+Connected Peers: Unknown
+'''
+        ).strip()
+
     log.info(
 f'''
 Nethermind is installed and working properly.
 
-Syncing: {result['exe_is_syncing']} (Starting: {result['exe_starting_block']}, Current: {result['exe_current_block']}, Highest: {result['exe_highest_block']})
-Connected Peers: {result['exe_connected_peers']}
+{health_description}
 ''' )
     time.sleep(5)
 
