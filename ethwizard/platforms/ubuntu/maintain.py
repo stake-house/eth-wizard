@@ -373,9 +373,14 @@ def show_dashboard(context):
 
         maintenance_message = 'Some maintenance tasks are pending. Select maintain to perform them.'
 
-    ec_section = (f'<b>Geth</b> details (I: {execution_client_details["versions"]["installed"]}, '
+    ec_available_version_section = ''
+
+    if execution_client_details['versions'].get('available', UNKNOWN_VALUE) != UNKNOWN_VALUE:
+        ec_available_version_section = f'A: {execution_client_details["versions"]["available"]}, '
+
+    ec_section = (f'<b>{current_execution_client}</b> details (I: {execution_client_details["versions"]["installed"]}, '
         f'R: {execution_client_details["versions"]["running"]}, '
-        f'A: {execution_client_details["versions"]["available"]}, '
+        f'{ec_available_version_section}'
         f'L: {execution_client_details["versions"]["latest"]})\n'
         f'Service is running: {execution_client_details["service"]["running"]}\n'
         f'<b>Maintenance task</b>: {maintenance_tasks_description.get(execution_client_details["next_step"], UNKNOWN_VALUE)}')
