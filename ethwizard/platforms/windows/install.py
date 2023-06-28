@@ -3031,7 +3031,7 @@ To examine your Nimbus service logs, inspect the following files:
 
     while keep_retrying and retry_index < retry_count:
         try:
-            response = httpx.get(cc_query_url, headers=headers)
+            response = httpx.get(cc_query_url, headers=headers, timeout=30)
         except httpx.RequestError as exception:
             last_exception = exception
             
