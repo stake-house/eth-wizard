@@ -2819,7 +2819,20 @@ Connected Peers: Unknown
         log.warning('Skipping Nethermind verification.')
         return True
 
-    if not result['exe_is_working']:
+    health_description = result['exe_health_description']
+    if health_description != UNKNOWN_VALUE:
+        health_description = format_for_terminal(health_description)
+    else:
+        health_description = (
+f'''
+Healthy: Unknown
+Connected Peers: {result['exe_connected_peers']}
+'''
+        ).strip()
+
+    exe_has_few_peers = (result['exe_connected_peers'] >= EXE_MIN_FEW_PEERS)
+
+    if not result['exe_is_healthy'] and not exe_has_few_peers:
         # We could not get a proper result from Nethermind
         result = button_dialog(
             title='Nethermind verification interrupted',
@@ -2828,8 +2841,7 @@ f'''
 We were interrupted before we could fully verify the Nethermind
 installation. Here are some results for the last tests we performed:
 
-Syncing: {result['exe_is_syncing']} (Starting: {result['exe_starting_block']}, Current: {result['exe_current_block']}, Highest: {result['exe_highest_block']})
-Connected Peers: {result['exe_connected_peers']}
+{health_description}
 
 We cannot proceed if Nethermind is not installed properly. Make sure to
 check the logs and fix any issue found there. You can see the logs with:
@@ -2850,17 +2862,6 @@ $ sudo journalctl -ru {nethermind_service_name}
         )
 
         return False
-    
-    health_description = result['exe_health_description']
-    if health_description != UNKNOWN_VALUE:
-        health_description = format_for_terminal(health_description)
-    else:
-        health_description = (
-'''
-Healthy: Unknown
-Connected Peers: Unknown
-'''
-        ).strip()
 
     log.info(
 f'''
