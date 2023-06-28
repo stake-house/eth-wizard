@@ -5591,6 +5591,7 @@ def initiate_deposit(network, keys, consensus_client):
     # Check for syncing status before prompting for deposit
 
     service_name = UNKNOWN_VALUE
+    bn_timeout = 5.0
 
     if consensus_client == CONSENSUS_CLIENT_LIGHTHOUSE:
 
@@ -5648,6 +5649,8 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
         nimbus_service_name = NIMBUS_SYSTEMD_SERVICE_NAME
         service_name = nimbus_service_name
 
+        bn_timeout = 30
+
         service_details = get_systemd_service_details(nimbus_service_name)
 
         if not (
@@ -5700,7 +5703,7 @@ $ sudo journalctl -ru {nimbus_service_name}
         'accept': 'application/json'
     }
     try:
-        response = httpx.get(bn_query_url, headers=headers)
+        response = httpx.get(bn_query_url, headers=headers, timeout=bn_timeout)
     except httpx.RequestError as exception:
         result = button_dialog(
             title='Cannot connect to beacon node',
@@ -5855,7 +5858,7 @@ $ sudo journalctl -ru {service_name}
                     'accept': 'application/json'
                 }
                 try:
-                    response = httpx.get(bn_query_url, headers=headers)
+                    response = httpx.get(bn_query_url, headers=headers, timeout=bn_timeout)
                 except httpx.RequestError as exception:
                     log_text(f'Exception: {exception} while querying beacon node.')
                     continue
@@ -5875,7 +5878,7 @@ $ sudo journalctl -ru {service_name}
                     'accept': 'application/json'
                 }
                 try:
-                    response = httpx.get(bn_query_url, headers=headers)
+                    response = httpx.get(bn_query_url, headers=headers, timeout=bn_timeout)
                 except httpx.RequestError as exception:
                     log_text(f'Exception: {exception} while querying beacon node.')
                     continue

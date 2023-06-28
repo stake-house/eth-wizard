@@ -6731,6 +6731,8 @@ def initiate_deposit(base_directory, network, keys, consensus_client):
     stdout_log_path = UNKNOWN_VALUE
     stderr_log_path = UNKNOWN_VALUE
 
+    bn_timeout = 5.0
+
     if consensus_client == CONSENSUS_CLIENT_TEKU:
 
         local_bn_http_base = 'http://127.0.0.1:5051'
@@ -6799,6 +6801,8 @@ To examine your teku service logs, inspect the following files:
 
         stdout_log_path = nimbus_stdout_log_path
         stderr_log_path = nimbus_stderr_log_path
+
+        bn_timeout = 30
 
         # Check if Nimbus service is still running
         service_details = get_service_details(nssm_binary, nimbus_service_name)
@@ -6911,7 +6915,7 @@ To examine your teku service logs, inspect the following files:
         'accept': 'application/json'
     }
     try:
-        response = httpx.get(bn_query_url, headers=headers)
+        response = httpx.get(bn_query_url, headers=headers, timeout=bn_timeout)
     except httpx.RequestError as exception:
 
         result = button_dialog(
@@ -7048,7 +7052,7 @@ To examine your beacon node service logs, inspect the following files:
                     'accept': 'application/json'
                 }
                 try:
-                    response = httpx.get(bn_query_url, headers=headers)
+                    response = httpx.get(bn_query_url, headers=headers, timeout=bn_timeout)
                 except httpx.RequestError as exception:
                     log_text(f'Exception: {exception} while querying beacon node.')
                     continue
@@ -7066,7 +7070,7 @@ To examine your beacon node service logs, inspect the following files:
                     'accept': 'application/json'
                 }
                 try:
-                    response = httpx.get(bn_query_url, headers=headers)
+                    response = httpx.get(bn_query_url, headers=headers, timeout=bn_timeout)
                 except httpx.RequestError as exception:
                     log_text(f'Exception: {exception} while querying beacon node.')
                     continue
