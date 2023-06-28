@@ -1154,6 +1154,38 @@ def perform_maintenance(execution_client, execution_client_details, consensus_cl
 
         elif execution_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
             log.warning('TODO: Reinstalling client is to be implemented.')
+
+    elif execution_client == EXECUTION_CLIENT_NETHERMIND:
+        # Nethermind maintenance tasks
+
+        if execution_client_details['next_step'] == MAINTENANCE_RESTART_SERVICE:
+            log.info('Restarting Nethermind service...')
+
+            subprocess.run(['systemctl', 'restart', NETHERMIND_SYSTEMD_SERVICE_NAME])
+
+        elif execution_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT:
+            if not upgrade_nethermind():
+                log.error('We could not upgrade the Nethermind client.')
+                return False
+        
+        elif execution_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT_MERGE:
+            log.warning('Upgrading Nethermind client for merge is not implemented. This should '
+                'not be needed as Nethermind support was added after the merge.')
+            return False
+    
+        elif execution_client_details['next_step'] == MAINTENANCE_CONFIG_CLIENT_MERGE:
+            log.warning('Configuring Nethermind client for merge is not implemented. This should '
+                'not be needed as Nimbus support was added after the merge.')
+            return False
+
+        elif execution_client_details['next_step'] == MAINTENANCE_START_SERVICE:
+            log.info('Starting Nethermind service...')
+
+            subprocess.run(['systemctl', 'start', NETHERMIND_SYSTEMD_SERVICE_NAME])
+
+        elif execution_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
+            log.warning('TODO: Reinstalling client is to be implemented.')
+    
     else:
         log.error(f'Unknown execution client {execution_client}.')
         return False
@@ -1440,6 +1472,38 @@ def upgrade_geth():
 
     log.info('Restarting Geth service...')
     subprocess.run(['systemctl', 'restart', GETH_SYSTEMD_SERVICE_NAME])
+
+    return True
+
+def upgrade_nethermind():
+    # Upgrade the Nethermind client
+    log.info('Upgrading Nethermind client...')
+
+    # Add Nethermind PPA if not already added.
+    if not is_nethermind_ppa_added():
+        spc_package_installed = False
+        try:
+            spc_package_installed = is_package_installed('software-properties-common')
+        except Exception:
+            return False
+        
+        if not spc_package_installed:
+            subprocess.run([
+                'apt', '-y', 'update'])
+            subprocess.run([
+                'apt', '-y', 'install', 'software-properties-common'])
+
+        subprocess.run(['add-apt-repository', '-y', 'ppa:nethermindeth/nethermind'])
+    else:
+        subprocess.run(['apt', '-y', 'update'])
+
+    env = os.environ.copy()
+    env['DEBIAN_FRONTEND'] = 'noninteractive'
+
+    subprocess.run(['apt', '-y', 'install', 'nethermind'], env=env)
+
+    log.info('Restarting Nethermind service...')
+    subprocess.run(['systemctl', 'restart', NETHERMIND_SYSTEMD_SERVICE_NAME])
 
     return True
 
