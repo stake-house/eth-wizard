@@ -2764,9 +2764,9 @@ $ sudo journalctl -ru {nethermind_service_name}
                     round(min(exe_connected_peers / EXE_MIN_FEW_PEERS, 1.0) * 90.0))
 
             formatted_description = (
-'''
+f'''
 Healthy: Unknown
-Connected Peers: Unknown
+Connected Peers: {exe_connected_peers}
 '''
         ).strip()
 
