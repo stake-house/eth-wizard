@@ -3194,7 +3194,7 @@ To examine your Nimbus service logs, inspect the following files:
                 'accept': 'application/json'
             }
             try:
-                response = httpx.get(cc_query_url, headers=headers)
+                response = httpx.get(cc_query_url, headers=headers, timeout=30)
             except httpx.RequestError as exception:
                 log_text(f'Exception: {exception} while querying Nimbus.')
                 continue
@@ -3212,7 +3212,7 @@ To examine your Nimbus service logs, inspect the following files:
                 'accept': 'application/json'
             }
             try:
-                response = httpx.get(cc_query_url, headers=headers)
+                response = httpx.get(cc_query_url, headers=headers, timeout=30)
             except httpx.RequestError as exception:
                 log_text(f'Exception: {exception} while querying Nimbus.')
                 continue

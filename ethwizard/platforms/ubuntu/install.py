@@ -4347,7 +4347,7 @@ $ sudo journalctl -ru {nimbus_service_name}
                 'accept': 'application/json'
             }
             try:
-                response = httpx.get(bn_query_url, headers=headers)
+                response = httpx.get(bn_query_url, headers=headers, timeout=30)
             except httpx.RequestError as exception:
                 log_text(f'Exception: {exception} while querying Nimbus beacon node.')
                 continue
@@ -4367,7 +4367,7 @@ $ sudo journalctl -ru {nimbus_service_name}
                 'accept': 'application/json'
             }
             try:
-                response = httpx.get(bn_query_url, headers=headers)
+                response = httpx.get(bn_query_url, headers=headers, timeout=30)
             except httpx.RequestError as exception:
                 log_text(f'Exception: {exception} while querying Nimbus beacon node.')
                 continue
