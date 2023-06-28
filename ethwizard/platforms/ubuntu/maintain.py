@@ -805,12 +805,12 @@ def get_nethermind_available_version():
         return UNKNOWN_VALUE
     
     process_output = process_result.stdout
-    result = re.search(r'Candidate: (?P<version>[^\+]+)', process_output)
+    result = re.search(r'Candidate: (?P<version>[^\+\n]+)', process_output)
     if not result:
         log.error(f'Cannot parse {process_output} for Nethermind candidate version.')
         return UNKNOWN_VALUE
     
-    available_version = result.group('version')
+    available_version = result.group('version').strip()
 
     splitted_version = available_version.split('.')
 
