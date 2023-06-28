@@ -2,6 +2,7 @@ GITHUB_REST_API_URL = 'https://api.github.com'
 GITHUB_API_VERSION = 'application/vnd.github.v3+json'
 
 GETH_LATEST_RELEASE = '/repos/ethereum/go-ethereum/releases/latest'
+NETHERMIND_LATEST_RELEASE = '/repos/NethermindEth/nethermind/releases/latest'
 LIGHTHOUSE_LATEST_RELEASE = '/repos/sigp/lighthouse/releases/latest'
 NIMBUS_LATEST_RELEASE = '/repos/status-im/nimbus-eth2/releases/latest'
 MEVBOOST_LATEST_RELEASE = '/repos/flashbots/mev-boost/releases/latest'

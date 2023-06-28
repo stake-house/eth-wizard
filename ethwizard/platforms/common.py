@@ -1575,6 +1575,91 @@ def get_geth_latest_version(log):
 
     return latest_version
 
+def get_nethermind_running_version(log):
+    # Get the running version for Nethermind
+
+    log.info('Getting Nethermind running version...')
+
+    local_nethermind_jsonrpc_url = 'http://127.0.0.1:8545'
+    request_json = {
+        'jsonrpc': '2.0',
+        'method': 'web3_clientVersion',
+        'id': 67
+    }
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    try:
+        response = httpx.post(local_nethermind_jsonrpc_url, json=request_json, headers=headers,
+            timeout=30)
+    except httpx.RequestError as exception:
+        log.error(f'Cannot connect to Geth. Exception: {exception}')
+        return UNKNOWN_VALUE
+
+    if response.status_code != 200:
+        log.error(f'Unexpected status code from {local_nethermind_jsonrpc_url}. Status code: '
+            f'{response.status_code}')
+        return UNKNOWN_VALUE
+    
+    response_json = response.json()
+
+    if 'result' not in response_json:
+        log.error(f'Unexpected JSON response from {local_nethermind_jsonrpc_url}. result not found.')
+        return UNKNOWN_VALUE
+    
+    version_agent = response_json['result']
+
+    # Version agent should look like: Nethermind/v1.19.3+e8ac1da4/linux-x64/dotnet7.0.8
+    result = re.search(r'Nethermind/v(?P<version>[^-/\+]+)(\+(?P<commit>[^-/]+))?',
+        version_agent)
+    if not result:
+        log.error(f'Cannot parse {version_agent} for Nethermind version.')
+        return UNKNOWN_VALUE
+
+    running_version = result.group('version')
+
+    log.info(f'Nethermind running version is {running_version}')
+
+    return running_version
+
+def get_nethermind_latest_version(log):
+    # Get the latest stable version for Nethermind, potentially not available yet for update
+
+    log.info('Getting Nethermind latest version...')
+
+    nethermind_gh_release_url = GITHUB_REST_API_URL + NETHERMIND_LATEST_RELEASE
+    headers = {'Accept': GITHUB_API_VERSION}
+    try:
+        response = httpx.get(nethermind_gh_release_url, headers=headers,
+            follow_redirects=True)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while getting the latest stable version for Nethermind. {exception}')
+        return UNKNOWN_VALUE
+
+    if response.status_code != 200:
+        log.error(f'HTTP error while getting the latest stable version for Nethermind. '
+            f'Status code {response.status_code}')
+        return UNKNOWN_VALUE
+    
+    release_json = response.json()
+
+    if 'tag_name' not in release_json or not isinstance(release_json['tag_name'], str):
+        log.error(f'Unable to find tag name in Github response while getting the latest stable '
+            f'version for Nethermind.')
+        return UNKNOWN_VALUE
+    
+    tag_name = release_json['tag_name']
+    result = re.search(r'v?(?P<version>.+)', tag_name)
+    if not result:
+        log.error(f'Cannot parse tag name {tag_name} for Nethermind version.')
+        return UNKNOWN_VALUE
+    
+    latest_version = result.group('version')
+
+    log.info(f'Nethermind latest version is {latest_version}')
+
+    return latest_version
+
 def get_lighthouse_latest_version(log):
     # Get the latest version for Lighthouse
 

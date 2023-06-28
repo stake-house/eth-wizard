@@ -211,3 +211,31 @@ def is_ethereum_ppa_added():
                 return True
                 
     return False
+
+def is_nethermind_ppa_added():
+    # Check if the Nethermind PPA has been added
+
+    sources_content = ''
+    with open('/etc/apt/sources.list', 'r') as sources_file:
+        sources_content = sources_file.read()
+
+    result = re.search(r'^deb\s+https?\://ppa\.launchpad(content)?\.net/nethermindeth/nethermind/ubuntu',
+        sources_content, re.MULTILINE)
+    if result:
+        return True
+    
+    with os.scandir('/etc/apt/sources.list.d/') as it:
+        for entry in it:
+            if entry.name.startswith('.') or not entry.is_file():
+                continue
+
+            sources_content = ''
+            with open(entry.path, 'r') as sources_file:
+                sources_content = sources_file.read()
+            
+            result = re.search(r'^deb\s+https?\://ppa\.launchpad(content)?\.net/nethermindeth/nethermind/ubuntu',
+                sources_content, re.MULTILINE)
+            if result:
+                return True
+                
+    return False

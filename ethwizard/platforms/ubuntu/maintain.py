@@ -17,6 +17,8 @@ from ethwizard.platforms.common import (
     select_fee_recipient_address,
     get_geth_running_version,
     get_geth_latest_version,
+    get_nethermind_running_version,
+    get_nethermind_latest_version,
     get_mevboost_latest_version,
     get_nimbus_latest_version,
     get_lighthouse_latest_version
@@ -25,12 +27,12 @@ from ethwizard.platforms.common import (
 from ethwizard.platforms.ubuntu.common import (
     log,
     save_state,
-    quit_app,
     get_systemd_service_details,
     is_package_installed,
     is_adx_supported,
     setup_jwt_token_file,
-    is_ethereum_ppa_added
+    is_ethereum_ppa_added,
+    is_nethermind_ppa_added
 )
 
 from ethwizard.constants import (
@@ -40,6 +42,7 @@ from ethwizard.constants import (
     CTX_MEVBOOST_INSTALLED,
     NETWORK_GOERLI,
     EXECUTION_CLIENT_GETH,
+    EXECUTION_CLIENT_NETHERMIND,
     CONSENSUS_CLIENT_LIGHTHOUSE,
     CONSENSUS_CLIENT_NIMBUS,
     WIZARD_COMPLETED_STEP_ID,
@@ -50,6 +53,7 @@ from ethwizard.constants import (
     MEVBOOST_LATEST_RELEASE,
     MEVBOOST_INSTALLED_DIRECTORY,
     GETH_SYSTEMD_SERVICE_NAME,
+    NETHERMIND_SYSTEMD_SERVICE_NAME,
     MIN_CLIENT_VERSION_FOR_MERGE,
     LINUX_JWT_TOKEN_FILE_PATH,
     MAINTENANCE_DO_NOTHING,
@@ -122,7 +126,7 @@ def show_dashboard(context):
     running_version = execution_client_details['versions']['running']
     if running_version != UNKNOWN_VALUE:
         running_version = parse_version(running_version)
-    available_version = execution_client_details['versions']['available']
+    available_version = execution_client_details['versions'].get('available', UNKNOWN_VALUE)
     if available_version != UNKNOWN_VALUE:
         available_version = parse_version(available_version)
     latest_version = execution_client_details['versions']['latest']
@@ -612,6 +616,65 @@ def get_execution_client_details(execution_client):
                 details['is_merge_configured'] = False
 
         return details
+    
+    elif execution_client == EXECUTION_CLIENT_NETHERMIND:
+
+        details = {
+            'service': {
+                'found': False,
+                'load': UNKNOWN_VALUE,
+                'active': UNKNOWN_VALUE,
+                'sub': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE
+            },
+            'versions': {
+                'installed': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE,
+                'available': UNKNOWN_VALUE,
+                'latest': UNKNOWN_VALUE
+            },
+            'exec': {
+                'path': UNKNOWN_VALUE,
+                'argv': []
+            },
+            'is_merge_configured': UNKNOWN_VALUE
+        }
+        
+        # Check for existing systemd service
+        nethermind_service_exists = False
+        nethermind_service_name = NETHERMIND_SYSTEMD_SERVICE_NAME
+
+        service_details = get_systemd_service_details(nethermind_service_name)
+
+        if service_details['LoadState'] == 'loaded':
+            nethermind_service_exists = True
+        
+        if not nethermind_service_exists:
+            return details
+        
+        details['service']['found'] = True
+        details['service']['load'] = service_details['LoadState']
+        details['service']['active'] = service_details['ActiveState']
+        details['service']['sub'] = service_details['SubState']
+        details['service']['running'] = is_service_running(service_details)
+
+        details['versions']['installed'] = get_nethermind_installed_version()
+        details['versions']['running'] = get_nethermind_running_version(log)
+        details['versions']['available'] = get_nethermind_available_version()
+        details['versions']['latest'] = get_nethermind_latest_version(log)
+
+        if 'ExecStart' in service_details:
+            details['exec'] = parse_exec_start(service_details['ExecStart'])
+
+            for arg in details['exec']['argv']:
+                if arg.lower().startswith('--jsonrpc.jwtsecretfile'):
+                    details['is_merge_configured'] = True
+                    break
+            
+            if details['is_merge_configured'] == UNKNOWN_VALUE:
+                details['is_merge_configured'] = False
+
+        return details
 
     else:
         log.error(f'Unknown execution client {execution_client}.')
@@ -682,6 +745,82 @@ def get_geth_available_version():
     available_version = result.group('version')
 
     log.info(f'Geth available version is {available_version}')
+
+    return available_version
+
+def get_nethermind_installed_version():
+    # Get the installed version for Nethermind
+
+    log.info('Getting Nethermind installed version...')
+
+    process_result = subprocess.run(['nethermind', '--version'], capture_output=True,
+        text=True)
+    
+    if process_result.returncode != 0:
+        log.error(f'Unexpected return code from Nethermind. Return code: '
+            f'{process_result.returncode}')
+        return UNKNOWN_VALUE
+    
+    process_output = process_result.stdout
+    result = re.search(r'Version: (?P<version>[^-\+]+)', process_output)
+    if not result:
+        log.error(f'Cannot parse {process_output} for Nethermind installed version.')
+        return UNKNOWN_VALUE
+    
+    installed_version = result.group('version')
+
+    log.info(f'Nethermind installed version is {installed_version}')
+
+    return installed_version
+
+def get_nethermind_available_version():
+    # Get the available version for Nethermind, potentially for update
+
+    log.info('Getting Nethermind available version...')
+
+    # Add Nethermind PPA if not already added.
+    if not is_nethermind_ppa_added():
+        spc_package_installed = False
+        try:
+            spc_package_installed = is_package_installed('software-properties-common')
+        except Exception:
+            return False
+        
+        if not spc_package_installed:
+            subprocess.run([
+                'apt', '-y', 'update'])
+            subprocess.run([
+                'apt', '-y', 'install', 'software-properties-common'])
+
+        subprocess.run(['add-apt-repository', '-y', 'ppa:nethermindeth/nethermind'])
+    else:
+        subprocess.run(['apt', '-y', 'update'])
+    
+    process_result = subprocess.run(['apt-cache', 'policy', 'nethermind'], capture_output=True,
+        text=True)
+    
+    if process_result.returncode != 0:
+        log.error(f'Unexpected return code from apt-cache. Return code: '
+            f'{process_result.returncode}')
+        return UNKNOWN_VALUE
+    
+    process_output = process_result.stdout
+    result = re.search(r'Candidate: (?P<version>[^\+]+)', process_output)
+    if not result:
+        log.error(f'Cannot parse {process_output} for Nethermind candidate version.')
+        return UNKNOWN_VALUE
+    
+    available_version = result.group('version')
+
+    splitted_version = available_version.split('.')
+
+    if len(splitted_version) <= 2:
+        # Fix PPA wrong version format scheme (We are getting 1.1930 instead of 1.19.3)
+        if len(splitted_version) > 1:
+            if len(splitted_version[1]) > 2:
+                available_version = f'{splitted_version[0]}.{splitted_version[1][:2]}.{splitted_version[1][2]}'
+
+    log.info(f'Nethermind available version is {available_version}')
 
     return available_version
 
