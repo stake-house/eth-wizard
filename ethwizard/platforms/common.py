@@ -1593,7 +1593,7 @@ def get_nethermind_running_version(log):
         response = httpx.post(local_nethermind_jsonrpc_url, json=request_json, headers=headers,
             timeout=30)
     except httpx.RequestError as exception:
-        log.error(f'Cannot connect to Geth. Exception: {exception}')
+        log.error(f'Cannot connect to Nethermind. Exception: {exception}')
         return UNKNOWN_VALUE
 
     if response.status_code != 200:
