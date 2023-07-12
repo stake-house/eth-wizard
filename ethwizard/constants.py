@@ -92,6 +92,11 @@ SUPPORTED_LINUX_EXECUTION_CLIENTS = [
   EXECUTION_CLIENT_NETHERMIND
 ]
 
+SUPPORTED_WINDOWS_EXECUTION_CLIENTS = [
+  EXECUTION_CLIENT_GETH,
+  EXECUTION_CLIENT_NETHERMIND
+]
+
 SUPPORTED_LINUX_CONSENSUS_CLIENTS = [
   CONSENSUS_CLIENT_LIGHTHOUSE,
   CONSENSUS_CLIENT_NIMBUS
@@ -247,6 +252,11 @@ GETH_SERVICE_DISPLAY_NAME = {
     NETWORK_GOERLI: 'Go Ethereum Client - Geth (Görli)'
 }
 
+NETHERMIND_SERVICE_DISPLAY_NAME = {
+    NETWORK_MAINNET: 'Nethermind Ethereum Client (Mainnet)',
+    NETWORK_GOERLI: 'Nethermind Ethereum Client (Görli)'
+}
+
 GNUPG_DOWNLOAD_URL = 'https://www.gnupg.org/download/'
 
 GETH_STORE_BUILDS_URL = 'https://gethstore.blob.core.windows.net/builds'
@@ -265,6 +275,13 @@ GETH_ARGUMENTS = {
 }
 
 GETH_SYSTEMD_SERVICE_NAME = 'geth.service'
+
+NETHERMIND_ARGUMENTS = {
+    NETWORK_MAINNET: ['--config', 'mainnet', '--Metrics.Enabled', 'true', '--Metrics.ExposePort',
+      '6061', '--Sync.SnapSync', 'true', '--HealthChecks.Enabled', 'true', '--JsonRpc.Enabled', 'true'],
+    NETWORK_GOERLI: ['--config', 'goerli', '--Metrics.Enabled', 'true', '--Metrics.ExposePort',
+      '6061', '--Sync.SnapSync', 'true', '--HealthChecks.Enabled', 'true', '--JsonRpc.Enabled', 'true']
+}
 
 NETHERMIND_SYSTEMD_SERVICE_NAME = 'nethermind.service'
 

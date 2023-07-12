@@ -46,6 +46,7 @@ from ethwizard.platforms.common import (
     progress_log_dialog,
     search_for_generated_keys,
     select_consensus_client,
+    select_execution_client,
     select_keys_directory,
     select_fee_recipient_address,
     select_withdrawal_address,
@@ -54,7 +55,8 @@ from ethwizard.platforms.common import (
     show_whats_next,
     show_public_keys,
     Step,
-    test_context_variable
+    test_context_variable,
+    format_for_terminal
 )
 
 from ethwizard.platforms.windows.common import (
@@ -124,18 +126,21 @@ def installation_steps(*args, **kwargs):
         # Context variables
         selected_ports = CTX_SELECTED_PORTS
         selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
+        selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
 
         if not (
-            test_context_variable(context, selected_consensus_client, log)
+            test_context_variable(context, selected_consensus_client, log) and
+            test_context_variable(context, selected_execution_client, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
         
         consensus_client = context[selected_consensus_client]
+        execution_client = context[selected_execution_client]
 
         if selected_ports not in context:
             context[selected_ports] = {
-                'eth1': DEFAULT_GETH_PORT,
+                'eth1': DEFAULT_EXECUTION_PORT[execution_client],
                 'eth2_bn': DEFAULT_CONSENSUS_PORT[consensus_client]
             }
         
@@ -205,7 +210,7 @@ def installation_steps(*args, **kwargs):
         exc_function=install_nssm_function
     )
 
-    def install_geth_function(step, context, step_sequence):
+    def install_execution_function(step, context, step_sequence):
         # Context variables
         selected_directory = CTX_SELECTED_DIRECTORY
         selected_network = CTX_SELECTED_NETWORK
@@ -216,25 +221,36 @@ def installation_steps(*args, **kwargs):
         if not (
             test_context_variable(context, selected_directory, log) and
             test_context_variable(context, selected_network, log) and
-            test_context_variable(context, selected_ports, log)
+            test_context_variable(context, selected_ports, log) and
+            test_context_variable(context, selected_execution_client, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
 
-        if not install_geth(context[selected_directory], context[selected_network],
-            context[selected_ports]):
-            # User asked to quit or error
-            quit_app()
+        execution_client = context[selected_execution_client]
 
-        context[selected_execution_client] = EXECUTION_CLIENT_GETH
-        context[execution_improved_service_timeout] = True
+        if execution_client == EXECUTION_CLIENT_GETH:
 
+            if not install_geth(context[selected_directory], context[selected_network],
+                context[selected_ports]):
+                # User asked to quit or error
+                quit_app()
+            
+            context[execution_improved_service_timeout] = True
+        
+        elif execution_client == EXECUTION_CLIENT_NETHERMIND:
+        
+            if not install_nethermind(context[selected_directory], context[selected_network],
+                context[selected_ports]):
+                # User asked to quit or error
+                quit_app()
+        
         return context
     
-    install_geth_step = Step(
-        step_id=INSTALL_GETH_STEP_ID,
-        display_name='Geth installation',
-        exc_function=install_geth_function
+    install_execution_step = Step(
+        step_id=INSTALL_EXECUTION_STEP_ID,
+        display_name='Execution client installation',
+        exc_function=install_execution_function
     )
 
     def install_mevboost_function(step, context, step_sequence):
@@ -721,10 +737,30 @@ def installation_steps(*args, **kwargs):
         exc_function=install_validator_function
     )
 
+    def select_execution_client_function(step, context, step_sequence):
+        # Context variables
+        selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
+
+        execution_client = select_execution_client(SUPPORTED_WINDOWS_EXECUTION_CLIENTS)
+
+        if not execution_client:
+            quit_app()
+        
+        context[selected_execution_client] = execution_client
+
+        return context
+    
+    select_execution_client_step = Step(
+        step_id=SELECT_EXECUTION_CLIENT_STEP_ID,
+        display_name='Select execution client',
+        exc_function=select_execution_client_function
+    )
+
     return [
         select_directory_step,
         select_network_step,
         select_consensus_client_step,
+        select_execution_client_step,
         install_chocolatey_step,
         install_nssm_step,
         install_mevboost_step,
@@ -734,7 +770,7 @@ def installation_steps(*args, **kwargs):
         select_consensus_checkpoint_url_step,
         select_eth1_fallbacks_step,
         install_consensus_step,
-        install_geth_step,
+        install_execution_step,
         test_open_ports_step,
         obtain_keys_step,
         select_fee_recipient_address_step,
@@ -2190,6 +2226,692 @@ Geth is installed and working properly.
 
 Syncing: {result['exe_is_syncing']} (Starting: {result['exe_starting_block']}, Current: {result['exe_current_block']}, Highest: {result['exe_highest_block']})
 Connected Peers: {result['exe_connected_peers']}
+''' )
+    time.sleep(5)
+
+    return True
+
+def install_nethermind(base_directory, network, ports):
+    # Install Nethermind for the selected network
+
+    base_directory = Path(base_directory)
+
+    nssm_binary = get_nssm_binary()
+    if not nssm_binary:
+        return False
+
+    # Check for existing service
+    nethermind_service_exists = False
+    nethermind_service_name = 'nethermind'
+
+    service_details = get_service_details(nssm_binary, nethermind_service_name)
+
+    if service_details is not None:
+        nethermind_service_exists = True
+
+    if nethermind_service_exists:
+        result = button_dialog(
+            title='Nethermind service found',
+            text=(
+f'''
+The Nethermind service seems to have already been created. Here are some
+details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+Do you want to skip installing Nethermind and its service?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+
+        if result == 1:
+            return True
+        
+        # User wants to proceed, make sure the Nethermind service is stopped first
+        subprocess.run([
+            str(nssm_binary), 'stop', nethermind_service_name])
+
+    result = button_dialog(
+        title='Nethermind installation',
+        text=(
+'''
+This next step will install Nethermind, an Ethereum execution client.
+
+It will install it using the Windows Package Manager.
+
+Once the installation is completed, it will create a system service that
+will automatically start Nethermind on reboot or if it crashes.
+Nethermind will be started and you will slowly start syncing with the
+Ethereum network. This syncing process can take a few hours or days even
+with good hardware and good internet. We will perform a few tests to make
+sure Nethermind is running properly.
+'''     ),
+        buttons=[
+            ('Install', True),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if not result:
+        return result
+
+    # Check if Nethermind is already installed
+    nethermind_dir = base_directory.joinpath('bin', 'Nethermind')
+    nethermind_path = nethermind_dir.joinpath('Nethermind.Runner.exe')
+
+    nethermind_found = False
+    nethermind_version = 'unknown'
+
+    if nethermind_path.is_file():
+        try:
+            process_result = subprocess.run([
+                str(nethermind_path), '--version'
+                ], capture_output=True, text=True, encoding='utf8')
+            nethermind_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'Version: (?P<version>[^-\+]+)', process_output)
+            if result:
+                nethermind_version = result.group('version').strip()
+
+        except FileNotFoundError:
+            pass
+    
+    install_nethermind_binary = True
+
+    if nethermind_found:
+        result = button_dialog(
+            title='Nethermind binary found',
+            text=(
+f'''
+The Nethermind binary seems to have already been installed. Here are some
+details found:
+
+Version: {nethermind_version}
+Location: {nethermind_path}
+
+Do you want to skip installing the Nethermind binary?
+'''         ),
+            buttons=[
+                ('Skip', 1),
+                ('Install', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        install_nethermind_binary = (result == 2)
+
+    if install_nethermind_binary:
+        # Install Nethermind using winget
+
+        base_options = ['--disable-interactivity', '--accept-source-agreements',
+            '--accept-package-agreements']
+
+        uninstall_options = ['--disable-interactivity', '--accept-source-agreements']
+
+        try:
+            # Install prerequisites
+            command = ['winget', 'install', 'Microsoft.VCRedist.2015+.x64'] + base_options
+            subprocess.run(command)
+
+            # Install Nethermind
+            command = ['winget', 'uninstall', 'nethermind'] + uninstall_options
+            subprocess.run(command)
+
+            nethermind_dir.mkdir(parents=True, exist_ok=True)
+            command = ['winget', 'install', 'nethermind', '-l', str(nethermind_dir)] + base_options
+
+            process_result = subprocess.run(command)
+            if process_result.returncode != 0:
+                log.error(f'Unexpected return code from winget when installing prerequisites. '
+                    f'Return code {process_result.returncode}')
+                return False
+
+        except FileNotFoundError:
+            log.error('winget not found. Aborting.')
+            return False
+
+        # Get Nethermind version
+        nethermind_found = False
+        nethermind_version = 'unknown'
+
+        try:
+            process_result = subprocess.run([
+                str(nethermind_path), '--version'
+                ], capture_output=True, text=True, encoding='utf8')
+            nethermind_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'Version: (?P<version>[^-\+]+)', process_output)
+            if result:
+                nethermind_version = result.group('version').strip()
+
+        except FileNotFoundError:
+            pass
+    
+    # Check if Nethermind directory already exists
+    nethermind_datadir = base_directory.joinpath('var', 'lib', 'nethermind')
+    if nethermind_datadir.is_dir():
+        nethermind_datadir_size = sizeof_fmt(get_dir_size(nethermind_datadir))
+
+        result = button_dialog(
+            title='Nethermind data directory found',
+            text=(
+f'''
+An existing Nethermind data directory has been found. Here are some
+details found:
+
+Location: {nethermind_datadir}
+Size: {nethermind_datadir_size}
+
+Do you want to remove this directory first and start from nothing?
+'''         ),
+            buttons=[
+                ('Remove', 1),
+                ('Keep', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            shutil.rmtree(nethermind_datadir)
+
+    # Setup Nethermind directory
+    nethermind_datadir.mkdir(parents=True, exist_ok=True)
+    
+    # Setup Nethermind service
+    log_path = base_directory.joinpath('var', 'log')
+    log_path.mkdir(parents=True, exist_ok=True)
+
+    nethermind_stdout_log_path = log_path.joinpath('nethermind-service-stdout.log')
+    nethermind_stderr_log_path = log_path.joinpath('nethermind-service-stderr.log')
+
+    if nethermind_stdout_log_path.is_file():
+        nethermind_stdout_log_path.unlink()
+    if nethermind_stderr_log_path.is_file():
+        nethermind_stderr_log_path.unlink()
+
+    nethermind_arguments = NETHERMIND_ARGUMENTS[network]
+    nethermind_arguments.append('--datadir')
+    nethermind_arguments.append(f'"{nethermind_datadir}"')
+    if ports['eth1'] != DEFAULT_NETHERMIND_PORT:
+        nethermind_arguments.append('--Network.P2PPort')
+        nethermind_arguments.append(f'{ports["eth1"]}')
+        nethermind_arguments.append('--Network.DiscoveryPort')
+        nethermind_arguments.append(f'{ports["eth1"]}')
+    
+    # Check if merge ready
+    merge_ready = False
+
+    result = re.search(r'([^-]+)', nethermind_version)
+    if result:
+        cleaned_nethermind_version = parse_version(result.group(1).strip())
+        target_nethermind_version = parse_version(
+            MIN_CLIENT_VERSION_FOR_MERGE[network][EXECUTION_CLIENT_NETHERMIND])
+        
+        if cleaned_nethermind_version >= target_nethermind_version:
+            merge_ready = True
+    
+    if merge_ready:
+        jwt_token_dir = base_directory.joinpath('var', 'lib', 'ethereum')
+        jwt_token_path = jwt_token_dir.joinpath('jwttoken')
+
+        if not setup_jwt_token_file(base_directory):
+            log.error(
+f'''
+Unable to create JWT token file in {jwt_token_path}
+'''
+            )
+
+            return False
+    
+        nethermind_arguments.append('--JsonRpc.JwtSecretFile')
+        nethermind_arguments.append(f'"{jwt_token_path}"')
+
+    parameters = {
+        'DisplayName': NETHERMIND_SERVICE_DISPLAY_NAME[network],
+        'AppRotateFiles': '1',
+        'AppRotateSeconds': '86400',
+        'AppRotateBytes': '10485760',
+        'AppStdout': str(nethermind_stdout_log_path),
+        'AppStderr': str(nethermind_stderr_log_path)
+    }
+
+    if not create_service(nssm_binary, nethermind_service_name, nethermind_path,
+        nethermind_arguments, parameters):
+        log.error('There was an issue creating the Nethermind service. We cannot continue.')
+        return False
+    
+    log.info('Starting Nethermind service...')
+    process_result = subprocess.run([
+        str(nssm_binary), 'start', nethermind_service_name
+    ])
+
+    # Wait a little before checking for Nethermind syncing since it can be slow to start
+    delay = 30
+    log.info(f'We are giving Nethermind {delay} seconds to start before testing it.')
+    time.sleep(delay)
+    
+    # Verify proper Nethermind service installation
+    service_details = get_service_details(nssm_binary, nethermind_service_name)
+    if not service_details:
+        log.error('We could not find the Nethermind service we just created. We cannot continue.')
+        return False
+
+    if not (
+        service_details['status'] == WINDOWS_SERVICE_RUNNING):
+
+        result = button_dialog(
+            title='Nethermind service not running properly',
+            text=(
+f'''
+The Nethermind service we just created seems to have issues. Here are
+some details found:
+
+Display name: {service_details['parameters'].get('DisplayName')}
+Status: {service_details['status']}
+Binary: {service_details['install']}
+App parameters: {service_details['parameters'].get('AppParameters')}
+App directory: {service_details['parameters'].get('AppDirectory')}
+
+We cannot proceed if the Nethermind service cannot be started properly.
+Make sure to check the logs and fix any issue found there. You can see
+the logs in:
+
+{nethermind_stdout_log_path}
+{nethermind_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your Nethermind service logs, inspect the following file:
+
+{nethermind_stdout_log_path}
+{nethermind_stderr_log_path}
+'''
+        )
+
+        return False
+
+    # Verify Nethermind JSON-RPC response
+    local_nethermind_jsonrpc_url = 'http://127.0.0.1:8545'
+    request_json = {
+        'jsonrpc': '2.0',
+        'method': 'web3_clientVersion',
+        'id': 67
+    }
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    try:
+        response = httpx.post(local_nethermind_jsonrpc_url, json=request_json, headers=headers)
+    except httpx.RequestError as exception:
+        result = button_dialog(
+            title='Cannot connect to Nethermind',
+            text=(
+f'''
+We could not connect to Nethermind HTTP-RPC server. Here are some details
+for this last test we tried to perform:
+
+URL: {local_nethermind_jsonrpc_url}
+Method: POST
+Headers: {headers}
+JSON payload: {json.dumps(request_json)}
+Exception: {exception}
+
+We cannot proceed if the Nethermind HTTP-RPC server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in:
+
+{nethermind_stdout_log_path}
+{nethermind_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your Nethermind service logs, inspect the following file:
+
+{nethermind_stdout_log_path}
+{nethermind_stderr_log_path}
+'''
+        )
+
+        return False
+
+    if response.status_code != 200:
+        result = button_dialog(
+            title='Cannot connect to Nethermind',
+            text=(
+f'''
+We could not connect to Nethermind HTTP-RPC server. Here are some details
+for this last test we tried to perform:
+
+URL: {local_nethermind_jsonrpc_url}
+Method: POST
+Headers: {headers}
+JSON payload: {json.dumps(request_json)}
+Status code: {response.status_code}
+
+We cannot proceed if the Nethermind HTTP-RPC server is not responding
+properly. Make sure to check the logs and fix any issue found there. You
+can see the logs in:
+
+{nethermind_stdout_log_path}
+{nethermind_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your Nethermind service logs, inspect the following file:
+
+{nethermind_stdout_log_path}
+{nethermind_stderr_log_path}
+'''
+        )
+
+        return False
+    
+    # Verify proper Nethermind syncing
+    def verifying_callback(set_percentage, log_text, change_status, set_result, get_exited):
+        exe_is_healthy = False
+        exe_has_few_peers = False
+        exe_connected_peers = 0
+        exe_starting_block = UNKNOWN_VALUE
+        exe_current_block = UNKNOWN_VALUE
+        exe_highest_block = UNKNOWN_VALUE
+        exe_health_description = UNKNOWN_VALUE
+
+        set_result({
+            'exe_is_healthy': exe_is_healthy,
+            'exe_starting_block': exe_starting_block,
+            'exe_current_block': exe_current_block,
+            'exe_highest_block': exe_highest_block,
+            'exe_connected_peers': exe_connected_peers,
+            'exe_health_description': exe_health_description
+        })
+
+        set_percentage(10)
+
+        out_log_read_index = 0
+        err_log_read_index = 0
+
+        while True:
+
+            if get_exited():
+                return {
+                    'exe_is_healthy': exe_is_healthy,
+                    'exe_starting_block': exe_starting_block,
+                    'exe_current_block': exe_current_block,
+                    'exe_highest_block': exe_highest_block,
+                    'exe_connected_peers': exe_connected_peers,
+                    'exe_health_description': exe_health_description
+                }
+
+            # Output logs
+            out_log_text = ''
+            with open(nethermind_stdout_log_path, 'r', encoding='utf8') as log_file:
+                log_file.seek(out_log_read_index)
+                out_log_text = log_file.read()
+                out_log_read_index = log_file.tell()
+
+            out_log_length = len(out_log_text)
+            if out_log_length > 0:
+                log_text(out_log_text)
+
+            err_log_text = ''
+            with open(nethermind_stderr_log_path, 'r', encoding='utf8') as log_file:
+                log_file.seek(err_log_read_index)
+                err_log_text = log_file.read()
+                err_log_read_index = log_file.tell()
+
+            err_log_length = len(err_log_text)
+            if err_log_length > 0:
+                log_text(err_log_text)
+
+            time.sleep(1)
+            
+            local_nethermind_jsonrpc_url = 'http://127.0.0.1:8545'
+            request_json = {
+                'jsonrpc': '2.0',
+                'method': 'eth_syncing',
+                'id': 1
+            }
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            try:
+                response = httpx.post(local_nethermind_jsonrpc_url, json=request_json,
+                    headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Nethermind.')
+                continue
+
+            if response.status_code != 200:
+                log_text(
+                    f'Status code: {response.status_code} while querying Nethermind.')
+                continue
+        
+            response_json = response.json()
+            syncing_json = response_json
+
+            local_nethermind_jsonrpc_url = 'http://127.0.0.1:8545'
+            request_json = {
+                'jsonrpc': '2.0',
+                'method': 'net_peerCount',
+                'id': 1
+            }
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            try:
+                response = httpx.post(local_nethermind_jsonrpc_url, json=request_json,
+                    headers=headers)
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Nethermind.')
+                continue
+
+            if response.status_code != 200:
+                log_text(
+                    f'Status code: {response.status_code} while querying Nethermind.')
+                continue
+
+            response_json = response.json()
+            peer_count_json = response_json
+
+            exe_starting_block = UNKNOWN_VALUE
+            exe_current_block = UNKNOWN_VALUE
+            exe_highest_block = UNKNOWN_VALUE
+            if (
+                syncing_json and
+                'result' in syncing_json and
+                syncing_json['result']
+                ):
+                if 'startingBlock' in syncing_json['result']:
+                    exe_starting_block = int(syncing_json['result']['startingBlock'], 16)
+                if 'currentBlock' in syncing_json['result']:
+                    exe_current_block = int(syncing_json['result']['currentBlock'], 16)
+                if 'highestBlock' in syncing_json['result']:
+                    exe_highest_block = int(syncing_json['result']['highestBlock'], 16)
+
+            exe_connected_peers = 0
+            if (
+                peer_count_json and
+                'result' in peer_count_json and
+                peer_count_json['result']
+                ):
+                exe_connected_peers = int(peer_count_json['result'], 16)
+            
+            exe_has_few_peers = exe_connected_peers >= EXE_MIN_FEW_PEERS
+
+            exe_is_healthy = False
+            exe_health_description = UNKNOWN_VALUE
+
+            # Query health endpoint
+
+            local_nethermind_health_url = 'http://127.0.0.1:8545/health'
+
+            try:
+                response = httpx.post(local_nethermind_health_url)
+                if response.status_code != 200:
+                    log_text(
+                        f'Status code: {response.status_code} while querying Nethermind Health.')
+                else:
+                    response_json = response.json()
+                    health_json = response_json
+
+                    if 'status' in health_json:
+                        exe_is_healthy = (health_json['status'] == 'Healthy')
+                    
+                    if ('entries' in health_json and
+                        'node-health' in health_json['entries'] and
+                        'description' in health_json['entries']['node-health']):
+                        exe_health_description = health_json['entries']['node-health']['description']
+
+            except httpx.RequestError as exception:
+                log_text(f'Exception: {exception} while querying Nethermind Health.')
+
+            if exe_is_healthy or exe_has_few_peers:
+                set_percentage(100)
+            else:
+                set_percentage(10 +
+                    round(min(exe_connected_peers / EXE_MIN_FEW_PEERS, 1.0) * 90.0))
+
+            formatted_description = (
+f'''
+Healthy: Unknown
+Connected Peers: {exe_connected_peers}
+'''
+        ).strip()
+
+            if exe_health_description != UNKNOWN_VALUE:
+                formatted_description = format_for_terminal(exe_health_description)
+
+            change_status(formatted_description)
+
+            if exe_is_healthy or exe_has_few_peers:
+                return {
+                    'exe_is_healthy': exe_is_healthy,
+                    'exe_starting_block': exe_starting_block,
+                    'exe_current_block': exe_current_block,
+                    'exe_highest_block': exe_highest_block,
+                    'exe_connected_peers': exe_connected_peers,
+                    'exe_health_description': exe_health_description
+                }
+            else:
+                set_result({
+                    'exe_is_healthy': exe_is_healthy,
+                    'exe_starting_block': exe_starting_block,
+                    'exe_current_block': exe_current_block,
+                    'exe_highest_block': exe_highest_block,
+                    'exe_connected_peers': exe_connected_peers,
+                    'exe_health_description': exe_health_description
+                })
+
+    result = progress_log_dialog(
+        title='Verifying proper Nethermind service installation',
+        text=(
+f'''
+We are waiting for Nethermind to become healthy or find enough peers to
+confirm that it is working properly.
+'''     ),
+        status_text=(
+'''
+Healthy: Unknown
+Connected Peers: Unknown
+'''
+        ).strip(),
+        with_skip=True,
+        run_callback=verifying_callback
+    ).run()
+    
+    if not result:
+        log.warning('Nethermind verification was cancelled.')
+        return False
+
+    if result.get('skipping', False):
+        log.warning('Skipping Nethermind verification.')
+        return True
+
+    health_description = result['exe_health_description']
+    if health_description != UNKNOWN_VALUE:
+        health_description = format_for_terminal(health_description)
+    else:
+        health_description = (
+f'''
+Healthy: Unknown
+Connected Peers: {result['exe_connected_peers']}
+'''
+        ).strip()
+
+    exe_has_few_peers = (result['exe_connected_peers'] >= EXE_MIN_FEW_PEERS)
+
+    if not result['exe_is_healthy'] and not exe_has_few_peers:
+        # We could not get a proper result from Nethermind
+        result = button_dialog(
+            title='Nethermind verification interrupted',
+            text=(
+f'''
+We were interrupted before we could fully verify the Nethermind
+installation. Here are some results for the last tests we performed:
+
+{health_description}
+
+We cannot proceed if Nethermind is not installed properly. Make sure to
+check the logs and fix any issue found there. You can see the logs in:
+
+{nethermind_stdout_log_path}
+{nethermind_stderr_log_path}
+'''         ),
+            buttons=[
+                ('Quit', False)
+            ]
+        ).run()
+
+        log.info(
+f'''
+To examine your Nethermind service logs, inspect the following file:
+
+{nethermind_stdout_log_path}
+{nethermind_stderr_log_path}
+'''
+        )
+
+        return False
+
+    log.info(
+f'''
+Nethermind is installed and working properly.
+
+{health_description}
 ''' )
     time.sleep(5)
 
