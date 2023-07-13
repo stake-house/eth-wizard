@@ -399,6 +399,13 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets: ['localhost:9182']
+{{scrape_configs}}
+'''
+)
+
+EXECUTION_PROMETHEUS_CONFIG = {
+    EXECUTION_CLIENT_GETH: (
+'''
   - job_name: geth
     scrape_interval: 15s
     scrape_timeout: 10s
@@ -406,9 +413,17 @@ scrape_configs:
     scheme: http
     static_configs:
       - targets: ['localhost:6060']
-{{scrape_configs}}
 '''
-)
+    ),
+    EXECUTION_CLIENT_NETHERMIND: (
+'''
+  - job_name: nethermind
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ['localhost:6061']
+'''
+    )
+}
 
 CONSENSUS_PROMETHEUS_CONFIG = {
     CONSENSUS_CLIENT_TEKU: (

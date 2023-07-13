@@ -539,17 +539,20 @@ def installation_steps(*args, **kwargs):
         # Context variables
         selected_directory = CTX_SELECTED_DIRECTORY
         selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
+        selected_execution_client = CTX_SELECTED_EXECUTION_CLIENT
 
         if not (
             test_context_variable(context, selected_directory, log) and
-            test_context_variable(context, selected_consensus_client, log)
+            test_context_variable(context, selected_consensus_client, log) and
+            test_context_variable(context, selected_execution_client, log)
             ):
             # We are missing context variables, we cannot continue
             quit_app()
         
         consensus_client = context[selected_consensus_client]
+        execution_client = context[selected_execution_client]
 
-        if not install_monitoring(context[selected_directory], consensus_client):
+        if not install_monitoring(context[selected_directory], consensus_client, execution_client):
             # User asked to quit or error
             quit_app()
 
@@ -8265,7 +8268,7 @@ Would you like to disable automatic Windows updates?
 
     return True
 
-def install_monitoring(base_directory, consensus_client):
+def install_monitoring(base_directory, consensus_client, execution_client):
 
     base_directory = Path(base_directory)
 
@@ -8298,13 +8301,13 @@ start Prometheus, Grafana and Windows Exporter on reboot or if they crash.
     if not result:
         return result
     
-    if not install_prometheus(base_directory, consensus_client):
+    if not install_prometheus(base_directory, consensus_client, execution_client):
         return False
     
     if not install_windows_exporter(base_directory):
         return False
     
-    if not install_grafana(base_directory, consensus_client):
+    if not install_grafana(base_directory, consensus_client, execution_client):
         return False
     
     # Show message on how to use monitoring
@@ -8331,7 +8334,7 @@ Teku and your system resources.
 
     return result
 
-def install_prometheus(base_directory, consensus_client):
+def install_prometheus(base_directory, consensus_client, execution_client):
     # Install Prometheus as a service
 
     nssm_binary = get_nssm_binary()
@@ -8596,7 +8599,10 @@ Do you want to remove this directory first and start from nothing?
     prometheus_config_content = PROMETHEUS_CONFIG_WINDOWS
 
     prometheus_config_content = prometheus_config_content.format(
-        scrape_configs=CONSENSUS_PROMETHEUS_CONFIG[consensus_client])
+        scrape_configs=(
+            EXECUTION_PROMETHEUS_CONFIG[execution_client] +
+            '\n' +
+            CONSENSUS_PROMETHEUS_CONFIG[consensus_client]))
 
     with open(str(prometheus_config_file), 'w', encoding='utf8') as config_file:
         config_file.write(prometheus_config_content)
@@ -9376,7 +9382,7 @@ Windows Exporter is installed and working properly.
 
     return True
 
-def install_grafana(base_directory, consensus_client):
+def install_grafana(base_directory, consensus_client, execution_client):
     # Install Grafana as a service
 
     nssm_binary = get_nssm_binary()
