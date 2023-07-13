@@ -2695,7 +2695,7 @@ To examine your Nethermind service logs, inspect the following file:
 
             # Output logs
             out_log_text = ''
-            with open(nethermind_stdout_log_path, 'r', encoding='utf8') as log_file:
+            with open(nethermind_stdout_log_path, 'r', encoding='utf8', errors='replace') as log_file:
                 log_file.seek(out_log_read_index)
                 out_log_text = log_file.read()
                 out_log_read_index = log_file.tell()
@@ -2705,7 +2705,7 @@ To examine your Nethermind service logs, inspect the following file:
                 log_text(out_log_text)
 
             err_log_text = ''
-            with open(nethermind_stderr_log_path, 'r', encoding='utf8') as log_file:
+            with open(nethermind_stderr_log_path, 'r', encoding='utf8', errors='replace') as log_file:
                 log_file.seek(err_log_read_index)
                 err_log_text = log_file.read()
                 err_log_read_index = log_file.tell()
