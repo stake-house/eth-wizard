@@ -145,6 +145,7 @@ TEST_OPEN_PORTS_STEP_ID = 'test_open_ports_step'
 INSTALL_MONITORING_STEP_ID = 'install_monitoring_step'
 IMPROVE_TIME_SYNC_STEP_ID = 'improve_time_sync_step'
 DISABLE_WINDOWS_UPDATES_STEP_ID = 'disable_windows_updates_step'
+ADJUST_POWER_PLAN_STEP_ID = 'adjust_power_plan_step'
 INSTALL_LIGHTHOUSE_VALIDATOR_STEP_ID = 'install_lighthouse_validator_step'
 INSTALL_CHRONY_STEP_ID = 'install_chrony_step'
 INITIATE_DEPOSIT_STEP_ID = 'initiate_deposit_step'
@@ -363,6 +364,7 @@ LIGHTHOUSE_VC_ARGUMENTS = {
 
 WINDOWS_SERVICE_RUNNING = 'SERVICE_RUNNING'
 WINDOWS_SERVICE_START_PENDING = 'SERVICE_START_PENDING'
+WINDOWS_HIGH_PERFORMANCE_POWERPLAN_GUID = '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'
 
 ADOPTIUM_17_API_URL = 'https://api.adoptium.net/v3/assets/latest/17/hotspot'
 ADOPTIUM_17_API_PARAMS = {

@@ -590,6 +590,19 @@ def installation_steps(*args, **kwargs):
         exc_function=disable_windows_updates_function
     )
 
+    def adjust_power_plan_function(step, context, step_sequence):
+        if not adjust_power_plan():
+            # User asked to quit or error
+            quit_app()
+
+        return context
+
+    adjust_power_plan_step = Step(
+        step_id=ADJUST_POWER_PLAN_STEP_ID,
+        display_name='Adjust power plan',
+        exc_function=adjust_power_plan_function
+    )
+
     def initiate_deposit_function(step, context, step_sequence):
         # Context variables
         selected_directory = CTX_SELECTED_DIRECTORY
@@ -781,6 +794,7 @@ def installation_steps(*args, **kwargs):
         install_monitoring_step,
         improve_time_sync_step,
         disable_windows_updates_step,
+        adjust_power_plan_step,
         initiate_deposit_step,
         show_whats_next_step,
         show_public_keys_step
@@ -8266,6 +8280,87 @@ Would you like to disable automatic Windows updates?
     
         winreg.SetValueEx(key, 'DODownloadMode', 0, winreg.REG_DWORD, 0)
 
+    return True
+
+def adjust_power_plan():
+    # Adjust the power plan and suggest the high performance one
+
+    process_result = subprocess.run([
+        'powercfg', '/l'
+        ], capture_output=True, text=True)
+    
+    if process_result.returncode != 0:
+        log.error('Unable to call powercfg to list power plans.')
+        return False
+
+    process_output = process_result.stdout
+
+    active_plan = UNKNOWN_VALUE
+    high_performance_plan_name = 'High performance'
+    high_performance_plan_found = False
+    current_plan_name = UNKNOWN_VALUE
+
+    plans = {}
+
+    for line in process_output.splitlines():
+        match = re.search(r'Power Scheme GUID:\s*(?P<guid>\S+)\s*\((?P<name>[^\)]+)\)\s*(?P<active>\*?)', line)
+        if match:
+            is_active = match.group('active') == '*'
+            guid = match.group('guid')
+            name = match.group('name')
+            if is_active:
+                active_plan = guid
+                current_plan_name = name
+            plans[guid] = {
+                'name': name,
+                'active': is_active
+            }
+
+            if guid.lower() == WINDOWS_HIGH_PERFORMANCE_POWERPLAN_GUID.lower():
+                high_performance_plan_name = name
+                high_performance_plan_found = True
+    
+    if not high_performance_plan_found:
+        log.warn('Could not find the high performance power plan. Skipping adjusting power plan.')
+        return True
+
+    if active_plan.lower() == WINDOWS_HIGH_PERFORMANCE_POWERPLAN_GUID.lower():
+        log.info('Current power plan is already the high performance one. Skipping adjusting power plan.')
+        return True
+
+    result = button_dialog(
+        title='Adjust power plan',
+        text=(
+f'''
+You are currently using the {current_plan_name} power plan but we suggest
+you switch to the {high_performance_plan_name} power plan.
+
+Good performance is needed for a well functionning validator node. This
+suggested power plan will give you a good baseline performance without
+any sleeping issue with the default values.
+
+Would you like to switch to this other power plan?
+'''     ),
+        buttons=[
+            ('Switch', 1),
+            ('Skip', 2),
+            ('Quit', False)
+        ]
+    ).run()
+
+    if result == 2:
+        return True
+
+    if not result:
+        return result
+    
+    log.info(f'Switching to {high_performance_plan_name} power plan...')
+
+    process_result = subprocess.run(['powercfg', '/S', WINDOWS_HIGH_PERFORMANCE_POWERPLAN_GUID])
+    if process_result.returncode != 0:
+        log.error('Unable to change the current power plans.')
+        return False
+    
     return True
 
 def install_monitoring(base_directory, consensus_client, execution_client):
