@@ -9734,9 +9734,14 @@ providers:
 '''
         )
     
-    geth_dashboard_file = grafana_dashboard_dir.joinpath('geth.json')
-    with open(geth_dashboard_file, 'w', encoding='utf8') as dashboard_file:
-        dashboard_file.write(GETH_GRAFANA_DASHBOARD)
+    if execution_client == EXECUTION_CLIENT_GETH:
+        geth_dashboard_file = grafana_dashboard_dir.joinpath('geth.json')
+        with open(geth_dashboard_file, 'w', encoding='utf8') as dashboard_file:
+            dashboard_file.write(GETH_GRAFANA_DASHBOARD)
+    elif execution_client == EXECUTION_CLIENT_NETHERMIND:
+        nethermind_dashboard_file = grafana_dashboard_dir.joinpath('nethermind.json')
+        with open(nethermind_dashboard_file, 'w', encoding='utf8') as dashboard_file:
+            dashboard_file.write(NETHERMIND_GRAFANA_DASHBOARD)
     
     windows_system_dashboard_file = grafana_dashboard_dir.joinpath('windows-system.json')
     with open(windows_system_dashboard_file, 'w', encoding='utf8') as dashboard_file:
