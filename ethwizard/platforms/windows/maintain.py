@@ -51,6 +51,7 @@ from ethwizard.constants import (
     CTX_MEVBOOST_INSTALLED,
     CTX_SELECTED_DIRECTORY,
     EXECUTION_CLIENT_GETH,
+    EXECUTION_CLIENT_NETHERMIND,
     CONSENSUS_CLIENT_TEKU,
     CONSENSUS_CLIENT_NIMBUS,
     CONSENSUS_CLIENT_LIGHTHOUSE,
@@ -61,6 +62,7 @@ from ethwizard.constants import (
     MAINTENANCE_START_SERVICE,
     MAINTENANCE_RESTART_SERVICE,
     MAINTENANCE_CONFIG_CLIENT_MERGE,
+    MAINTENANCE_CHECK_AGAIN_SOON,
     MAINTENANCE_UPGRADE_CLIENT,
     MAINTENANCE_UPGRADE_CLIENT_MERGE,
     MAINTENANCE_REINSTALL_CLIENT,
@@ -344,10 +346,12 @@ def show_dashboard(context):
 
     # We only need to do maintenance if one of clients or MEV-Boost needs maintenance.
 
+    no_maintenance_tasks = set((MAINTENANCE_DO_NOTHING, MAINTENANCE_CHECK_AGAIN_SOON))
+
     maintenance_needed = (
-        execution_client_details['next_step'] != MAINTENANCE_DO_NOTHING or
-        consensus_client_details['next_step'] != MAINTENANCE_DO_NOTHING or
-        (mevboost_details is not None and mevboost_details['next_step'] != MAINTENANCE_DO_NOTHING)
+        execution_client_details['next_step'] not in no_maintenance_tasks or
+        consensus_client_details['next_step'] not in no_maintenance_tasks or
+        (mevboost_details is not None and mevboost_details['next_step'] not in no_maintenance_tasks)
         )
 
     # Build the dashboard with the details we have
@@ -359,6 +363,7 @@ def show_dashboard(context):
         MAINTENANCE_UPGRADE_CLIENT_MERGE: (
             'Client needs to be upgraded and configured for the merge.'),
         MAINTENANCE_CONFIG_CLIENT_MERGE: 'Client needs to be configured for the merge.',
+        MAINTENANCE_CHECK_AGAIN_SOON: 'Check again. Client update should be available soon.',
         MAINTENANCE_START_SERVICE: 'Service needs to be started.',
         MAINTENANCE_REINSTALL_CLIENT: 'Client needs to be reinstalled.',
         MAINTENANCE_IMPROVE_TIMEOUT: 'Improve service shutdown timeout',
@@ -378,8 +383,14 @@ def show_dashboard(context):
 
         maintenance_message = 'Some maintenance tasks are pending. Select maintain to perform them.'
 
-    ec_section = (f'<b>Geth</b> details (I: {execution_client_details["versions"]["installed"]}, '
+    ec_available_version_section = ''
+
+    if execution_client_details['versions'].get('available', UNKNOWN_VALUE) != UNKNOWN_VALUE:
+        ec_available_version_section = f'A: {execution_client_details["versions"]["available"]}, '
+
+    ec_section = (f'<b>{current_execution_client}</b> details (I: {execution_client_details["versions"]["installed"]}, '
         f'R: {execution_client_details["versions"]["running"]}, '
+        f'{ec_available_version_section}'
         f'L: {execution_client_details["versions"]["latest"]})\n'
         f'Service is running: {execution_client_details["service"]["running"]}\n'
         f'<b>Maintenance task</b>: {maintenance_tasks_description.get(execution_client_details["next_step"], UNKNOWN_VALUE)}')

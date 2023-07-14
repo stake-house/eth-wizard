@@ -339,10 +339,12 @@ def show_dashboard(context):
 
     # We only need to do maintenance if one of clients or MEV-Boost needs maintenance.
 
+    no_maintenance_tasks = set((MAINTENANCE_DO_NOTHING, MAINTENANCE_CHECK_AGAIN_SOON))
+
     maintenance_needed = (
-        execution_client_details['next_step'] != MAINTENANCE_DO_NOTHING or
-        consensus_client_details['next_step'] != MAINTENANCE_DO_NOTHING or
-        (mevboost_details is not None and mevboost_details['next_step'] != MAINTENANCE_DO_NOTHING)
+        execution_client_details['next_step'] not in no_maintenance_tasks or
+        consensus_client_details['next_step'] not in no_maintenance_tasks or
+        (mevboost_details is not None and mevboost_details['next_step'] not in no_maintenance_tasks)
         )
 
     # Build the dashboard with the details we have
