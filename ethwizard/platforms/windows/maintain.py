@@ -1397,6 +1397,44 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
 
         elif execution_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
             log.warning('TODO: Reinstalling client is to be implemented.')
+
+    elif execution_client == EXECUTION_CLIENT_NETHERMIND:
+        # Nethermind maintenance tasks
+        nethermind_service_name = 'nethermind'
+
+        if execution_client_details['next_step'] == MAINTENANCE_RESTART_SERVICE:
+            log.info('Restarting Nethermind service...')
+
+            subprocess.run([str(nssm_binary), 'restart', nethermind_service_name])
+
+        elif execution_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT:
+            if not upgrade_nethermind(base_directory, nssm_binary):
+                log.error('We could not upgrade the Nethermind client.')
+                return False
+        
+        elif execution_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT_MERGE:
+            log.warning('Upgrading Nethermind client for merge is not implemented. This should '
+                'not be needed as Nethermind support was added after the merge.')
+            return False
+    
+        elif execution_client_details['next_step'] == MAINTENANCE_CONFIG_CLIENT_MERGE:
+            log.warning('Configuring Nethermind client for merge is not implemented. This should '
+                'not be needed as Nethermind support was added after the merge.')
+            return False
+
+        elif execution_client_details['next_step'] == MAINTENANCE_START_SERVICE:
+            log.info('Starting Nethermind service...')
+
+            subprocess.run([str(nssm_binary), 'start', nethermind_service_name])
+
+        elif execution_client_details['next_step'] == MAINTENANCE_IMPROVE_TIMEOUT:
+            log.warning('Impriving Nethermind service timeout is not implemented. This should '
+                'not be needed as Nethermind support was added with proper timeout configuration.')
+            return False
+
+        elif execution_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
+            log.warning('TODO: Reinstalling client is to be implemented.')
+
     else:
         log.error(f'Unknown execution client {execution_client}.')
         return False
@@ -1968,6 +2006,39 @@ Unable to create JWT token file in {jwt_token_path}
 
     if not set_service_param(nssm_binary, geth_service_name, 'AppParameters', geth_arguments):
         return False
+
+    return True
+
+def upgrade_nethermind(base_directory, nssm_binary):
+    # Upgrade the Nethermind client
+    log.info('Upgrading Nethermind client...')
+
+    nethermind_service_name = 'nethermind'
+    nethermind_dir = base_directory.joinpath('bin', 'Nethermind')
+
+    log.info('Stoping Nethermind service...')
+    subprocess.run([str(nssm_binary), 'stop', nethermind_service_name])
+
+    # Updating Nethermind with winget
+    base_options = ['--disable-interactivity', '--accept-source-agreements',
+            '--accept-package-agreements']
+
+    try:
+        # Update Nethermind
+        command = ['winget', 'install', 'nethermind', '-l', str(nethermind_dir)] + base_options
+
+        process_result = subprocess.run(command)
+        if process_result.returncode != 0:
+            log.error(f'Unexpected return code from winget when installing Nethermind. '
+                f'Return code {process_result.returncode}')
+            return False
+
+    except FileNotFoundError:
+        log.error('winget not found. Aborting.')
+        return False
+
+    log.info('Starting Nethermind service...')
+    subprocess.run([str(nssm_binary), 'start', nethermind_service_name])
 
     return True
 

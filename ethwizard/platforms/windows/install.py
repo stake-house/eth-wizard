@@ -2394,7 +2394,7 @@ Do you want to skip installing the Nethermind binary?
 
             process_result = subprocess.run(command)
             if process_result.returncode != 0:
-                log.error(f'Unexpected return code from winget when installing prerequisites. '
+                log.error(f'Unexpected return code from winget when installing Nethermind. '
                     f'Return code {process_result.returncode}')
                 return False
 
