@@ -235,8 +235,6 @@ def installation_steps(*args, **kwargs):
                 context[selected_ports]):
                 # User asked to quit or error
                 quit_app()
-            
-            context[execution_improved_service_timeout] = True
         
         elif execution_client == EXECUTION_CLIENT_NETHERMIND:
         
@@ -245,6 +243,8 @@ def installation_steps(*args, **kwargs):
                 # User asked to quit or error
                 quit_app()
         
+        context[execution_improved_service_timeout] = True
+
         return context
     
     install_execution_step = Step(

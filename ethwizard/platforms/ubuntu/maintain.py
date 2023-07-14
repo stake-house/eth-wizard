@@ -174,8 +174,12 @@ def show_dashboard(context):
 
     # If the installed version is older than the available one, we need to upgrade the client
 
-    if is_version(installed_version) and is_version(available_version):
-        if installed_version < available_version:
+    target_version = latest_version
+    if is_version(available_version):
+        target_version = available_version
+
+    if is_version(installed_version) and is_version(target_version):
+        if installed_version < target_version:
             execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
         
             # If the next version is merge ready and we are not configured yet, we need to upgrade and

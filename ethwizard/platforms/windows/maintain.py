@@ -26,6 +26,8 @@ from ethwizard.platforms.common import (
     select_fee_recipient_address,
     get_geth_running_version,
     get_geth_latest_version,
+    get_nethermind_running_version,
+    get_nethermind_latest_version,
     get_mevboost_latest_version,
     get_nimbus_latest_version,
     get_lighthouse_latest_version
@@ -139,6 +141,9 @@ def show_dashboard(context):
     running_version = execution_client_details['versions']['running']
     if running_version != UNKNOWN_VALUE:
         running_version = parse_version(running_version)
+    available_version = execution_client_details['versions'].get('available', UNKNOWN_VALUE)
+    if available_version != UNKNOWN_VALUE:
+        available_version = parse_version(available_version)
     latest_version = execution_client_details['versions']['latest']
     if latest_version != UNKNOWN_VALUE:
         latest_version = parse_version(latest_version)
@@ -156,6 +161,13 @@ def show_dashboard(context):
     if is_version(latest_version) and is_version(merge_ready_exec_version):
         if latest_version >= merge_ready_exec_version:
             is_latest_exec_merge_ready = True
+
+    # If the available version is older than the latest one, we need to check again soon
+    # It simply means that the updated build is not available yet for installing
+
+    if is_version(latest_version) and is_version(available_version):
+        if available_version < latest_version:
+            execution_client_details['next_step'] = MAINTENANCE_CHECK_AGAIN_SOON
 
     # If the service is not running, we need to start it
 
@@ -177,8 +189,12 @@ def show_dashboard(context):
 
     # If the installed version is older than the available one, we need to upgrade the client
 
-    if is_version(installed_version) and is_version(latest_version):
-        if installed_version < latest_version:
+    target_version = latest_version
+    if is_version(available_version):
+        target_version = available_version
+
+    if is_version(installed_version) and is_version(target_version):
+        if installed_version < target_version:
             execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
         
             # If the next version is merge ready and we are not configured yet, we need to upgrade and
@@ -606,6 +622,65 @@ def get_execution_client_details(base_directory, execution_client):
 
         return details
 
+    elif execution_client == EXECUTION_CLIENT_NETHERMIND:
+
+        details = {
+            'service': {
+                'found': False,
+                'status': UNKNOWN_VALUE,
+                'binary': UNKNOWN_VALUE,
+                'parameters': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE
+            },
+            'versions': {
+                'installed': UNKNOWN_VALUE,
+                'running': UNKNOWN_VALUE,
+                'latest': UNKNOWN_VALUE,
+                'available': UNKNOWN_VALUE
+            },
+            'exec': {
+                'path': UNKNOWN_VALUE,
+                'argv': []
+            },
+            'is_merge_configured': UNKNOWN_VALUE
+        }
+
+        # Check for existing service
+        nethermind_service_exists = False
+        nethermind_service_name = 'nethermind'
+
+        service_details = get_service_details(nssm_binary, nethermind_service_name)
+
+        if service_details is not None:
+            nethermind_service_exists = True
+        
+        if not nethermind_service_exists:
+            return details
+
+        details['service']['found'] = True
+        details['service']['status'] = service_details['status']
+        details['service']['binary'] = service_details['install']
+        details['service']['parameters'] = service_details['parameters']['AppParameters']
+        details['service']['running'] = is_service_running(service_details)
+
+        details['versions']['installed'] = get_nethermind_installed_version(base_directory)
+        details['versions']['running'] = get_nethermind_running_version(log)
+        details['versions']['available'] = get_nethermind_available_version()
+        details['versions']['latest'] = get_nethermind_latest_version(log)
+
+        details['exec']['path'] = service_details['install']
+        details['exec']['argv'] = shlex.split(service_details['parameters']['AppParameters'], posix=False)
+
+        for arg in details['exec']['argv']:
+            if arg.lower().startswith('--JsonRpc.JwtSecretFile'.lower()):
+                details['is_merge_configured'] = True
+                break
+        
+        if details['is_merge_configured'] == UNKNOWN_VALUE:
+            details['is_merge_configured'] = False
+
+        return details
+
     else:
         log.error(f'Unknown execution client {execution_client}.')
         return False
@@ -636,6 +711,69 @@ def get_geth_installed_version(base_directory):
     log.info(f'Geth installed version is {installed_version}')
 
     return installed_version
+
+def get_nethermind_installed_version(base_directory):
+    # Get the installed version for Nethermind
+
+    log.info('Getting Nethermind installed version...')
+
+    nethermind_dir = base_directory.joinpath('bin', 'Nethermind')
+    nethermind_path = nethermind_dir.joinpath('Nethermind.Runner.exe')
+
+    nethermind_version = UNKNOWN_VALUE
+
+    if nethermind_path.is_file():
+        try:
+            process_result = subprocess.run([
+                str(nethermind_path), '--version'
+                ], capture_output=True, text=True, encoding='utf8')
+            
+            if process_result.returncode != 0:
+                log.error(f'Unexpected return code from Nethermind. Return code: '
+                    f'{process_result.returncode}')
+                return UNKNOWN_VALUE
+
+            process_output = process_result.stdout
+            result = re.search(r'Version: (?P<version>[^-\+]+)', process_output)
+            if not result:
+                log.error(f'Cannot parse {process_output} for Geth installed version.')
+                return UNKNOWN_VALUE
+            
+            nethermind_version = result.group('version').strip()
+
+        except FileNotFoundError:
+            log.error(f'Cannot find Nethermind in {nethermind_path} for installed version.')
+            return UNKNOWN_VALUE
+    
+    installed_version = nethermind_version
+
+    log.info(f'Nethermind installed version is {installed_version}')
+
+    return installed_version
+
+def get_nethermind_available_version():
+    # Get the available version for Nethermind
+
+    command = ['winget', 'show', 'nethermind', '--disable-interactivity', '--accept-source-agreements']
+
+    process_result = subprocess.run(command, capture_output=True, text=True)
+    if process_result.returncode != 0:
+        log.error(f'Unexpected return code from winget and getting the latest available Nethermind '
+            f'version. Return code: {process_result.returncode}')
+        return UNKNOWN_VALUE
+    
+    nethermind_version = UNKNOWN_VALUE
+
+    process_output = process_result.stdout
+    result = re.search(r'\nVersion: (?P<version>[^-\+\n]+)', process_output)
+    if result:
+        nethermind_version = result.group('version').strip()
+
+    available_version = nethermind_version
+
+    log.info(f'Nethermind available version is {available_version}')
+
+    return available_version
 
 def get_consensus_client_details(base_directory, consensus_client):
     # Get the details for the current consensus client
@@ -1178,11 +1316,13 @@ def use_default_values(context):
         context[selected_consensus_client] = NETWORK_GOERLI
         updated_context = True
     
-    if execution_improved_service_timeout not in context:
+    if (execution_improved_service_timeout not in context and
+        context[selected_execution_client] == EXECUTION_CLIENT_GETH):
         context[execution_improved_service_timeout] = False
         updated_context = True
     
-    if consensus_improved_service_timeout not in context:
+    if (consensus_improved_service_timeout not in context and 
+        context[selected_consensus_client] == CONSENSUS_CLIENT_TEKU):
         context[consensus_improved_service_timeout] = False
         updated_context = True
 
