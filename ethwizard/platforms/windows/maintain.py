@@ -2025,7 +2025,7 @@ def upgrade_nethermind(base_directory, nssm_binary):
 
     try:
         # Update Nethermind
-        command = ['winget', 'install', 'nethermind', '-l', str(nethermind_dir)] + base_options
+        command = ['winget', 'upgrade', 'nethermind', '-l', str(nethermind_dir)] + base_options
 
         process_result = subprocess.run(command)
         if process_result.returncode != 0:
