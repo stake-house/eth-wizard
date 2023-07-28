@@ -4544,7 +4544,7 @@ Unable to create JWT token file in {jwt_token_path}
         'AppStderr': str(teku_stderr_log_path),
         'AppEnvironmentExtra': [
             'JAVA_HOME=' + str(java_home),
-            'JAVA_OPTS=-Xmx5g',
+            'JAVA_OPTS=-Xmx6g',
             'TEKU_OPTS=-XX:HeapDumpPath=' + str(heap_dump_path)
         ],
         'AppStopMethodConsole': '1500'
