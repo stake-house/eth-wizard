@@ -246,7 +246,7 @@ If this machine is behind a router or another network device that blocks
 incoming connections on those ports, you will have to configure those
 devices so that they can forward (port forward) those connections to this
 machine. If you need help with this, read your device's manual, search for
-"How to Forward Ports" for your device or ask the ETHStaker community.
+"How to Forward Ports" for your device or ask the EthStaker community.
 
 Do you want to use the default ports?
 '''     )),
@@ -1133,7 +1133,7 @@ router or another network device that blocks incoming connections on those
 ports, you will have to configure those devices so that they can forward
 (port forward) those connections to this machine. If you need help with
 this, read your device's manual, search for "How to Forward Ports" for your
-device or ask the ETHStaker community.
+device or ask the EthStaker community.
 
 Would you like to retry?
 '''                 ),

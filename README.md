@@ -6,7 +6,7 @@ An Ethereum validator installation wizard meant to guide anyone through the diff
 
 ## Disclaimer
 
-Eth-wizard should be stable enough to be used by everyone. It was never audited and it might still have some issues. Support is offered through [the ETHStaker community](https://ethstaker.cc/).
+Eth-wizard should be stable enough to be used by everyone. It was never audited and it might still have some issues. Support is offered through [the EthStaker community](https://ethstaker.cc/).
 
 ## Goals
 
@@ -63,10 +63,14 @@ Here is a demonstration of eth-wizard on Ubuntu 20.04:
 
 ## Support
 
-If you have any question or if you need additional support, make sure to get in touch with the ETHStaker community on:
+If you have any question or if you need additional support, make sure to get in touch with the EthStaker community on:
 
 * Discord: [discord.io/ethstaker](https://discord.io/ethstaker)
 * Reddit: [reddit.com/r/ethstaker](https://www.reddit.com/r/ethstaker/)
+
+## Financial support
+
+If you would like to help and support eth-wizard, check out [our donation page](donation.md).
 
 ## Credits
 
