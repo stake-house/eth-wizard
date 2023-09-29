@@ -61023,7 +61023,7 @@ RestartSec=5
 TimeoutStopSec=180
 WorkingDirectory=/var/lib/nethermind
 Environment="DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/nethermind"
-ExecStart=/usr/share/nethermind/Nethermind.Runner \\
+ExecStart=/usr/share/nethermind/nethermind \\
     --config mainnet \\
     --datadir /var/lib/nethermind \\
     --Metrics.Enabled true \\
@@ -61051,7 +61051,7 @@ RestartSec=5
 TimeoutStopSec=180
 WorkingDirectory=/var/lib/nethermind
 Environment="DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/nethermind"
-ExecStart=/usr/share/nethermind/Nethermind.Runner \\
+ExecStart=/usr/share/nethermind/nethermind \\
     --config goerli \\
     --datadir /var/lib/nethermind \\
     --Metrics.Enabled true \\

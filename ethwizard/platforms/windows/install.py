@@ -2325,15 +2325,23 @@ sure Nethermind is running properly.
 
     # Check if Nethermind is already installed
     nethermind_dir = base_directory.joinpath('bin', 'Nethermind')
-    nethermind_path = nethermind_dir.joinpath('Nethermind.Runner.exe')
+    nethermind_path = nethermind_dir.joinpath('nethermind.exe')
+    old_nethermind_path = nethermind_dir.joinpath('Nethermind.Runner.exe')
 
     nethermind_found = False
     nethermind_version = 'unknown'
 
+    found_nethermind_path = None
+
     if nethermind_path.is_file():
+        found_nethermind_path = nethermind_path
+    elif old_nethermind_path.is_file():
+        found_nethermind_path = old_nethermind_path
+    
+    if found_nethermind_path is not None:
         try:
             process_result = subprocess.run([
-                str(nethermind_path), '--version'
+                str(found_nethermind_path), '--version'
                 ], capture_output=True, text=True, encoding='utf8')
             nethermind_found = True
 

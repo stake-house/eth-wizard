@@ -718,32 +718,43 @@ def get_nethermind_installed_version(base_directory):
     log.info('Getting Nethermind installed version...')
 
     nethermind_dir = base_directory.joinpath('bin', 'Nethermind')
-    nethermind_path = nethermind_dir.joinpath('Nethermind.Runner.exe')
+    nethermind_path = nethermind_dir.joinpath('nethermind.exe')
+    old_nethermind_path = nethermind_dir.joinpath('Nethermind.Runner.exe')
 
     nethermind_version = UNKNOWN_VALUE
 
+    found_nethermind_path = None
+
     if nethermind_path.is_file():
-        try:
-            process_result = subprocess.run([
-                str(nethermind_path), '--version'
-                ], capture_output=True, text=True, encoding='utf8')
-            
-            if process_result.returncode != 0:
-                log.error(f'Unexpected return code from Nethermind. Return code: '
-                    f'{process_result.returncode}')
-                return UNKNOWN_VALUE
-
-            process_output = process_result.stdout
-            result = re.search(r'Version: (?P<version>[^-\+]+)', process_output)
-            if not result:
-                log.error(f'Cannot parse {process_output} for Geth installed version.')
-                return UNKNOWN_VALUE
-            
-            nethermind_version = result.group('version').strip()
-
-        except FileNotFoundError:
-            log.error(f'Cannot find Nethermind in {nethermind_path} for installed version.')
+        found_nethermind_path = nethermind_path
+    elif old_nethermind_path.is_file():
+        found_nethermind_path = old_nethermind_path
+    else:
+        log.error(f'Cannot find Nethermind binary in {nethermind_path} or in '
+            f'{old_nethermind_path} for installed version.')
+        return UNKNOWN_VALUE
+    
+    try:
+        process_result = subprocess.run([
+            str(found_nethermind_path), '--version'
+            ], capture_output=True, text=True, encoding='utf8')
+        
+        if process_result.returncode != 0:
+            log.error(f'Unexpected return code from Nethermind. Return code: '
+                f'{process_result.returncode}')
             return UNKNOWN_VALUE
+
+        process_output = process_result.stdout
+        result = re.search(r'Version: (?P<version>[^-\+]+)', process_output)
+        if not result:
+            log.error(f'Cannot parse {process_output} for Geth installed version.')
+            return UNKNOWN_VALUE
+        
+        nethermind_version = result.group('version').strip()
+
+    except FileNotFoundError:
+        log.error(f'Cannot find Nethermind in {found_nethermind_path} for installed version.')
+        return UNKNOWN_VALUE
     
     installed_version = nethermind_version
 
