@@ -54,6 +54,7 @@ from ethwizard.constants import (
     MEVBOOST_INSTALLED_DIRECTORY,
     GETH_SYSTEMD_SERVICE_NAME,
     NETHERMIND_SYSTEMD_SERVICE_NAME,
+    NETHERMIND_NEW_BIN_PATH_VERSION,
     MIN_CLIENT_VERSION_FOR_MERGE,
     LINUX_JWT_TOKEN_FILE_PATH,
     MAINTENANCE_DO_NOTHING,
@@ -61,6 +62,8 @@ from ethwizard.constants import (
     MAINTENANCE_UPGRADE_CLIENT,
     MAINTENANCE_UPGRADE_CLIENT_MERGE,
     MAINTENANCE_CONFIG_CLIENT_MERGE,
+    MAINTENANCE_UPGRADE_CLIENT_FIX_PATH,
+    MAINTENANCE_FIX_BIN_PATH,
     MAINTENANCE_CHECK_AGAIN_SOON,
     MAINTENANCE_START_SERVICE,
     MAINTENANCE_REINSTALL_CLIENT,
@@ -165,6 +168,19 @@ def show_dashboard(context):
         if running_version < installed_version:
             execution_client_details['next_step'] = MAINTENANCE_RESTART_SERVICE
 
+    nethermind_new_bin_path_version = parse_version(NETHERMIND_NEW_BIN_PATH_VERSION)
+
+    # If using Nethermind and using the old bin path on a version that is after the bin path
+    # change, we need to fix the bin path
+    if (
+        current_execution_client == EXECUTION_CLIENT_NETHERMIND and
+        is_version(installed_version) and
+        installed_version >= nethermind_new_bin_path_version and
+        execution_client_details['is_bin_path_fixed'] != UNKNOWN_VALUE and
+        not execution_client_details['is_bin_path_fixed']
+        ):
+        execution_client_details['next_step'] = MAINTENANCE_FIX_BIN_PATH
+
     # If the installed version is merge ready but the client is not configured for the merge,
     # we need to configure the client for the merge
 
@@ -182,6 +198,15 @@ def show_dashboard(context):
         if installed_version < target_version:
             execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
         
+            # If using Nethermind and we are upgrading from a version prior to the one which is
+            # using a new bin path and upgrading to a version that is using the new bin path, we
+            # need to upgrade and fix the bin path
+            if (
+                current_execution_client == EXECUTION_CLIENT_NETHERMIND and
+                installed_version < nethermind_new_bin_path_version and
+                target_version >= nethermind_new_bin_path_version):
+                execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_FIX_PATH
+
             # If the next version is merge ready and we are not configured yet, we need to upgrade and
             # configure the client
 
@@ -360,6 +385,8 @@ def show_dashboard(context):
         MAINTENANCE_UPGRADE_CLIENT_MERGE: (
             'Client needs to be upgraded and configured for the merge.'),
         MAINTENANCE_CONFIG_CLIENT_MERGE: 'Client needs to be configured for the merge.',
+        MAINTENANCE_UPGRADE_CLIENT_FIX_PATH: 'Client needs to be upgraded and binary path fixed.',
+        MAINTENANCE_FIX_BIN_PATH: 'Client needs binary path fixed.',
         MAINTENANCE_CHECK_AGAIN_SOON: 'Check again. Client update should be available soon.',
         MAINTENANCE_START_SERVICE: 'Service needs to be started.',
         MAINTENANCE_REINSTALL_CLIENT: 'Client needs to be reinstalled.',
@@ -589,7 +616,8 @@ def get_execution_client_details(execution_client):
                 'path': UNKNOWN_VALUE,
                 'argv': []
             },
-            'is_merge_configured': UNKNOWN_VALUE
+            'is_merge_configured': UNKNOWN_VALUE,
+            'is_bin_path_fixed': UNKNOWN_VALUE
         }
         
         # Check for existing systemd service
@@ -648,7 +676,8 @@ def get_execution_client_details(execution_client):
                 'path': UNKNOWN_VALUE,
                 'argv': []
             },
-            'is_merge_configured': UNKNOWN_VALUE
+            'is_merge_configured': UNKNOWN_VALUE,
+            'is_bin_path_fixed': UNKNOWN_VALUE
         }
         
         # Check for existing systemd service
@@ -684,6 +713,8 @@ def get_execution_client_details(execution_client):
             
             if details['is_merge_configured'] == UNKNOWN_VALUE:
                 details['is_merge_configured'] = False
+            
+            details['is_bin_path_fixed'] == details['exec']['path'].endswith('/nethermind')
 
         return details
 
@@ -1153,6 +1184,14 @@ def perform_maintenance(execution_client, execution_client_details, consensus_cl
 
             subprocess.run(['systemctl', 'restart', GETH_SYSTEMD_SERVICE_NAME])
 
+        elif execution_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT_FIX_PATH:
+            log.warning('We should never reach this since there is not about fixing path with Geth.')
+            return False
+        
+        elif execution_client_details['next_step'] == MAINTENANCE_FIX_BIN_PATH:
+            log.warning('We should never reach this since there is not about fixing path with Geth.')
+            return False
+
         elif execution_client_details['next_step'] == MAINTENANCE_START_SERVICE:
             log.info('Starting Geth service...')
 
@@ -1183,6 +1222,24 @@ def perform_maintenance(execution_client, execution_client_details, consensus_cl
             log.warning('Configuring Nethermind client for merge is not implemented. This should '
                 'not be needed as Nimbus support was added after the merge.')
             return False
+
+        elif execution_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT_FIX_PATH:
+            if not fix_nethermind_path():
+                log.error('We could not fix the Nethermind binary path.')
+                return False
+            
+            if not upgrade_nethermind():
+                log.error('We could not upgrade the Nethermind client.')
+                return False
+        
+        elif execution_client_details['next_step'] == MAINTENANCE_FIX_BIN_PATH:
+            if not fix_nethermind_path():
+                log.error('We could not fix the Nethermind binary path.')
+                return False
+            
+            log.info('Restarting Nethermind service...')
+
+            subprocess.run(['systemctl', 'restart', NETHERMIND_SYSTEMD_SERVICE_NAME])
 
         elif execution_client_details['next_step'] == MAINTENANCE_START_SERVICE:
             log.info('Starting Nethermind service...')
@@ -1510,6 +1567,42 @@ def upgrade_nethermind():
 
     log.info('Restarting Nethermind service...')
     subprocess.run(['systemctl', 'restart', NETHERMIND_SYSTEMD_SERVICE_NAME])
+
+    return True
+
+def fix_nethermind_path():
+    # Fix Nethermind binary path to use the new one
+    log.info('Fixing Nethermind binary path...')
+
+    nethermind_service_name = NETHERMIND_SYSTEMD_SERVICE_NAME
+    nethermind_service_content = ''
+
+    with open('/etc/systemd/system/' + nethermind_service_name, 'r') as service_file:
+        nethermind_service_content = service_file.read()
+
+    result = re.search(r'ExecStart\s*=\s*(\S*?)(Nethermind.Runner|nethermind)([^\\\n]*(\\\s+)?)*',
+        nethermind_service_content)
+    if not result:
+        log.error('Cannot parse Nethermind service file.')
+        return False
+    
+    exec_start = result.group(0)
+
+    # Replace the old binary path with to the new one
+    exec_start = re.sub(r'(?P<before>ExecStart\s*=\s*(\S*?))(Nethermind.Runner)',
+        r'\g<before>nethermind', exec_start)
+
+    nethermind_service_content = re.sub(
+        r'ExecStart\s*=\s*(\S*?)(Nethermind.Runner|nethermind)([^\\\n]*(\\\s+)?)*',
+        exec_start, nethermind_service_content)
+
+    # Write back configuration
+    with open('/etc/systemd/system/' + nethermind_service_name, 'w') as service_file:
+        service_file.write(nethermind_service_content)
+
+    # Reload configuration
+    log.info('Reloading service configurations...')
+    subprocess.run(['systemctl', 'daemon-reload'])
 
     return True
 
