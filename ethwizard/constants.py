@@ -33,7 +33,7 @@ COREINFO_DOWNLOAD_URL = 'https://download.sysinternals.com/files/Coreinfo.zip'
 
 MIN_AVAILABLE_DISK_SPACE_GB = {
     NETWORK_MAINNET: 1700.0,
-    NETWORK_GOERLI: 300.0
+    NETWORK_GOERLI: 450.0
 }
 
 MIN_SUSTAINED_K_READ_IOPS = 3.0
