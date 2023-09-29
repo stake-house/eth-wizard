@@ -714,7 +714,7 @@ def get_execution_client_details(execution_client):
             if details['is_merge_configured'] == UNKNOWN_VALUE:
                 details['is_merge_configured'] = False
             
-            details['is_bin_path_fixed'] == details['exec']['path'].endswith('/nethermind')
+            details['is_bin_path_fixed'] = details['exec']['path'].endswith('/nethermind')
 
         return details
 
