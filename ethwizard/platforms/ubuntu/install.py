@@ -2739,10 +2739,10 @@ $ sudo journalctl -ru {nethermind_service_name}
 
             try:
                 response = httpx.post(local_nethermind_health_url)
-                if response.status_code != 200:
+                if response.status_code not in (200, 503):
                     log_text(
                         f'Status code: {response.status_code} while querying Nethermind Health.')
-                else:
+                elif response.status_code == 200:
                     response_json = response.json()
                     health_json = response_json
 
