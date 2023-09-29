@@ -1580,7 +1580,7 @@ def fix_nethermind_path():
     with open('/etc/systemd/system/' + nethermind_service_name, 'r') as service_file:
         nethermind_service_content = service_file.read()
 
-    result = re.search(r'ExecStart\s*=\s*(\S*?)(Nethermind.Runner|nethermind)([^\\\n]*(\\\s+)?)*',
+    result = re.search(r'ExecStart\s*=\s*(\S*)(Nethermind.Runner|nethermind)([^\\\n]*(\\\s+)?)*',
         nethermind_service_content)
     if not result:
         log.error('Cannot parse Nethermind service file.')
@@ -1589,11 +1589,11 @@ def fix_nethermind_path():
     exec_start = result.group(0)
 
     # Replace the old binary path with to the new one
-    exec_start = re.sub(r'(?P<before>ExecStart\s*=\s*(\S*?))(Nethermind.Runner)',
+    exec_start = re.sub(r'(?P<before>ExecStart\s*=\s*(\S*))(Nethermind.Runner)',
         r'\g<before>nethermind', exec_start)
 
     nethermind_service_content = re.sub(
-        r'ExecStart\s*=\s*(\S*?)(Nethermind.Runner|nethermind)([^\\\n]*(\\\s+)?)*',
+        r'ExecStart\s*=\s*(\S*)(Nethermind.Runner|nethermind)([^\\\n]*(\\\s+)?)*',
         exec_start, nethermind_service_content)
 
     # Write back configuration
