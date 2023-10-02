@@ -168,10 +168,11 @@ def show_dashboard(context):
         if running_version < installed_version:
             execution_client_details['next_step'] = MAINTENANCE_RESTART_SERVICE
 
-    nethermind_new_bin_path_version = parse_version(NETHERMIND_NEW_BIN_PATH_VERSION)
-
     # If using Nethermind and using the old bin path on a version that is after the bin path
     # change, we need to fix the bin path
+
+    nethermind_new_bin_path_version = parse_version(NETHERMIND_NEW_BIN_PATH_VERSION)
+
     if (
         current_execution_client == EXECUTION_CLIENT_NETHERMIND and
         is_version(installed_version) and
@@ -201,6 +202,7 @@ def show_dashboard(context):
             # If using Nethermind and we are upgrading from a version prior to the one which is
             # using a new bin path and upgrading to a version that is using the new bin path, we
             # need to upgrade and fix the bin path
+
             if (
                 current_execution_client == EXECUTION_CLIENT_NETHERMIND and
                 installed_version < nethermind_new_bin_path_version and
@@ -1185,11 +1187,13 @@ def perform_maintenance(execution_client, execution_client_details, consensus_cl
             subprocess.run(['systemctl', 'restart', GETH_SYSTEMD_SERVICE_NAME])
 
         elif execution_client_details['next_step'] == MAINTENANCE_UPGRADE_CLIENT_FIX_PATH:
-            log.warning('We should never reach this since there is not about fixing path with Geth.')
+            log.warning('We should never reach this since there is nothing about fixing path '
+                'with Geth.')
             return False
         
         elif execution_client_details['next_step'] == MAINTENANCE_FIX_BIN_PATH:
-            log.warning('We should never reach this since there is not about fixing path with Geth.')
+            log.warning('We should never reach this since there is nothing about fixing path '
+                'with Geth.')
             return False
 
         elif execution_client_details['next_step'] == MAINTENANCE_START_SERVICE:
