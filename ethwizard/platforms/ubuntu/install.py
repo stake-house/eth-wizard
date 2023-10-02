@@ -5695,6 +5695,8 @@ $ sudo journalctl -ru {nimbus_service_name}
             return False
 
     # Verify proper beacon node installation and syncing
+    log.info('Testing your beacon node before performing your deposit...')
+
     local_bn_http_base = 'http://127.0.0.1:5052'
     
     bn_version_query = BN_VERSION_EP
@@ -5702,12 +5704,52 @@ $ sudo journalctl -ru {nimbus_service_name}
     headers = {
         'accept': 'application/json'
     }
-    try:
-        response = httpx.get(bn_query_url, headers=headers, timeout=bn_timeout)
-    except httpx.RequestError as exception:
-        result = button_dialog(
-            title='Cannot connect to beacon node',
-            text=(
+
+    keep_retrying = True
+
+    retry_index = 0
+    retry_count = 10
+    retry_delay = 30
+    retry_delay_increase = 15
+    last_exception = None
+    last_status_code = None
+
+    while keep_retrying and retry_index < retry_count:
+        try:
+            response = httpx.get(bn_query_url, headers=headers, timeout=bn_timeout)
+        except httpx.RequestError as exception:
+            last_exception = exception
+            
+            log.warning(f'Exception {exception} when trying to connect to beacon node on '
+                f'{bn_query_url}')
+
+            retry_index = retry_index + 1
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            retry_delay = retry_delay + retry_delay_increase
+            continue
+
+        if response.status_code != 200:
+            last_status_code = response.status_code
+
+            log.error(f'Error code {response.status_code} when trying to connect to Nimbus HTTP '
+                f'server on {bn_query_url}')
+            
+            retry_index = retry_index + 1
+            log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
+            time.sleep(retry_delay)
+            retry_delay = retry_delay + retry_delay_increase
+            continue
+        
+        keep_retrying = False
+        last_exception = None
+        last_status_code = None
+    
+    if keep_retrying:
+        if last_exception is not None:
+            result = button_dialog(
+                title='Cannot connect to beacon node',
+                text=(
 f'''
 We could not connect to beacon node HTTP server. Here are some details
 for this last test we tried to perform:
@@ -5723,25 +5765,25 @@ can see the logs with:
 
 $ sudo journalctl -ru {service_name}
 '''         ),
-            buttons=[
-                ('Quit', False)
-            ]
-        ).run()
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
 
-        log.info(
+            log.info(
 f'''
 To examine your beacon node service logs, type the following command:
 
 $ sudo journalctl -ru {service_name}
 '''
-        )
+            )
 
-        return False
+            return False
 
-    if response.status_code != 200:
-        result = button_dialog(
-            title='Cannot connect to beacon node',
-            text=(
+        elif last_status_code is not None:
+            result = button_dialog(
+                title='Cannot connect to beacon node',
+                text=(
 f'''
 We could not connect to beacon node HTTP server. Here are some details
 for this last test we tried to perform:
@@ -5757,22 +5799,23 @@ can see the logs with:
 
 $ sudo journalctl -ru {service_name}
 '''         ),
-            buttons=[
-                ('Quit', False)
-            ]
-        ).run()
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
 
-        log.info(
+            log.info(
 f'''
 To examine your beacon node service logs, type the following command:
 
 $ sudo journalctl -ru {service_name}
 '''
-        )
+            )
 
-        return False
+            return False
     
     is_fully_sync = False
+
     syncing_status = {
         'bn_is_fully_sync': False,
         'bn_is_syncing': False,
