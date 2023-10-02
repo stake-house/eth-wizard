@@ -153,6 +153,7 @@ SHOW_WHATS_NEXT_STEP_ID = 'show_whats_next_step'
 SHOW_PUBLIC_KEYS_STEP_ID = 'show_public_keys_step'
 SELECT_CONSENSUS_CLIENT_STEP_ID = 'select_consensus_client_step'
 SELECT_EXECUTION_CLIENT_STEP_ID = 'select_execution_client_step'
+CHECK_OS_REQUIREMENTS_STEP_ID = 'check_os_requirements_step'
 INSTALL_EXECUTION_STEP_ID = 'install_execution_step'
 INSTALL_CONSENSUS_STEP_ID = 'install_consensus_step'
 INSTALL_VALIDATOR_STEP_ID = 'install_validator_step'
@@ -210,6 +211,8 @@ MIN_CLIENT_VERSION_FOR_MERGE = {
 }
 
 NETHERMIND_NEW_BIN_PATH_VERSION = '1.21.0'
+
+TEKU_MIN_GLIBC_VERSION = '2.34'
 
 LINUX_JWT_TOKEN_DIRECTORY = '/var/lib/ethereum'
 LINUX_JWT_TOKEN_FILE_PATH = f'{LINUX_JWT_TOKEN_DIRECTORY}/jwttoken'

@@ -653,10 +653,34 @@ def installation_steps():
         exc_function=select_execution_client_function
     )
 
+    def check_os_requirements_function(step, context, step_sequence):
+        # Context variables
+        selected_consensus_client = CTX_SELECTED_CONSENSUS_CLIENT
+
+        if not (
+            test_context_variable(context, selected_consensus_client, log)
+            ):
+            # We are missing context variables, we cannot continue
+            quit_app()
+
+        consensus_client = context[selected_consensus_client]
+
+        if not check_cc_os_requirements(consensus_client):
+            quit_app()
+
+        return context
+
+    check_os_requirements_step = Step(
+        step_id=CHECK_OS_REQUIREMENTS_STEP_ID,
+        display_name='Check OS requirements',
+        exc_function=check_os_requirements_function
+    )
+
     return [
         select_network_step,
         select_consensus_client_step,
         select_execution_client_step,
+        check_os_requirements_step,
         test_system_step,
         install_mevboost_step,
         select_custom_ports_step,
@@ -1103,6 +1127,56 @@ enough</b></style> to be a fully working validator. Here are your results:
     ).run()
 
     return result
+
+def check_cc_os_requirements(consensus_client):
+    # Check for consensus client OS requirements
+
+    if consensus_client == CONSENSUS_CLIENT_TEKU:
+        # Teku needs GLIBC version 2.34
+
+        process_result = subprocess.run(['ldd', '--version'], capture_output=True, text=True)
+
+        process_output = process_result.stdout
+        result = re.search(r'ldd\s*?.*\s+(?P<version>(?P<major>[0-9]+)\.(?P<minor>[0-9]+))',
+            process_output)
+        
+        if not result:
+            log.error('We could not parse the output of ldd to find the current GLIBC version.')
+            return False
+        
+        glibc_version = parse_version(result.group('version'))
+
+        teku_min_glibc_version = parse_version(TEKU_MIN_GLIBC_VERSION)
+
+        if glibc_version < teku_min_glibc_version:
+            result = button_dialog(
+                title=HTML('GLIBC too old for Teku'),
+                text=(HTML(
+f'''
+Your version of GLIBC ({glibc_version}) is too old for Teku. Teku requires
+version {teku_min_glibc_version} or newer.
+
+If you want to use Teku, you can update to a newer version of your OS.
+
+On Ubuntu, you can upgrade your OS with this command:
+
+sudo do-release-upgrade
+'''             )),
+                buttons=[
+                    ('Quit', False)
+                ]
+            ).run()
+
+            log.info(
+'''
+On Ubuntu, you can upgrade your OS with this command:
+
+sudo do-release-upgrade
+'''         )
+
+            return False
+
+    return True
 
 def install_mevboost(network):
     # Install mev-boost for the selected network
