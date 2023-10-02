@@ -2122,7 +2122,7 @@ def fix_nethermind_path(base_directory, nssm_binary):
     nethermind_dir = base_directory.joinpath('bin', 'Nethermind')
     nethermind_path = nethermind_dir.joinpath('nethermind.exe')
 
-    if not set_service_param(nssm_binary, nethermind_service_name, 'install', str(nethermind_path)):
+    if not set_service_param(nssm_binary, nethermind_service_name, 'Application', str(nethermind_path)):
         return False
 
     return True
