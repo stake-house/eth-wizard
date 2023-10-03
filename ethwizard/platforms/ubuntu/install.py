@@ -1240,6 +1240,11 @@ Do you want to keep the current MEV-Boost service?
         subprocess.run([
             'systemctl', 'stop', mevboost_service_name])
     
+    # Don't try to install mevboost if it's not supported on this network
+    if network not in MEVBOOST_SERVICE_DEFINITION:
+        log.info(f'No MEV-Boost support for {ETH1_NETWORK_NAME[network]} network.')
+        return installed_value
+
     result = button_dialog(
         title='MEV-Boost installation',
         text=(
