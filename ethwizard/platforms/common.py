@@ -142,6 +142,7 @@ def select_network(log):
 
     network_queue_info = {
         NETWORK_MAINNET: unknown_joining_queue,
+        NETWORK_HOLESKY: unknown_joining_queue,
         NETWORK_GOERLI: unknown_joining_queue
     }
 
@@ -220,6 +221,7 @@ For which network would you like to perform this installation?
         ),
         values=[
             (NETWORK_MAINNET, f'{NETWORK_LABEL[NETWORK_MAINNET]} {network_queue_info[NETWORK_MAINNET]}'),
+            (NETWORK_HOLESKY, f'{NETWORK_LABEL[NETWORK_HOLESKY]} {network_queue_info[NETWORK_HOLESKY]}'),
             (NETWORK_GOERLI, f'{NETWORK_LABEL[NETWORK_GOERLI]} {network_queue_info[NETWORK_GOERLI]}')
         ],
         ok_text='Use this',
