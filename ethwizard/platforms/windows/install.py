@@ -7721,7 +7721,7 @@ for this last test we tried to perform:
 URL: {bn_query_url}
 Method: GET
 Headers: {headers}
-Exception: {exception}
+Exception: {last_exception}
 
 We cannot proceed if the beacon node HTTP server is not responding
 properly. Make sure to check the logs and fix any issue found there. You
@@ -7757,7 +7757,7 @@ for this last test we tried to perform:
 URL: {bn_query_url}
 Method: GET
 Headers: {headers}
-Status code: {response.status_code}
+Status code: {last_status_code}
 
 We cannot proceed if the beacon node HTTP server is not responding
 properly. Make sure to check the logs and fix any issue found there. You
