@@ -4253,7 +4253,7 @@ $ sudo journalctl -ru {nimbus_service_name}
 
     while keep_retrying and retry_index < retry_count:
         try:
-            response = httpx.get(bn_query_url, headers=headers, timeout=30)
+            response = httpx.get(bn_query_url, headers=headers, timeout=60)
         except httpx.RequestError as exception:
             last_exception = exception
 
@@ -4426,7 +4426,7 @@ $ sudo journalctl -ru {nimbus_service_name}
                 'accept': 'application/json'
             }
             try:
-                response = httpx.get(bn_query_url, headers=headers, timeout=30)
+                response = httpx.get(bn_query_url, headers=headers, timeout=60)
             except httpx.RequestError as exception:
                 log_text(f'Exception: {exception} while querying Nimbus beacon node.')
                 continue
@@ -4446,7 +4446,7 @@ $ sudo journalctl -ru {nimbus_service_name}
                 'accept': 'application/json'
             }
             try:
-                response = httpx.get(bn_query_url, headers=headers, timeout=30)
+                response = httpx.get(bn_query_url, headers=headers, timeout=60)
             except httpx.RequestError as exception:
                 log_text(f'Exception: {exception} while querying Nimbus beacon node.')
                 continue
@@ -5728,7 +5728,7 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
         nimbus_service_name = NIMBUS_SYSTEMD_SERVICE_NAME
         service_name = nimbus_service_name
 
-        bn_timeout = 30
+        bn_timeout = 60
 
         service_details = get_systemd_service_details(nimbus_service_name)
 

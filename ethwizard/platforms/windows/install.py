@@ -3783,7 +3783,7 @@ To examine your Nimbus service logs, inspect the following files:
 
     while keep_retrying and retry_index < retry_count:
         try:
-            response = httpx.get(cc_query_url, headers=headers, timeout=30)
+            response = httpx.get(cc_query_url, headers=headers, timeout=60)
         except httpx.RequestError as exception:
             last_exception = exception
             
@@ -3946,7 +3946,7 @@ To examine your Nimbus service logs, inspect the following files:
                 'accept': 'application/json'
             }
             try:
-                response = httpx.get(cc_query_url, headers=headers, timeout=30)
+                response = httpx.get(cc_query_url, headers=headers, timeout=60)
             except httpx.RequestError as exception:
                 log_text(f'Exception: {exception} while querying Nimbus.')
                 continue
@@ -3964,7 +3964,7 @@ To examine your Nimbus service logs, inspect the following files:
                 'accept': 'application/json'
             }
             try:
-                response = httpx.get(cc_query_url, headers=headers, timeout=30)
+                response = httpx.get(cc_query_url, headers=headers, timeout=60)
             except httpx.RequestError as exception:
                 log_text(f'Exception: {exception} while querying Nimbus.')
                 continue
@@ -7554,7 +7554,7 @@ To examine your teku service logs, inspect the following files:
         stdout_log_path = nimbus_stdout_log_path
         stderr_log_path = nimbus_stderr_log_path
 
-        bn_timeout = 30
+        bn_timeout = 60
 
         # Check if Nimbus service is still running
         service_details = get_service_details(nssm_binary, nimbus_service_name)
