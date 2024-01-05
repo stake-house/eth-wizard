@@ -20,6 +20,8 @@ from ethwizard.constants import *
 
 from ethwizard.utils.CompactFIPS202 import Keccak_256
 
+from asyncio import get_running_loop
+
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import radiolist_dialog, button_dialog, input_dialog, checkboxlist_dialog
 from prompt_toolkit.shortcuts.dialogs import _return_none, _create_app
@@ -191,12 +193,7 @@ def select_network(log):
     for network in network_queue_info.keys():
         async_tasks.append(network_joining_validators(network))
     
-    loop = None
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError as e:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    loop = get_running_loop()
 
     results = loop.run_until_complete(asyncio.gather(*async_tasks))
 
@@ -843,12 +840,7 @@ def progress_log_dialog(
     :param run_callback: A function that receives as input a `set_percentage`
         function and it does the work.
     """
-    loop = None
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError as e:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    loop = get_running_loop()
 
     def wait_handler() -> None:
         pass
