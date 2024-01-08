@@ -193,7 +193,11 @@ def select_network(log):
     for network in network_queue_info.keys():
         async_tasks.append(network_joining_validators(network))
     
-    loop = get_running_loop()
+    try:
+        loop = get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
 
     results = loop.run_until_complete(asyncio.gather(*async_tasks))
 
@@ -840,7 +844,11 @@ def progress_log_dialog(
     :param run_callback: A function that receives as input a `set_percentage`
         function and it does the work.
     """
-    loop = get_running_loop()
+    try:
+        loop = get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
 
     def wait_handler() -> None:
         pass

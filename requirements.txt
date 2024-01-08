@@ -1,4 +1,4 @@
-prompt_toolkit>=3.0.0,<3.1.0
+prompt_toolkit==3.0.39
 httpx
 packaging
 humanize
