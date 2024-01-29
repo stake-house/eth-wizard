@@ -1812,7 +1812,7 @@ def upgrade_mevboost(base_directory, nssm_binary):
 
     mevboost_service_name = 'mevboost'
 
-    log.info('Stoping MEV-Boost service...')
+    log.info('Stopping MEV-Boost service...')
     subprocess.run([str(nssm_binary), 'stop', mevboost_service_name])
 
     subprocess.run(['tar', 'xvf', str(binary_path), '--directory', str(bin_path)])
@@ -2004,7 +2004,7 @@ archive after {retry_count} retries.
         return False
 
     geth_service_name = 'geth'
-    log.info('Stoping Geth service...')
+    log.info('Stopping Geth service...')
     subprocess.run([str(nssm_binary), 'stop', geth_service_name])
 
     # Move geth back into bin directory
@@ -2088,7 +2088,7 @@ def upgrade_nethermind(base_directory, nssm_binary):
     nethermind_service_name = 'nethermind'
     nethermind_dir = base_directory.joinpath('bin', 'Nethermind')
 
-    log.info('Stoping Nethermind service...')
+    log.info('Stopping Nethermind service...')
     subprocess.run([str(nssm_binary), 'stop', nethermind_service_name])
 
     # Updating Nethermind with winget
