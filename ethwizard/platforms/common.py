@@ -631,7 +631,7 @@ Do you want add one or more execution fallback node?
 f'''
 Please enter your execution fallback endpoint:
 
-It usually starts with 'https://' and it usally includes a unique id which
+It usually starts with 'https://' and it usually includes a unique id which
 you should keep secret if you used a service that requires an account.
 
 * Press the tab key to switch between the controls below{not_valid_msg}
@@ -1426,7 +1426,7 @@ and all your validator rewards will go into regularly and when you exit.
     return entered_address
 
 def is_checksum_address(address):
-    # Check for valid checksumed Ethereum address
+    # Check for valid checksummed Ethereum address
     address = address.replace('0x', '').strip()
     address_hash = Keccak_256(address.lower().encode('utf-8')).hex()
 
@@ -1437,7 +1437,7 @@ def is_checksum_address(address):
     return True
 
 def is_address(address):
-    # Check for valide Ethereum address
+    # Check for valid Ethereum address
     if not re.match(r'^(0x)?[0-9a-f]{40}$', address, flags=re.IGNORECASE):
         return False
     elif re.match(r'^(0x)?[0-9a-f]{40}$', address) or re.match(r'^(0x)?[0-9A-F]{40}$', address):
