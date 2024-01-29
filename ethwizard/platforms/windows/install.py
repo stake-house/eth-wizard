@@ -8295,7 +8295,7 @@ def disable_windows_updates():
         text=(
 '''
 Automatic download and installation of Windows updates can impede the
-proper functionning of a validator machine. A validator machine is expected
+proper functioning of a validator machine. A validator machine is expected
 to run 24/7 to maximize your rewards. Installing regular Windows updates is
 still strongly recommended to keep your machine secure, but moving this to
 a manual process is recommended for a validator machine.
@@ -8389,7 +8389,7 @@ f'''
 You are currently using the {current_plan_name} power plan but we suggest
 you switch to the {high_performance_plan_name} power plan.
 
-Good performance is needed for a well functionning validator node. This
+Good performance is needed for a well functioning validator node. This
 suggested power plan will give you a good baseline performance without
 any sleeping issue with the default values.
 
