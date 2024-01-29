@@ -292,7 +292,7 @@ def install_gpg(base_directory):
     return True
 
 def set_service_param(nssm_binary, service_name, param, value):
-    # Configure an NSSM service paramater with a value
+    # Configure an NSSM service parameter with a value
     if type(value) is str:
         process_result = subprocess.run([
             str(nssm_binary), 'set', service_name, param, value
