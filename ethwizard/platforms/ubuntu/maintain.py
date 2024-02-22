@@ -235,7 +235,7 @@ def show_dashboard(context):
         if (
             fixed_installed_package_version != UNKNOWN_VALUE and
             is_version(fixed_installed_package_version) and
-            fixed_installed_package_version < nethermind_ppa_package_change_version:
+            fixed_installed_package_version < nethermind_ppa_package_change_version):
             execution_client_details['next_step'] = MAINTENANCE_FIX_PPA_PACKAGE
 
     # If the service is not installed or found, we need to reinstall the client
