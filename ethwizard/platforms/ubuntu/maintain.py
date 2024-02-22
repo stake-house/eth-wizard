@@ -1567,6 +1567,7 @@ def upgrade_nethermind():
     env = os.environ.copy()
     env['DEBIAN_FRONTEND'] = 'noninteractive'
 
+    subprocess.run(['apt', '-y', 'install', 'unzip'], env=env)
     subprocess.run(['apt', '-y', 'install', 'nethermind'], env=env)
 
     log.info('Restarting Nethermind service...')

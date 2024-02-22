@@ -2421,6 +2421,8 @@ Do you want to skip installing the Nethermind binary?
         subprocess.run([
             'apt', '-y', 'update'])
         subprocess.run([
+            'apt', '-y', 'install', 'unzip'])
+        subprocess.run([
             'apt', '-y', 'install', 'nethermind'])
         
         # Get Nethermind version
