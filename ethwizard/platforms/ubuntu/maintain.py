@@ -55,6 +55,7 @@ from ethwizard.constants import (
     GETH_SYSTEMD_SERVICE_NAME,
     NETHERMIND_SYSTEMD_SERVICE_NAME,
     NETHERMIND_NEW_BIN_PATH_VERSION,
+    NETHERMIND_PPA_PACKAGE_CHANGE_VERSION,
     MIN_CLIENT_VERSION_FOR_MERGE,
     LINUX_JWT_TOKEN_FILE_PATH,
     MAINTENANCE_DO_NOTHING,
@@ -64,6 +65,7 @@ from ethwizard.constants import (
     MAINTENANCE_CONFIG_CLIENT_MERGE,
     MAINTENANCE_UPGRADE_CLIENT_FIX_PATH,
     MAINTENANCE_FIX_BIN_PATH,
+    MAINTENANCE_FIX_PPA_PACKAGE,
     MAINTENANCE_CHECK_AGAIN_SOON,
     MAINTENANCE_START_SERVICE,
     MAINTENANCE_REINSTALL_CLIENT,
@@ -215,6 +217,26 @@ def show_dashboard(context):
             if is_available_exec_merge_ready and not execution_client_details['is_merge_configured']:
                 execution_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT_MERGE
 
+    # If using Nethermind and using the old PPA package, we need to fix it with APT for
+    # the new package. See https://github.com/NethermindEth/nethermind/releases/tag/1.25.4
+
+    nethermind_ppa_package_change_version = parse_version(NETHERMIND_PPA_PACKAGE_CHANGE_VERSION)
+
+    if current_execution_client == EXECUTION_CLIENT_NETHERMIND:
+        installed_packaged_version = execution_client_details['versions'].get(
+            'installed_packaged', UNKNOWN_VALUE)
+        if installed_packaged_version != UNKNOWN_VALUE:
+            installed_packaged_version = parse_version(installed_packaged_version)
+        fixed_installed_package_version = execution_client_details['versions'].get(
+            'fixed_installed_package', UNKNOWN_VALUE)
+        if fixed_installed_package_version != UNKNOWN_VALUE:
+            fixed_installed_package_version = parse_version(fixed_installed_package_version)
+        
+        if (
+            fixed_installed_package_version != UNKNOWN_VALUE and
+            is_version(fixed_installed_package_version) and
+            fixed_installed_package_version < nethermind_ppa_package_change_version:
+            execution_client_details['next_step'] = MAINTENANCE_FIX_PPA_PACKAGE
 
     # If the service is not installed or found, we need to reinstall the client
 
@@ -389,6 +411,7 @@ def show_dashboard(context):
         MAINTENANCE_CONFIG_CLIENT_MERGE: 'Client needs to be configured for the merge.',
         MAINTENANCE_UPGRADE_CLIENT_FIX_PATH: 'Client needs to be upgraded and binary path fixed.',
         MAINTENANCE_FIX_BIN_PATH: 'Client needs binary path fixed.',
+        MAINTENANCE_FIX_PPA_PACKAGE: 'Client needs a PPA package fix to be upgraded.',
         MAINTENANCE_CHECK_AGAIN_SOON: 'Check again. Client update should be available soon.',
         MAINTENANCE_START_SERVICE: 'Service needs to be started.',
         MAINTENANCE_REINSTALL_CLIENT: 'Client needs to be reinstalled.',
@@ -672,7 +695,9 @@ def get_execution_client_details(execution_client):
                 'installed': UNKNOWN_VALUE,
                 'running': UNKNOWN_VALUE,
                 'available': UNKNOWN_VALUE,
-                'latest': UNKNOWN_VALUE
+                'latest': UNKNOWN_VALUE,
+                'installed_packaged': UNKNOWN_VALUE,
+                'fixed_installed_package': UNKNOWN_VALUE
             },
             'exec': {
                 'path': UNKNOWN_VALUE,
@@ -704,6 +729,9 @@ def get_execution_client_details(execution_client):
         details['versions']['running'] = get_nethermind_running_version(log)
         details['versions']['available'] = get_nethermind_available_version()
         details['versions']['latest'] = get_nethermind_latest_version(log)
+
+        details['versions']['installed_packaged'], details['versions']['fixed_installed_package'] = (
+            get_nethermind_installed_package_version())
 
         if 'ExecStart' in service_details:
             details['exec'] = parse_exec_start(service_details['ExecStart'])
@@ -816,6 +844,65 @@ def get_nethermind_installed_version():
     log.info(f'Nethermind installed version is {installed_version}')
 
     return installed_version
+
+def get_nethermind_installed_package_version():
+    # Get the installed version for Nethermind package, potentially for fix, see
+    # https://github.com/NethermindEth/nethermind/releases/tag/1.25.4
+
+    log.info('Getting Nethermind installed package version...')
+
+    # Add Nethermind PPA if not already added.
+    if not is_nethermind_ppa_added():
+        spc_package_installed = False
+        try:
+            spc_package_installed = is_package_installed('software-properties-common')
+        except Exception:
+            return UNKNOWN_VALUE, UNKNOWN_VALUE
+        
+        if not spc_package_installed:
+            subprocess.run([
+                'apt', '-y', 'update'])
+            subprocess.run([
+                'apt', '-y', 'install', 'software-properties-common'])
+
+        subprocess.run(['add-apt-repository', '-y', 'ppa:nethermindeth/nethermind'])
+    else:
+        subprocess.run(['apt', '-y', 'update'])
+    
+    process_result = subprocess.run(['apt-cache', 'policy', 'nethermind'], capture_output=True,
+        text=True)
+    
+    if process_result.returncode != 0:
+        log.error(f'Unexpected return code from apt-cache. Return code: '
+            f'{process_result.returncode}')
+        return UNKNOWN_VALUE, UNKNOWN_VALUE
+    
+    process_output = process_result.stdout
+    result = re.search(r'Installed: (?P<version>[^\+\n]+)', process_output)
+    if not result:
+        log.error(f'Cannot parse {process_output} for Nethermind installed version.')
+        return UNKNOWN_VALUE, UNKNOWN_VALUE
+    
+    installed_ppa_version = result.group('version').strip()
+    fixed_installed_ppa_version = UNKNOWN_VALUE
+
+    if installed_ppa_version != '(none)':
+
+        splitted_version = installed_ppa_version.split('.')
+
+        if len(splitted_version) <= 2:
+            # Fix PPA wrong version format scheme (We are getting 1.1930 instead of 1.19.3)
+            if len(splitted_version) > 1:
+                if len(splitted_version[1]) > 2:
+                    fixed_installed_ppa_version = (
+                        f'{splitted_version[0]}.{splitted_version[1][:2]}'
+                        f'.{splitted_version[1][2]}')
+    else:
+        installed_ppa_version = UNKNOWN_VALUE
+
+    log.info(f'Nethermind installed PPA version is {installed_ppa_version} ({fixed_installed_ppa_version})')
+
+    return installed_ppa_version, fixed_installed_ppa_version
 
 def get_nethermind_available_version():
     # Get the available version for Nethermind, potentially for update
@@ -1195,6 +1282,11 @@ def perform_maintenance(execution_client, execution_client_details, consensus_cl
             log.warning('We should never reach this since there is nothing about fixing path '
                 'with Geth.')
             return False
+        
+        elif execution_client_details['next_step'] == MAINTENANCE_FIX_PPA_PACKAGE:
+            log.warning('We should never reach this since there is nothing about fixing PPA '
+                'package with Geth.')
+            return False
 
         elif execution_client_details['next_step'] == MAINTENANCE_START_SERVICE:
             log.info('Starting Geth service...')
@@ -1244,6 +1336,11 @@ def perform_maintenance(execution_client, execution_client_details, consensus_cl
             log.info('Restarting Nethermind service...')
 
             subprocess.run(['systemctl', 'restart', NETHERMIND_SYSTEMD_SERVICE_NAME])
+        
+        elif execution_client_details['next_step'] == MAINTENANCE_FIX_PPA_PACKAGE:
+            if not fix_nethermind_ppa_package():
+                log.error('We could not fix the Nethermind PPA package.')
+                return False
 
         elif execution_client_details['next_step'] == MAINTENANCE_START_SERVICE:
             log.info('Starting Nethermind service...')
@@ -1608,6 +1705,48 @@ def fix_nethermind_path():
     # Reload configuration
     log.info('Reloading service configurations...')
     subprocess.run(['systemctl', 'daemon-reload'])
+
+    return True
+
+def fix_nethermind_ppa_package():
+    # Fix Nethermind PPA package
+    log.info('Fixing Nethermind PPA package...')
+
+    env = os.environ.copy()
+    env['DEBIAN_FRONTEND'] = 'noninteractive'
+
+    # Add Nethermind PPA if not already added.
+    if not is_nethermind_ppa_added():
+        spc_package_installed = False
+        try:
+            spc_package_installed = is_package_installed('software-properties-common')
+        except Exception:
+            return False
+        
+        if not spc_package_installed:
+            subprocess.run([
+                'apt', '-y', 'update'], env=env)
+            subprocess.run([
+                'apt', '-y', 'install', 'software-properties-common'], env=env)
+
+    nethermind_service_name = NETHERMIND_SYSTEMD_SERVICE_NAME
+
+    log.info('Stopping Nethermind service...')
+    subprocess.run(['systemctl', 'stop', nethermind_service_name])
+
+    log.info('Removing current Nethermind package...')
+    subprocess.run(['apt', '-y', 'purge', 'nethermind'], env=env)
+
+    subprocess.run(['apt', '-y', 'update'], env=env)
+
+    log.info('Making sure we have the unzip package...')
+    subprocess.run(['apt', '-y', 'install', 'unzip'], env=env)
+
+    log.info('Reinstalling the Nethermind package...')
+    subprocess.run(['apt', '-y', 'install', 'nethermind'], env=env)
+
+    log.info('Restarting Nethermind service...')
+    subprocess.run(['systemctl', 'start', nethermind_service_name])
 
     return True
 
