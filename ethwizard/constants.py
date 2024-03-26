@@ -19,8 +19,7 @@ NETWORK_GOERLI = 'goerli'
 
 NETWORK_LABEL = {
   NETWORK_MAINNET: 'Mainnet',
-  NETWORK_HOLESKY: 'Holesky',
-  NETWORK_GOERLI: 'Goerli'
+  NETWORK_HOLESKY: 'Holesky'
 }
 
 EPOCHS_PER_DAY = 225
@@ -35,8 +34,7 @@ COREINFO_DOWNLOAD_URL = 'https://download.sysinternals.com/files/Coreinfo.zip'
 
 MIN_AVAILABLE_DISK_SPACE_GB = {
     NETWORK_MAINNET: 1700.0,
-    NETWORK_HOLESKY: 200.0,
-    NETWORK_GOERLI: 450.0
+    NETWORK_HOLESKY: 200.0
 }
 
 MIN_SUSTAINED_K_READ_IOPS = 3.0
@@ -182,20 +180,17 @@ CHOCOLATEY_DEFAULT_BIN_PATH = r'C:\ProgramData\chocolatey\bin'
 
 LAUNCHPAD_URLS = {
     NETWORK_MAINNET: 'https://launchpad.ethereum.org',
-    NETWORK_HOLESKY: 'https://holesky.launchpad.ethereum.org/',
-    NETWORK_GOERLI: 'https://goerli.launchpad.ethereum.org'
+    NETWORK_HOLESKY: 'https://holesky.launchpad.ethereum.org/'
 }
 
 BEACONCHA_IN_URLS = {
     NETWORK_MAINNET: 'https://beaconcha.in',
-    NETWORK_HOLESKY: 'https://holesky.beaconcha.in/',
-    NETWORK_GOERLI: 'https://goerli.beaconcha.in'
+    NETWORK_HOLESKY: 'https://holesky.beaconcha.in/'
 }
 
 COMMUNITY_CHECKPOINT_SYNC_YAML = {
     NETWORK_MAINNET: 'https://raw.githubusercontent.com/eth-clients/checkpoint-sync-endpoints/main/endpoints/mainnet.yaml',
-    NETWORK_HOLESKY: 'https://raw.githubusercontent.com/eth-clients/checkpoint-sync-endpoints/main/endpoints/holesky.yaml',
-    NETWORK_GOERLI: 'https://raw.githubusercontent.com/eth-clients/checkpoint-sync-endpoints/main/endpoints/goerli.yaml'
+    NETWORK_HOLESKY: 'https://raw.githubusercontent.com/eth-clients/checkpoint-sync-endpoints/main/endpoints/holesky.yaml'
 }
 
 VERY_LARGE_VERSION_NUMBER = '500.0.0'
@@ -214,13 +209,6 @@ MIN_CLIENT_VERSION_FOR_MERGE = {
     CONSENSUS_CLIENT_LIGHTHOUSE: '3.0.0',
     CONSENSUS_CLIENT_TEKU: '22.8.1',
     CONSENSUS_CLIENT_NIMBUS: '22.9.0',
-  },
-  NETWORK_GOERLI: {
-    EXECUTION_CLIENT_GETH: '1.10.21',
-    EXECUTION_CLIENT_NETHERMIND: '1.13.5',
-    CONSENSUS_CLIENT_LIGHTHOUSE: '2.4.0',
-    CONSENSUS_CLIENT_TEKU: '22.7.0',
-    CONSENSUS_CLIENT_NIMBUS: '22.7.0',
   }
 }
 
@@ -241,32 +229,27 @@ BN_SYNCING_EP = '/eth/v1/node/syncing'
 
 BN_CHAIN_IDS = {
     NETWORK_MAINNET: 1,
-    NETWORK_HOLESKY: 17000,
-    NETWORK_GOERLI: 5
+    NETWORK_HOLESKY: 17000
 }
 
 BN_DEPOSIT_CONTRACTS = {
     NETWORK_MAINNET: '0x00000000219ab540356cbb839cbe05303d7705fa',
-    NETWORK_HOLESKY: '0x4242424242424242424242424242424242424242',
-    NETWORK_GOERLI: '0xff50ed3d0ec03ac01d4c79aad74928bff48a7b2b'
+    NETWORK_HOLESKY: '0x4242424242424242424242424242424242424242'
 }
 
 NETWORK_CURRENCY = {
     NETWORK_MAINNET: 'ETH',
-    NETWORK_HOLESKY: 'HoETH',
-    NETWORK_GOERLI: 'GöETH',
+    NETWORK_HOLESKY: 'HoETH'
 }
 
 ETH1_NETWORK_NAME = {
     NETWORK_MAINNET: 'Mainnet',
-    NETWORK_HOLESKY: 'Holešky',
-    NETWORK_GOERLI: 'Görli'
+    NETWORK_HOLESKY: 'Holešky'
 }
 
 ETH1_NETWORK_CHAINID = {
     NETWORK_MAINNET: 1,
-    NETWORK_HOLESKY: 17000,
-    NETWORK_GOERLI: 5
+    NETWORK_HOLESKY: 17000
 }
 
 BEACONCHA_VALIDATOR_DEPOSITS_API_URL = '/api/v1/validator/{indexOrPubkey}/deposits'
@@ -277,14 +260,12 @@ NETHERMIND_APT_SOURCE_URL = 'https://ppa.launchpadcontent.net/nethermindeth/neth
 
 GETH_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Go Ethereum Client - Geth (Mainnet)',
-    NETWORK_HOLESKY: 'Go Ethereum Client - Geth (Holešky)',
-    NETWORK_GOERLI: 'Go Ethereum Client - Geth (Görli)'
+    NETWORK_HOLESKY: 'Go Ethereum Client - Geth (Holešky)'
 }
 
 NETHERMIND_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Nethermind Ethereum Client (Mainnet)',
-    NETWORK_HOLESKY: 'Nethermind Ethereum Client (Holešky)',
-    NETWORK_GOERLI: 'Nethermind Ethereum Client (Görli)'
+    NETWORK_HOLESKY: 'Nethermind Ethereum Client (Holešky)'
 }
 
 GNUPG_DOWNLOAD_URL = 'https://www.gnupg.org/download/'
@@ -301,8 +282,7 @@ GETH_BUILDS_BASE_URL = 'https://gethstore.blob.core.windows.net/builds/'
 GETH_WINDOWS_PGP_KEY_ID = '9417309ED2A67EAC'
 GETH_ARGUMENTS = {
     NETWORK_MAINNET: ['--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof'],
-    NETWORK_HOLESKY: ['--holesky', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof'],
-    NETWORK_GOERLI: ['--goerli', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof']
+    NETWORK_HOLESKY: ['--holesky', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof']
 }
 
 GETH_SYSTEMD_SERVICE_NAME = 'geth.service'
@@ -311,8 +291,6 @@ NETHERMIND_ARGUMENTS = {
     NETWORK_MAINNET: ['--config', 'mainnet', '--Metrics.Enabled', 'true', '--Metrics.ExposePort',
       '6061', '--Sync.SnapSync', 'true', '--HealthChecks.Enabled', 'true', '--JsonRpc.Enabled', 'true'],
     NETWORK_HOLESKY: ['--config', 'holesky', '--Metrics.Enabled', 'true', '--Metrics.ExposePort',
-      '6061', '--Sync.SnapSync', 'true', '--HealthChecks.Enabled', 'true', '--JsonRpc.Enabled', 'true'],
-    NETWORK_GOERLI: ['--config', 'goerli', '--Metrics.Enabled', 'true', '--Metrics.ExposePort',
       '6061', '--Sync.SnapSync', 'true', '--HealthChecks.Enabled', 'true', '--JsonRpc.Enabled', 'true']
 }
 
@@ -323,12 +301,12 @@ MEVBOOST_INSTALLED_DIRECTORY = '/usr/local/bin'
 
 MEVBOOST_ARGUMENTS = {
     NETWORK_MAINNET: ['-mainnet', '-relay-check'],
-    NETWORK_GOERLI: ['-goerli', '-relay-check']
+    NETWORK_HOLESKY: ['-holesky', '-relay-check']
 }
 
 MEVBOOST_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'MEV-Boost (Mainnet)',
-    NETWORK_GOERLI: 'MEV-Boost (Goerli)'
+    NETWORK_HOLESKY: 'MEV-Boost (Holesky)'
 }
 
 ETHSTAKER_RELAY_LIST_URL = 'https://raw.githubusercontent.com/eth-educators/ethstaker-guides/main/MEV-relay-list.md'
@@ -345,11 +323,11 @@ RELAY_BUNDLES = {
       'https://0xb0b07cd0abef743db4260b0ed50619cf6ad4d82064cb4fbec9d3ec530f7c5e6793d9f286c4e082c0244ffb9f2658fe88@bloxroute.regulated.blxrbdn.com'
     ]
   },
-  NETWORK_GOERLI: {
+  NETWORK_HOLESKY: {
     'Some': [
-      'https://0xafa4c6985aa049fb79dd37010438cfebeb0f2bd42b115b89dd678dab0670c1de38da0c4e9138c9290a398ecd9a0b3110@builder-relay-goerli.flashbots.net',
-      'https://0x821f2a65afb70e7f2e820a925a9b4c80a159620582c1766b1b09729fec178b11ea22abb3a51f07b288be815a1a2ff516@bloxroute.max-profit.builder.goerli.blxrbdn.com',
-      'https://0xb1559beef7b5ba3127485bbbb090362d9f497ba64e177ee2c8e7db74746306efad687f2cf8574e38d70067d40ef136dc@relay-stag.ultrasound.money'
+      'https://0xafa4c6985aa049fb79dd37010438cfebeb0f2bd42b115b89dd678dab0670c1de38da0c4e9138c9290a398ecd9a0b3110@boost-relay-holesky.flashbots.net',
+      'https://0xab78bf8c781c58078c3beb5710c57940874dd96aef2835e7742c866b4c7c0406754376c2c8285a36c630346aa5c5f833@holesky.aestus.live',
+      'https://0xaa58208899c6105603b74396734a6263cc7d947f444f396a90f7b7d3e65d102aec7e5e5291b27e08d02c50a050825c2f@holesky.titanrelay.xyz'
     ]
   }
 }
@@ -366,38 +344,32 @@ NIMBUS_VC_INSTALLED_PATH = f'{NIMBUS_INSTALLED_DIRECTORY}/nimbus_validator_clien
 
 NIMBUS_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Nimbus Ethereum Client (Mainnet)',
-    NETWORK_HOLESKY: 'Nimbus Ethereum Client (Holešky)',
-    NETWORK_GOERLI: 'Nimbus Ethereum Client (Görli)'
+    NETWORK_HOLESKY: 'Nimbus Ethereum Client (Holešky)'
 }
 
 NIMBUS_ARGUMENTS = {
     NETWORK_MAINNET: ['--network=mainnet', '--rest=true', '--metrics=true', '--enr-auto-update=true'],
-    NETWORK_HOLESKY: ['--network=holesky', '--rest=true', '--metrics=true', '--enr-auto-update=true'],
-    NETWORK_GOERLI: ['--network=goerli', '--rest=true', '--metrics=true', '--enr-auto-update=true']
+    NETWORK_HOLESKY: ['--network=holesky', '--rest=true', '--metrics=true', '--enr-auto-update=true']
 }
 
 LIGHTHOUSE_BN_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Lighthouse Ethereum Client - Beacon Node (Mainnet)',
-    NETWORK_HOLESKY: 'Lighthouse Ethereum Client - Beacon Node (Holešky)',
-    NETWORK_GOERLI: 'Lighthouse Ethereum Client - Beacon Node (Görli)'
+    NETWORK_HOLESKY: 'Lighthouse Ethereum Client - Beacon Node (Holešky)'
 }
 
 LIGHTHOUSE_BN_ARGUMENTS = {
     NETWORK_MAINNET: ['bn', '--network', 'mainnet', '--staking', '--validator-monitor-auto', '--metrics'],
-    NETWORK_HOLESKY: ['bn', '--network', 'holesky', '--staking', '--validator-monitor-auto', '--metrics'],
-    NETWORK_GOERLI: ['bn', '--network', 'goerli', '--staking', '--validator-monitor-auto', '--metrics']
+    NETWORK_HOLESKY: ['bn', '--network', 'holesky', '--staking', '--validator-monitor-auto', '--metrics']
 }
 
 LIGHTHOUSE_VC_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Lighthouse Ethereum Client - Validator Client (Mainnet)',
-    NETWORK_HOLESKY: 'Lighthouse Ethereum Client - Validator Client (Holešky)',
-    NETWORK_GOERLI: 'Lighthouse Ethereum Client - Validator Client (Görli)'
+    NETWORK_HOLESKY: 'Lighthouse Ethereum Client - Validator Client (Holešky)'
 }
 
 LIGHTHOUSE_VC_ARGUMENTS = {
     NETWORK_MAINNET: ['vc', '--network', 'mainnet', '--metrics'],
-    NETWORK_HOLESKY: ['vc', '--network', 'holesky', '--metrics'],
-    NETWORK_GOERLI: ['vc', '--network', 'goerli', '--metrics']
+    NETWORK_HOLESKY: ['vc', '--network', 'holesky', '--metrics']
 }
 
 WINDOWS_SERVICE_RUNNING = 'SERVICE_RUNNING'
@@ -413,14 +385,12 @@ ADOPTIUM_17_API_PARAMS = {
 
 TEKU_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Teku Ethereum Client (Mainnet)',
-    NETWORK_HOLESKY: 'Teku Ethereum Client (Holešky)',
-    NETWORK_GOERLI: 'Teku Ethereum Client (Görli)'
+    NETWORK_HOLESKY: 'Teku Ethereum Client (Holešky)'
 }
 
 TEKU_ARGUMENTS = {
     NETWORK_MAINNET: ['--network=mainnet', '--metrics-enabled', '--rest-api-enabled', '--log-color-enabled=false'],
-    NETWORK_HOLESKY: ['--network=holesky', '--metrics-enabled', '--rest-api-enabled', '--log-color-enabled=false'],
-    NETWORK_GOERLI: ['--network=goerli', '--metrics-enabled', '--rest-api-enabled', '--log-color-enabled=false']
+    NETWORK_HOLESKY: ['--network=holesky', '--metrics-enabled', '--rest-api-enabled', '--log-color-enabled=false']
 }
 
 PROMETHEUS_CONFIG_WINDOWS = (
@@ -60982,10 +60952,10 @@ ExecStart=mev-boost \\
 [Install]
 WantedBy=multi-user.target
 '''),
-    NETWORK_GOERLI: (
+    NETWORK_HOLESKY: (
 '''
 [Unit]
-Description=MEV-Boost (Goerli)
+Description=MEV-Boost (Holesky)
 Wants=network-online.target
 After=network-online.target
 
@@ -60996,7 +60966,7 @@ Group=mevboost
 Restart=always
 RestartSec=5
 ExecStart=mev-boost \\
-    -goerli \\
+    -holesky \\
     -relay-check{addparams}
 
 [Install]
@@ -61040,25 +61010,6 @@ Restart=always
 RestartSec=5
 TimeoutStopSec=180
 ExecStart=geth --holesky --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof{addparams}
-
-[Install]
-WantedBy=default.target
-'''),
-    NETWORK_GOERLI: (
-'''
-[Unit]
-Description=Go Ethereum Client - Geth (Görli)
-After=network.target
-Wants=network.target
-
-[Service]
-User=goeth
-Group=goeth
-Type=simple
-Restart=always
-RestartSec=5
-TimeoutStopSec=180
-ExecStart=geth --goerli --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof{addparams}
 
 [Install]
 WantedBy=default.target
@@ -61121,34 +61072,6 @@ ExecStart=/usr/share/nethermind/nethermind \\
 
 [Install]
 WantedBy=multi-user.target
-'''),
-    NETWORK_GOERLI: (
-f'''
-[Unit]
-Description=Nethermind Ethereum Client (Görli)
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-User=nethermind
-Group=nethermind
-Type=simple
-Restart=always
-RestartSec=5
-TimeoutStopSec=180
-WorkingDirectory=/var/lib/nethermind
-Environment="DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/nethermind"
-ExecStart=/usr/share/nethermind/nethermind \\
-    --config goerli \\
-    --datadir /var/lib/nethermind \\
-    --Metrics.Enabled true \\
-    --Metrics.ExposePort 6061 \\
-    --Sync.SnapSync true \\
-    --HealthChecks.Enabled true \\
-    --JsonRpc.Enabled true{{addparams}}
-
-[Install]
-WantedBy=multi-user.target
 ''')
 }
 
@@ -61198,29 +61121,6 @@ ExecStart={NIMBUS_INSTALLED_PATH} \\
 
 [Install]
 WantedBy=multi-user.target
-'''),
-    NETWORK_GOERLI: (
-f'''
-[Unit]
-Description=Nimbus Ethereum Client (Görli)
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-Type=simple
-User=nimbus
-Group=nimbus
-Restart=always
-RestartSec=5
-ExecStart={NIMBUS_INSTALLED_PATH} \\
-    --network=goerli \\
-    --data-dir=/var/lib/nimbus \\
-    --rest=true \\
-    --metrics=true \\
-    --enr-auto-update=true{{addparams}}
-
-[Install]
-WantedBy=multi-user.target
 ''')
 }
 
@@ -61260,24 +61160,6 @@ ExecStart={LIGHTHOUSE_INSTALLED_PATH} bn --network holesky --datadir /var/lib/li
 
 [Install]
 WantedBy=multi-user.target
-'''),
-    NETWORK_GOERLI: (
-f'''
-[Unit]
-Description=Lighthouse Ethereum Client Beacon Node (Görli)
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-Type=simple
-User=lighthousebeacon
-Group=lighthousebeacon
-Restart=always
-RestartSec=5
-ExecStart={LIGHTHOUSE_INSTALLED_PATH} bn --network goerli --datadir /var/lib/lighthouse --staking --validator-monitor-auto --metrics{{addparams}}
-
-[Install]
-WantedBy=multi-user.target
 ''')
 }
 
@@ -61314,24 +61196,6 @@ Type=simple
 Restart=always
 RestartSec=5
 ExecStart={LIGHTHOUSE_INSTALLED_PATH} vc --network holesky --datadir /var/lib/lighthouse --metrics{{addparams}}
-
-[Install]
-WantedBy=multi-user.target
-'''),
-    NETWORK_GOERLI: (
-f'''
-[Unit]
-Description=Lighthouse Ethereum Client Validator Client (Görli)
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-User=lighthousevalidator
-Group=lighthousevalidator
-Type=simple
-Restart=always
-RestartSec=5
-ExecStart={LIGHTHOUSE_INSTALLED_PATH} vc --network goerli --datadir /var/lib/lighthouse --metrics{{addparams}}
 
 [Install]
 WantedBy=multi-user.target

@@ -142,8 +142,7 @@ def select_network(log):
 
     network_queue_info = {
         NETWORK_MAINNET: unknown_joining_queue,
-        NETWORK_HOLESKY: unknown_joining_queue,
-        NETWORK_GOERLI: unknown_joining_queue
+        NETWORK_HOLESKY: unknown_joining_queue
     }
 
     headers = {
@@ -226,8 +225,7 @@ For which network would you like to perform this installation?
         ),
         values=[
             (NETWORK_MAINNET, f'{NETWORK_LABEL[NETWORK_MAINNET]} {network_queue_info[NETWORK_MAINNET]}'),
-            (NETWORK_HOLESKY, f'{NETWORK_LABEL[NETWORK_HOLESKY]} {network_queue_info[NETWORK_HOLESKY]}'),
-            (NETWORK_GOERLI, f'{NETWORK_LABEL[NETWORK_GOERLI]} {network_queue_info[NETWORK_GOERLI]}')
+            (NETWORK_HOLESKY, f'{NETWORK_LABEL[NETWORK_HOLESKY]} {network_queue_info[NETWORK_HOLESKY]}')
         ],
         ok_text='Use this',
         cancel_text='Quit'
@@ -1914,7 +1912,7 @@ def select_mev_relays(network, log):
         if found_first and line.strip() == '':
             found_first = False
             if current_network == NETWORK_MAINNET:
-                current_network = NETWORK_GOERLI
+                current_network = NETWORK_HOLESKY
             else:
                 current_network = 'unknown'
     
