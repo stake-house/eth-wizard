@@ -802,10 +802,13 @@ def test_disk_speed():
     if not fio_package_installed:
         log.info('Installing fio to test disk speed...')
 
+        env = os.environ.copy()
+        env['DEBIAN_FRONTEND'] = 'noninteractive'
+
         subprocess.run([
             'apt', '-y', 'update'])
         subprocess.run([
-            'apt', '-y', 'install', 'fio'])
+            'apt', '-y', 'install', 'fio'], env=env)
     
     # Run fio test
     fio_path = Path(Path.home(), 'ethwizard', 'fio')
@@ -1753,18 +1756,21 @@ Do you want to skip installing the Geth binary?
         except Exception:
             return False
         
+        env = os.environ.copy()
+        env['DEBIAN_FRONTEND'] = 'noninteractive'
+
         if not spc_package_installed:
             subprocess.run([
                 'apt', '-y', 'update'])
             subprocess.run([
-                'apt', '-y', 'install', 'software-properties-common'])
+                'apt', '-y', 'install', 'software-properties-common'], env=env)
 
         subprocess.run([
             'add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
         subprocess.run([
             'apt', '-y', 'update'])
         subprocess.run([
-            'apt', '-y', 'install', 'geth'])
+            'apt', '-y', 'install', 'geth'], env=env)
         
         # Get Geth version
         try:
@@ -2449,20 +2455,23 @@ Do you want to skip installing the Nethermind binary?
         except Exception:
             return False
         
+        env = os.environ.copy()
+        env['DEBIAN_FRONTEND'] = 'noninteractive'
+
         if not spc_package_installed:
             subprocess.run([
                 'apt', '-y', 'update'])
             subprocess.run([
-                'apt', '-y', 'install', 'software-properties-common'])
+                'apt', '-y', 'install', 'software-properties-common'], env=env)
 
         subprocess.run([
             'add-apt-repository', '-y', 'ppa:nethermindeth/nethermind'])
         subprocess.run([
             'apt', '-y', 'update'])
         subprocess.run([
-            'apt', '-y', 'install', 'unzip'])
+            'apt', '-y', 'install', 'unzip'], env=env)
         subprocess.run([
-            'apt', '-y', 'install', 'nethermind'])
+            'apt', '-y', 'install', 'nethermind'], env=env)
         
         # Get Nethermind version
         try:
@@ -3230,12 +3239,15 @@ Do you want to skip installing the lighthouse binary?
         except Exception:
             return False
 
+        env = os.environ.copy()
+        env['DEBIAN_FRONTEND'] = 'noninteractive'
+
         if not gpg_is_installed:
             # Install gpg using APT
             subprocess.run([
                 'apt', '-y', 'update'])
             subprocess.run([
-                'apt', '-y', 'install', 'gpg'])
+                'apt', '-y', 'install', 'gpg'], env=env)
 
         # Verify PGP signature
 
