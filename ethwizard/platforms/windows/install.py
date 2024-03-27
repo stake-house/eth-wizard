@@ -1856,6 +1856,9 @@ Do you want to remove this directory first and start from nothing?
         geth_arguments.append('--port')
         geth_arguments.append(str(ports['eth1']))
     
+    # Check if PBSS possible
+    pbss_possible = False
+
     # Check if merge ready
     merge_ready = False
 
@@ -1867,6 +1870,13 @@ Do you want to remove this directory first and start from nothing?
         
         if cleaned_geth_version >= target_geth_version:
             merge_ready = True
+        
+        geth_min_pbss_version = parse_version(GETH_MIN_PBSS_VERSION)
+        geth_max_notdefault_pbss_version = parse_version(GETH_MAX_NOTDEFAULT_PBSS_VERSION)
+
+        if (cleaned_geth_version >= geth_min_pbss_version and 
+            cleaned_geth_version < geth_max_notdefault_pbss_version):
+            pbss_possible =  True
     
     if merge_ready:
         jwt_token_dir = base_directory.joinpath('var', 'lib', 'ethereum')
@@ -1883,6 +1893,35 @@ Unable to create JWT token file in {jwt_token_path}
         
         geth_arguments.append('--authrpc.jwtsecret')
         geth_arguments.append(f'"{jwt_token_path}"')
+    
+    # Prompt for enabling PBSS if that is possible
+    if pbss_possible:
+        result = button_dialog(
+            title='PBSS configuration',
+            text=(
+f'''
+It is possible to enable the path-based storage scheme (PBSS) with Geth.
+
+Geth's new path-based storage is considered stable and production ready,
+but was not battle tested. It provides great benefits for disk space
+usage and maintenance. We suggest you enable it.
+
+You can learn more on https://blog.ethereum.org/2023/09/12/geth-v1-13-0
+
+Do you want to enable PBSS with Geth?
+'''         ),
+            buttons=[
+                ('Enable', 1),
+                ('Disable', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            geth_arguments.append(f'--state.scheme=path')
 
     parameters = {
         'DisplayName': GETH_SERVICE_DISPLAY_NAME[network],
