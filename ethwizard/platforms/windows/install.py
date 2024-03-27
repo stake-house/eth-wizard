@@ -5442,7 +5442,7 @@ Unable to create JWT token file in {jwt_token_path}
         str(nssm_binary), 'start', lighthouse_service_name
     ])
 
-    delay = 30
+    delay = 45
     log.info(f'We are giving {delay} seconds for the Lighthouse beacon node service to start properly.')
     time.sleep(delay)
 

@@ -3430,13 +3430,18 @@ f'''
 We are giving the lighthouse beacon node {delay} seconds to start before
 testing it.
 
-You might see some error and warn messages about your eth1 node not being in
-sync, being far behind or about the beacon node being unable to connect to any
-eth1 node. Those message are normal to see while your Ethereum execution
-client is syncing.
+You might see some error about your execution engine upcheck or about the
+beacon node being unable to connect to any execution client. Those message
+are normal to see since we will install the execution client later.
 '''
     )
-    time.sleep(delay)
+
+    try:
+        subprocess.run([
+            'journalctl', '-o', 'cat', '-fu', lighthouse_bn_service_name
+        ], timeout=delay)
+    except subprocess.TimeoutExpired:
+        pass
 
     # Check if the Lighthouse beacon node service is still running
     service_details = get_systemd_service_details(lighthouse_bn_service_name)
@@ -3512,7 +3517,14 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
 
             retry_index = retry_index + 1
             log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
-            time.sleep(retry_delay)
+
+            try:
+                subprocess.run([
+                    'journalctl', '-o', 'cat', '-fu', lighthouse_bn_service_name
+                ], timeout=retry_delay)
+            except subprocess.TimeoutExpired:
+                pass
+
             retry_delay = retry_delay + retry_delay_increase
             continue
 
@@ -3524,7 +3536,14 @@ $ sudo journalctl -ru {lighthouse_bn_service_name}
             
             retry_index = retry_index + 1
             log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
-            time.sleep(retry_delay)
+
+            try:
+                subprocess.run([
+                    'journalctl', '-o', 'cat', '-fu', lighthouse_bn_service_name
+                ], timeout=retry_delay)
+            except subprocess.TimeoutExpired:
+                pass
+
             retry_delay = retry_delay + retry_delay_increase
             continue
 
