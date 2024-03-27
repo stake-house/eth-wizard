@@ -270,6 +270,9 @@ NETHERMIND_SERVICE_DISPLAY_NAME = {
 
 GNUPG_DOWNLOAD_URL = 'https://www.gnupg.org/download/'
 
+GETH_MIN_PBSS_VERSION = '1.13.0'
+GETH_MAX_NOTDEFAULT_PBSS_VERSION = '1.14.0'
+
 GETH_STORE_BUILDS_URL = 'https://gethstore.blob.core.windows.net/builds'
 GETH_STORE_BUILDS_PARAMS = {
     'restype': 'container',

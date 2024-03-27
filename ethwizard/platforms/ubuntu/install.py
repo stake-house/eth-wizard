@@ -1832,6 +1832,9 @@ Do you want to remove this directory first and start from nothing?
 
     addparams = []
 
+    # Check if PBSS possible
+    pbss_possible = False
+
     # Check if merge ready
     merge_ready = False
 
@@ -1843,6 +1846,13 @@ Do you want to remove this directory first and start from nothing?
         
         if cleaned_geth_version >= target_geth_version:
             merge_ready = True
+        
+        geth_min_pbss_version = parse_version(GETH_MIN_PBSS_VERSION)
+        geth_max_notdefault_pbss_version = parse_version(GETH_MAX_NOTDEFAULT_PBSS_VERSION)
+
+        if (cleaned_geth_version >= geth_min_pbss_version and 
+            cleaned_geth_version < geth_max_notdefault_pbss_version):
+            pbss_possible =  True
     
     if merge_ready:
         if not setup_jwt_token_file():
@@ -1856,6 +1866,35 @@ Unable to create JWT token file in {LINUX_JWT_TOKEN_FILE_PATH}
         
         addparams.append(f'--authrpc.jwtsecret {LINUX_JWT_TOKEN_FILE_PATH}')
     
+    # Prompt for enabling PBSS if that is possible
+    if pbss_possible:
+        result = button_dialog(
+            title='PBSS configuration',
+            text=(
+f'''
+It is possible to enable the path-based storage scheme (PBSS) with Geth.
+
+Geth's new path-based storage is considered stable and production ready,
+but was not battle tested. It provides great benefits for disk space
+usage and maintenance. We suggest you enable it.
+
+You can learn more on https://blog.ethereum.org/2023/09/12/geth-v1-13-0
+
+Do you want to enable PBSS with Geth?
+'''         ),
+            buttons=[
+                ('Enable', 1),
+                ('Disable', 2),
+                ('Quit', False)
+            ]
+        ).run()
+
+        if not result:
+            return result
+        
+        if result == 1:
+            addparams.append(f'--state.scheme=path')
+
     # Setup Geth systemd service
     if ports['eth1'] != DEFAULT_GETH_PORT:
         addparams.append(f'--port {ports["eth1"]}')
