@@ -790,11 +790,14 @@ def get_geth_available_version():
         except Exception:
             return False
         
+        env = os.environ.copy()
+        env['DEBIAN_FRONTEND'] = 'noninteractive'
+
         if not spc_package_installed:
             subprocess.run([
                 'apt', '-y', 'update'])
             subprocess.run([
-                'apt', '-y', 'install', 'software-properties-common'])
+                'apt', '-y', 'install', 'software-properties-common'], env=env)
 
         subprocess.run(['add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
     else:
@@ -859,11 +862,14 @@ def get_nethermind_installed_package_version():
         except Exception:
             return UNKNOWN_VALUE, UNKNOWN_VALUE
         
+        env = os.environ.copy()
+        env['DEBIAN_FRONTEND'] = 'noninteractive'
+
         if not spc_package_installed:
             subprocess.run([
                 'apt', '-y', 'update'])
             subprocess.run([
-                'apt', '-y', 'install', 'software-properties-common'])
+                'apt', '-y', 'install', 'software-properties-common'], env=env)
 
         subprocess.run(['add-apt-repository', '-y', 'ppa:nethermindeth/nethermind'])
     else:
@@ -917,11 +923,14 @@ def get_nethermind_available_version():
         except Exception:
             return False
         
+        env = os.environ.copy()
+        env['DEBIAN_FRONTEND'] = 'noninteractive'
+
         if not spc_package_installed:
             subprocess.run([
                 'apt', '-y', 'update'])
             subprocess.run([
-                'apt', '-y', 'install', 'software-properties-common'])
+                'apt', '-y', 'install', 'software-properties-common'], env=env)
 
         subprocess.run(['add-apt-repository', '-y', 'ppa:nethermindeth/nethermind'])
     else:
@@ -1611,6 +1620,9 @@ def upgrade_geth():
     # Upgrade the Geth client
     log.info('Upgrading Geth client...')
 
+    env = os.environ.copy()
+    env['DEBIAN_FRONTEND'] = 'noninteractive'
+
     # Add Ethereum PPA if not already added.
     if not is_ethereum_ppa_added():
         spc_package_installed = False
@@ -1623,14 +1635,11 @@ def upgrade_geth():
             subprocess.run([
                 'apt', '-y', 'update'])
             subprocess.run([
-                'apt', '-y', 'install', 'software-properties-common'])
+                'apt', '-y', 'install', 'software-properties-common'], env=env)
 
         subprocess.run(['add-apt-repository', '-y', 'ppa:ethereum/ethereum'])
     else:
         subprocess.run(['apt', '-y', 'update'])
-
-    env = os.environ.copy()
-    env['DEBIAN_FRONTEND'] = 'noninteractive'
 
     subprocess.run(['apt', '-y', 'install', 'geth'], env=env)
 
@@ -1642,6 +1651,9 @@ def upgrade_geth():
 def upgrade_nethermind():
     # Upgrade the Nethermind client
     log.info('Upgrading Nethermind client...')
+
+    env = os.environ.copy()
+    env['DEBIAN_FRONTEND'] = 'noninteractive'
 
     # Add Nethermind PPA if not already added.
     if not is_nethermind_ppa_added():
@@ -1655,14 +1667,11 @@ def upgrade_nethermind():
             subprocess.run([
                 'apt', '-y', 'update'])
             subprocess.run([
-                'apt', '-y', 'install', 'software-properties-common'])
+                'apt', '-y', 'install', 'software-properties-common'], env=env)
 
         subprocess.run(['add-apt-repository', '-y', 'ppa:nethermindeth/nethermind'])
     else:
         subprocess.run(['apt', '-y', 'update'])
-
-    env = os.environ.copy()
-    env['DEBIAN_FRONTEND'] = 'noninteractive'
 
     subprocess.run(['apt', '-y', 'install', 'unzip'], env=env)
     subprocess.run(['apt', '-y', 'install', 'nethermind'], env=env)
@@ -1725,7 +1734,7 @@ def fix_nethermind_ppa_package():
         
         if not spc_package_installed:
             subprocess.run([
-                'apt', '-y', 'update'], env=env)
+                'apt', '-y', 'update'])
             subprocess.run([
                 'apt', '-y', 'install', 'software-properties-common'], env=env)
 
@@ -1737,7 +1746,7 @@ def fix_nethermind_ppa_package():
     log.info('Removing current Nethermind package...')
     subprocess.run(['apt', '-y', 'purge', 'nethermind'], env=env)
 
-    subprocess.run(['apt', '-y', 'update'], env=env)
+    subprocess.run(['apt', '-y', 'update'])
 
     log.info('Making sure we have the unzip package...')
     subprocess.run(['apt', '-y', 'install', 'unzip'], env=env)
@@ -2028,11 +2037,15 @@ def upgrade_lighthouse():
         return False
 
     if not gpg_is_installed:
+
+        env = os.environ.copy()
+        env['DEBIAN_FRONTEND'] = 'noninteractive'
+
         # Install gpg using APT
         subprocess.run([
             'apt', '-y', 'update'])
         subprocess.run([
-            'apt', '-y', 'install', 'gpg'])
+            'apt', '-y', 'install', 'gpg'], env=env)
 
     # Verify PGP signature
 
