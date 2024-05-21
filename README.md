@@ -30,7 +30,7 @@ You can use something like this in a terminal, to start the wizard:
 wget https://github.com/stake-house/eth-wizard/releases/download/v0.9.15/ethwizard-0.9.15.pyz && sudo python3 ethwizard-0.9.15.pyz
 ```
 
-### On Windows 10 on 11
+### On Windows 10 or 11
 
 Please note that some antivirus software might detect the wizard binary as a threat and delete it or prevent its execution.
 
