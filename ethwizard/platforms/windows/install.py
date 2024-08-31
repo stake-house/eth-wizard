@@ -2442,7 +2442,8 @@ Do you want to skip installing the Nethermind binary?
             subprocess.run(command)
 
             nethermind_dir.mkdir(parents=True, exist_ok=True)
-            command = ['winget', 'install', 'nethermind', '-l', str(nethermind_dir)] + base_options
+            command = ['winget', 'install', 'nethermind', '--source', 'winget',
+                '-l', str(nethermind_dir)] + base_options
 
             process_result = subprocess.run(command)
             if process_result.returncode != 0:
