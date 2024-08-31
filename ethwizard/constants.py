@@ -379,8 +379,8 @@ WINDOWS_SERVICE_RUNNING = 'SERVICE_RUNNING'
 WINDOWS_SERVICE_START_PENDING = 'SERVICE_START_PENDING'
 WINDOWS_HIGH_PERFORMANCE_POWERPLAN_GUID = '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'
 
-ADOPTIUM_17_API_URL = 'https://api.adoptium.net/v3/assets/latest/17/hotspot'
-ADOPTIUM_17_API_PARAMS = {
+ADOPTIUM_21_API_URL = 'https://api.adoptium.net/v3/assets/latest/21/hotspot'
+ADOPTIUM_21_API_PARAMS = {
     'release': 'latest',
     'jvm_impl': 'hotspot',
     'vendor': 'adoptium'
