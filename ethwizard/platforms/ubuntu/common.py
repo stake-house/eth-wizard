@@ -136,31 +136,6 @@ def is_package_installed(package):
 
     return package_is_installed
 
-def is_adx_supported():
-    # Detect if ADX instructions set is support on this CPU
-
-    with open('/proc/cpuinfo', 'r') as cpuinfo_file:
-        line = cpuinfo_file.readline()
-        while line:
-            result = re.search(r'flags\s+\:\s*(.*)', line)
-            if result:
-                cpuflags = set(result.group(1).strip().lower().split(' '))
-
-                adx_support = ('adx' in cpuflags)
-
-                if adx_support:
-                    log.info('ADX instructions set is supported on this CPU.')
-                else:
-                    log.warn('ADX instructions set is NOT supported on this CPU.')
-
-                return adx_support
-            line = cpuinfo_file.readline()
-        
-        log.warning('No CPU flags found in /proc/cpuinfo. '
-            'Could not find if ADX instructions are supported.')
-
-    return False
-
 def setup_jwt_token_file():
     # Create or ensure that the JWT token file exist
 

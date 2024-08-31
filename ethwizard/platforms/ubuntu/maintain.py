@@ -29,7 +29,6 @@ from ethwizard.platforms.ubuntu.common import (
     save_state,
     get_systemd_service_details,
     is_package_installed,
-    is_adx_supported,
     setup_jwt_token_file,
     is_ethereum_ppa_added,
     is_nethermind_ppa_added
@@ -1960,13 +1959,6 @@ def upgrade_lighthouse():
     signature_asset = None
 
     archive_filename_comp = 'x86_64-unknown-linux-gnu.tar.gz'
-
-    use_optimized_binary = is_adx_supported()
-    if not use_optimized_binary:
-        log.warning('CPU does not support ADX instructions. '
-            'Using the portable version for Lighthouse.')
-        archive_filename_comp = 'x86_64-unknown-linux-gnu-portable.tar.gz'
-    
     archive_filename_sig_comp = archive_filename_comp + '.asc'
 
     for asset in release_json['assets']:

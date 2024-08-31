@@ -42,8 +42,7 @@ from ethwizard.platforms.windows.common import (
     is_stable_windows_amd64_archive,
     install_gpg,
     set_service_param,
-    setup_jwt_token_file,
-    is_adx_supported
+    setup_jwt_token_file
 )
 
 from ethwizard.constants import (
@@ -2305,13 +2304,6 @@ def upgrade_lighthouse(base_directory, nssm_binary):
     signature_asset = None
 
     archive_filename_comp = 'x86_64-windows.tar.gz'
-
-    use_optimized_binary = is_adx_supported(base_directory, log)
-    if not use_optimized_binary:
-        log.warning('CPU does not support ADX instructions. '
-            'Using the portable version for Lighthouse.')
-        archive_filename_comp = 'x86_64-windows-portable.tar.gz'
-    
     archive_filename_sig_comp = archive_filename_comp + '.asc'
 
     for asset in release_json['assets']:
