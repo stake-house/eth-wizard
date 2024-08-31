@@ -2434,7 +2434,7 @@ Do you want to skip installing the Nethermind binary?
 
         try:
             # Install prerequisites
-            command = ['winget', 'install', 'Microsoft.VCRedist.2015+.x64'] + base_options
+            command = ['winget', 'install', 'Microsoft.VCRedist.2015+.x64', '--source', 'winget'] + base_options
             subprocess.run(command)
 
             # Install Nethermind
