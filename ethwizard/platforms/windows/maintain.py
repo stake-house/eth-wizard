@@ -602,7 +602,7 @@ def get_mevboost_installed_version(base_directory):
             f'{process_result.returncode}')
         return UNKNOWN_VALUE
     
-    process_output = process_result.stdout
+    process_output = process_result.stdout + process_result.stderr
     result = re.search(r'mev-boost v?(?P<version>\S+)', process_output)
     if not result:
         log.error(f'Cannot parse {process_output} for MEV-Boost installed version.')
