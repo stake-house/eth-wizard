@@ -846,6 +846,9 @@ def get_consensus_client_details(base_directory, consensus_client):
                 'path': UNKNOWN_VALUE,
                 'argv': []
             },
+            'jre': {
+                'version': UNKNOWN_VALUE
+            },
             'is_merge_configured': UNKNOWN_VALUE,
             'single_service': True,
         }
@@ -887,6 +890,8 @@ def get_consensus_client_details(base_directory, consensus_client):
         details['versions']['installed'] = get_teku_installed_version(base_directory)
         details['versions']['running'] = get_teku_running_version()
         details['versions']['latest'] = get_teku_latest_version()
+
+        details['jre']['version'] = get_jre_installed_version(base_directory)
 
         return details
 
@@ -1095,6 +1100,40 @@ def get_teku_installed_version(base_directory):
         log.info(f'Teku installed version is {teku_version}')
 
         return teku_version
+    
+    return UNKNOWN_VALUE
+
+def get_jre_installed_version(base_directory):
+    # Get the installed version for Java JRE
+
+    log.info('Getting Java JRE installed version...')
+
+    jre_path = base_directory.joinpath('bin', 'jre')
+    java_path = jre_path.joinpath('bin', 'java.exe')
+
+    jre_found = False
+    jre_version = 'unknown'
+
+    if java_path.is_file():
+        try:
+            process_result = subprocess.run([
+                str(java_path), '--version'
+                ], capture_output=True, text=True, encoding='utf8')
+            jre_found = True
+
+            process_output = process_result.stdout
+            result = re.search(r'openjdk (?P<version>\S+)', process_output)
+            if result:
+                jre_version = result.group('version').strip()
+
+        except FileNotFoundError:
+            log.error('No Java JRE installation found.')
+            pass
+
+    if jre_found:
+        log.info(f'Java JRE installed version is {jre_version}')
+
+        return jre_version
     
     return UNKNOWN_VALUE
 
