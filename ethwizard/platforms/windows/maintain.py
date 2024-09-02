@@ -71,12 +71,15 @@ from ethwizard.constants import (
     MAINTENANCE_START_SERVICE,
     MAINTENANCE_REINSTALL_CLIENT,
     MAINTENANCE_IMPROVE_TIMEOUT,
+    MAINTENANCE_UPGRADE_JRE,
+    MAINTENANCE_UPGRADE_JRE_CLIENT,
     WINDOWS_SERVICE_RUNNING,
     BN_VERSION_EP,
     GITHUB_REST_API_URL,
     GITHUB_API_VERSION,
     MEVBOOST_LATEST_RELEASE,
     TEKU_LATEST_RELEASE,
+    TEKU_MIN_JAVA_VERSION,
     NIMBUS_LATEST_RELEASE,
     LIGHTHOUSE_LATEST_RELEASE,
     LIGHTHOUSE_PRIME_PGP_KEY_ID,
@@ -87,7 +90,9 @@ from ethwizard.constants import (
     GETH_WINDOWS_PGP_KEY_ID,
     NETWORK_GOERLI,
     CTX_EXECUTION_IMPROVED_SERVICE_TIMEOUT,
-    CTX_CONSENSUS_IMPROVED_SERVICE_TIMEOUT
+    CTX_CONSENSUS_IMPROVED_SERVICE_TIMEOUT,
+    ADOPTIUM_21_API_URL,
+    ADOPTIUM_21_API_PARAMS,
 )
 
 def enter_maintenance(context):
@@ -259,6 +264,11 @@ def show_dashboard(context):
     latest_version = consensus_client_details['versions']['latest']
     if latest_version != UNKNOWN_VALUE:
         latest_version = parse_version(latest_version)
+    jre_version = UNKNOWN_VALUE
+    if 'jre' in consensus_client_details:
+        jre_version = consensus_client_details['jre'].get('version', UNKNOWN_VALUE)
+    if jre_version != UNKNOWN_VALUE:
+        jre_version = parse_version(jre_version)
     
     # Merge tests for consensus client
     merge_ready_cons_version = parse_version(
@@ -313,11 +323,29 @@ def show_dashboard(context):
                 not consensus_client_details['is_vc_merge_configured']):
                 consensus_client_details['next_step'] = MAINTENANCE_CONFIG_CLIENT_MERGE
 
+    # If JRE version is lower than the required one, we need to upgrade the JRE
+
+    teku_min_java_version = parse_version(TEKU_MIN_JAVA_VERSION)
+
+    if (
+        current_consensus_client == CONSENSUS_CLIENT_TEKU and
+        is_version(jre_version) and
+        jre_version < teku_min_java_version
+        ):
+        consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_JRE
+
     # If the installed version is older than the latest one, we need to upgrade the client
 
     if is_version(installed_version) and is_version(latest_version):
         if installed_version < latest_version:
             consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_CLIENT
+
+            if (
+                current_consensus_client == CONSENSUS_CLIENT_TEKU and
+                is_version(jre_version) and
+                jre_version < teku_min_java_version
+                ):
+                consensus_client_details['next_step'] = MAINTENANCE_UPGRADE_JRE_CLIENT
         
             # If the next version is merge ready and we are not configured yet, we need to upgrade and
             # configure the client
@@ -411,6 +439,8 @@ def show_dashboard(context):
         MAINTENANCE_START_SERVICE: 'Service needs to be started.',
         MAINTENANCE_REINSTALL_CLIENT: 'Client needs to be reinstalled.',
         MAINTENANCE_IMPROVE_TIMEOUT: 'Improve service shutdown timeout',
+        MAINTENANCE_UPGRADE_JRE: 'Java JRE needs to be upgraded.',
+        MAINTENANCE_UPGRADE_JRE_CLIENT: 'Java JRE and client need to be upgraded.',
     }
 
     buttons = [
@@ -1599,6 +1629,26 @@ def perform_maintenance(base_directory, execution_client, execution_client_detai
             consensus_improved_service_timeout = CTX_CONSENSUS_IMPROVED_SERVICE_TIMEOUT
             context[consensus_improved_service_timeout] = True
             updated_context = True
+
+        elif consensus_client_details['next_step'] == MAINTENANCE_UPGRADE_JRE:
+
+            if not upgrade_jre(base_directory, nssm_binary):
+                log.error('We could not upgrade the Java JRE.')
+                return False
+
+            log.info('Restarting Teku service...')
+
+            subprocess.run([str(nssm_binary), 'start', teku_service_name])
+        
+        elif consensus_client_details['next_step'] == MAINTENANCE_UPGRADE_JRE_CLIENT:
+
+            if not upgrade_jre(base_directory, nssm_binary):
+                log.error('We could not upgrade the Java JRE.')
+                return False
+
+            if not upgrade_teku(base_directory, nssm_binary):
+                log.error('We could not upgrade the Teku client.')
+                return False
 
         elif consensus_client_details['next_step'] == MAINTENANCE_REINSTALL_CLIENT:
             log.warning('TODO: Reinstalling client is to be implemented.')
@@ -2887,5 +2937,170 @@ Unable to create JWT token file in {jwt_token_path}
     
     if not set_service_param(nssm_binary, teku_service_name, 'AppParameters', teku_arguments):
         return False
+
+    return True
+
+def upgrade_jre(base_directory, nssm_binary):
+    # Upgrade the Java JRE
+    log.info('Upgrading Java JRE...')
+
+    teku_service_name = 'teku'
+    subprocess.run([str(nssm_binary), 'stop', teku_service_name])
+
+    jre_path = base_directory.joinpath('bin', 'jre')
+    java_path = jre_path.joinpath('bin', 'java.exe')
+
+    jre_found = False
+    jre_version = 'unknown'
+
+    windows_builds = []
+
+    try:
+        log.info('Getting JRE builds...')
+
+        response = httpx.get(ADOPTIUM_21_API_URL, params=ADOPTIUM_21_API_PARAMS,
+            follow_redirects=True)
+
+        if response.status_code != 200:
+            log.error(f'Cannot connect to JRE builds URL {ADOPTIUM_21_API_URL}.\n'
+                f'Unexpected status code {response.status_code}')
+            return False
+        
+        response_json = response.json()
+
+        if (
+            type(response_json) is not list or
+            len(response_json) == 0 or
+            type(response_json[0]) is not dict):
+            log.error(f'Unexpected response from JRE builds URL {ADOPTIUM_21_API_URL}')
+            return False
+        
+        binaries = response_json
+        for binary in binaries:
+            if 'binary' not in binary:
+                continue
+            binary = binary['binary']
+            if (
+                'architecture' not in binary or
+                'os' not in binary or
+                'package' not in binary or
+                'image_type' not in binary or
+                'updated_at' not in binary):
+                continue
+            image_type = binary['image_type']
+            architecture = binary['architecture']
+            binary_os = binary['os']
+
+            if not (
+                binary_os == 'windows' and
+                architecture == 'x64' and
+                image_type == 'jre'):
+                continue
+
+            package = binary['package']
+            updated_at = dateparse(binary['updated_at'])
+
+            if (
+                'name' not in package or
+                'checksum' not in package or
+                'link' not in package):
+                log.error(f'Unexpected response from JRE builds URL '
+                    f'{ADOPTIUM_21_API_URL} in package')
+                return False
+            
+            package_name = package['name']
+            package_link = package['link']
+            package_checksum = package['checksum']
+
+            windows_builds.append({
+                'name': package_name,
+                'updated_at': updated_at,
+                'link': package_link,
+                'checksum': package_checksum
+            })
+
+    except httpx.RequestError as exception:
+        log.error(f'Cannot connect to JRE builds URL {ADOPTIUM_21_API_URL}.'
+            f'\nException {exception}')
+        return False
+
+    if len(windows_builds) <= 0:
+        log.error('No JRE builds found on adoptium.net. We cannot continue.')
+        return False
+    
+    # Download latest JRE build and its signature
+    windows_builds.sort(key=lambda x: (x['updated_at'], x['name']), reverse=True)
+    latest_build = windows_builds[0]
+
+    download_path = base_directory.joinpath('downloads')
+    download_path.mkdir(parents=True, exist_ok=True)
+
+    jre_archive_path = download_path.joinpath(latest_build['name'])
+    if jre_archive_path.is_file():
+        jre_archive_path.unlink()
+
+    try:
+        with open(jre_archive_path, 'wb') as binary_file:
+            log.info(f'Downloading JRE archive {latest_build["name"]}...')
+            with httpx.stream('GET', latest_build['link'],
+                follow_redirects=True) as http_stream:
+                if http_stream.status_code != 200:
+                    log.error(f'Cannot download JRE archive {latest_build["link"]}.\n'
+                        f'Unexpected status code {http_stream.status_code}')
+                    return False
+                for data in http_stream.iter_bytes():
+                    binary_file.write(data)
+    except httpx.RequestError as exception:
+        log.error(f'Exception while downloading JRE archive. Exception {exception}')
+        return False
+    
+    # Unzip JRE archive
+    archive_members = None
+
+    log.info(f'Extracting JRE archive {latest_build["name"]}...')
+    with ZipFile(jre_archive_path, 'r') as zip_file:
+        archive_members = zip_file.namelist()
+        zip_file.extractall(download_path)
+    
+    # Remove download leftovers
+    jre_archive_path.unlink()
+
+    if archive_members is None or len(archive_members) == 0:
+        log.error('No files found in JRE archive. We cannot continue.')
+        return False
+    
+    # Move all those extracted files into their final destination
+    if jre_path.is_dir():
+        shutil.rmtree(jre_path)
+    jre_path.mkdir(parents=True, exist_ok=True)
+
+    archive_extracted_dir = download_path.joinpath(Path(archive_members[0]).parts[0])
+
+    with os.scandir(archive_extracted_dir) as it:
+        for diritem in it:
+            shutil.move(diritem.path, jre_path)
+        
+    # Make sure jre was installed properly
+    jre_found = False
+    try:
+        process_result = subprocess.run([
+            str(java_path), '--version'
+            ], capture_output=True, text=True, encoding='utf8')
+        jre_found = True
+
+        process_output = process_result.stdout
+        result = re.search(r'OpenJDK Runtime Environment (.*?)\n', process_output)
+        if result:
+            jre_version = result.group(1).strip()
+
+    except FileNotFoundError:
+        pass
+
+    if not jre_found:
+        log.error(f'We could not find the java binary from the installed JRE in {java_path}. '
+            f'We cannot continue.')
+        return False
+    else:
+        log.info(f'Java JRE version {jre_version} installed.')
 
     return True
