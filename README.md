@@ -12,7 +12,7 @@ Eth-wizard should be stable enough to be used by everyone. It was never audited 
 
 * Simple to use
 * Mostly automated
-* For Ubuntu 20.04 or 22.04
+* For Ubuntu 20.04, 22.04 or 24.04
 * For Windows 10 or 11
 * No prerequisite needed
 * Internally simple to read, understand and modify
@@ -27,16 +27,16 @@ Eth-wizard should be stable enough to be used by everyone. It was never audited 
 You can use something like this in a terminal, to start the wizard:
 
 ```
-wget https://github.com/stake-house/eth-wizard/releases/download/v0.9.15/ethwizard-0.9.15.pyz && sudo python3 ethwizard-0.9.15.pyz
+wget https://github.com/stake-house/eth-wizard/releases/download/v0.9.16/ethwizard-0.9.16.pyz && sudo python3 ethwizard-0.9.16.pyz
 ```
 
 ### On Windows 10 on 11
 
 Please note that some antivirus software might detect the wizard binary as a threat and delete it or prevent its execution.
 
-Download and run [the ethwizard-0.9.15.exe binary](https://github.com/stake-house/eth-wizard/releases/download/v0.9.15/ethwizard-0.9.15.exe)
+Download and run [the ethwizard-0.9.16.exe binary](https://github.com/stake-house/eth-wizard/releases/download/v0.9.16/ethwizard-0.9.16.exe)
 
-As an alternative, you can download and install [a recent version of Python](https://www.python.org/downloads/), make sure to install py launcher (it should be part of the default options), download [the ethwizard-0.9.15-win.pyz bundle](https://github.com/stake-house/eth-wizard/releases/download/v0.9.15/ethwizard-0.9.15-win.pyz) and double-click on it. This alternative is less likely to trigger your antivirus software.
+As an alternative, you can download and install [a recent version of Python](https://www.python.org/downloads/), make sure to install py launcher (it should be part of the default options), download [the ethwizard-0.9.16-win.pyz bundle](https://github.com/stake-house/eth-wizard/releases/download/v0.9.16/ethwizard-0.9.16-win.pyz) and double-click on it. This alternative is less likely to trigger your antivirus software.
 
 ### Maintenance
 

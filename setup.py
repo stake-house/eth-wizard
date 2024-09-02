@@ -145,11 +145,11 @@ class Bundle(Command):
             bundle_sign_path.unlink()
         
         subprocess.run([
-            'gpg', '--default-key', '6EEC4CD326C4BBC79F51F55AE68A0CC47982CB5F', '--sign',
+            'gpg', '--default-key', 'BE905564CFC0D168456BCC72D292C9F431302697', '--sign',
             '--armor', '--output', bundle_sign_path, '--detach-sig', bundle_path
         ])
 
-        # gpg --default-key 6EEC4CD326C4BBC79F51F55AE68A0CC47982CB5F --sign --armor --output ethwizard-0.7.2.exe.asc --detach-sig ethwizard-0.7.2.exe
+        # gpg --default-key BE905564CFC0D168456BCC72D292C9F431302697 --sign --armor --output ethwizard-0.7.2.exe.asc --detach-sig ethwizard-0.7.2.exe
 
 
 class BundleWinZip(Command):
