@@ -5506,6 +5506,9 @@ To examine your Lighthouse service logs, inspect the following files:
     last_exception = None
     last_status_code = None
 
+    out_log_read_index = 0
+    err_log_read_index = 0
+
     while keep_retrying and retry_index < retry_count:
         try:
             response = httpx.get(cc_query_url, headers=headers)
@@ -5517,7 +5520,33 @@ To examine your Lighthouse service logs, inspect the following files:
 
             retry_index = retry_index + 1
             log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
-            time.sleep(retry_delay)
+
+            log_reading_ends = datetime.now() + timedelta(seconds=retry_delay)
+
+            while log_reading_ends >= datetime.now():
+
+                out_log_text = ''
+                with open(lighthouse_stdout_log_path, 'r', encoding='utf8') as log_file:
+                    log_file.seek(out_log_read_index)
+                    out_log_text = log_file.read()
+                    out_log_read_index = log_file.tell()
+                
+                err_log_text = ''
+                with open(lighthouse_stderr_log_path, 'r', encoding='utf8') as log_file:
+                    log_file.seek(err_log_read_index)
+                    err_log_text = log_file.read()
+                    err_log_read_index = log_file.tell()
+                
+                out_log_length = len(out_log_text)
+                if out_log_length > 0:
+                    log.info(out_log_text)
+
+                err_log_length = len(err_log_text)
+                if err_log_length > 0:
+                    log.info(err_log_text)
+
+                time.sleep(0.5)
+
             retry_delay = retry_delay + retry_delay_increase
             continue
 
@@ -5529,7 +5558,33 @@ To examine your Lighthouse service logs, inspect the following files:
             
             retry_index = retry_index + 1
             log.info(f'We will retry in {retry_delay} seconds (retry index = {retry_index})')
-            time.sleep(retry_delay)
+            
+            log_reading_ends = datetime.now() + timedelta(seconds=retry_delay)
+
+            while log_reading_ends >= datetime.now():
+
+                out_log_text = ''
+                with open(lighthouse_stdout_log_path, 'r', encoding='utf8') as log_file:
+                    log_file.seek(out_log_read_index)
+                    out_log_text = log_file.read()
+                    out_log_read_index = log_file.tell()
+                
+                err_log_text = ''
+                with open(lighthouse_stderr_log_path, 'r', encoding='utf8') as log_file:
+                    log_file.seek(err_log_read_index)
+                    err_log_text = log_file.read()
+                    err_log_read_index = log_file.tell()
+                
+                out_log_length = len(out_log_text)
+                if out_log_length > 0:
+                    log.info(out_log_text)
+
+                err_log_length = len(err_log_text)
+                if err_log_length > 0:
+                    log.info(err_log_text)
+
+                time.sleep(0.5)
+
             retry_delay = retry_delay + retry_delay_increase
             continue
         
