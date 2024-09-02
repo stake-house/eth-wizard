@@ -5435,9 +5435,37 @@ Unable to create JWT token file in {jwt_token_path}
         str(nssm_binary), 'start', lighthouse_service_name
     ])
 
+    out_log_read_index = 0
+    err_log_read_index = 0
+
     delay = 45
     log.info(f'We are giving {delay} seconds for the Lighthouse beacon node service to start properly.')
-    time.sleep(delay)
+    
+    log_reading_ends = datetime.now() + timedelta(seconds=delay)
+
+    while log_reading_ends >= datetime.now():
+
+        out_log_text = ''
+        with open(lighthouse_stdout_log_path, 'r', encoding='utf8') as log_file:
+            log_file.seek(out_log_read_index)
+            out_log_text = log_file.read()
+            out_log_read_index = log_file.tell()
+        
+        err_log_text = ''
+        with open(lighthouse_stderr_log_path, 'r', encoding='utf8') as log_file:
+            log_file.seek(err_log_read_index)
+            err_log_text = log_file.read()
+            err_log_read_index = log_file.tell()
+        
+        out_log_length = len(out_log_text)
+        if out_log_length > 0:
+            log.info(out_log_text)
+
+        err_log_length = len(err_log_text)
+        if err_log_length > 0:
+            log.info(err_log_text)
+
+        time.sleep(0.5)
 
     # Verify proper Lighthouse service installation
     service_details = get_service_details(nssm_binary, lighthouse_service_name)
@@ -5505,9 +5533,6 @@ To examine your Lighthouse service logs, inspect the following files:
     retry_delay_increase = 15
     last_exception = None
     last_status_code = None
-
-    out_log_read_index = 0
-    err_log_read_index = 0
 
     while keep_retrying and retry_index < retry_count:
         try:
