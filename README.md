@@ -22,7 +22,7 @@ Eth-wizard should be stable enough to be used by everyone. It was never audited 
 
 ## How to use
 
-### On Ubuntu 20.04 or 22.04
+### On Ubuntu 20.04, 22.04 or 24.04
 
 You can use something like this in a terminal, to start the wizard:
 
