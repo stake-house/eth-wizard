@@ -4576,10 +4576,7 @@ Unable to create JWT token file in {jwt_token_path}
     teku_arguments.append(f'{eth1_endpoints_flag}=' + ','.join(eth1_endpoints))
     teku_arguments.append(f'--data-path="{teku_datadir}"')
     if consensus_checkpoint_url != '':
-        base_url = urlbuilder.URIBuilder.from_uri(consensus_checkpoint_url)
-        initial_state_url = base_url.add_path(BN_FINALIZED_STATE_URL).finalize().unsplit()
-
-        teku_arguments.append('--initial-state=' + initial_state_url)
+        teku_arguments.append('--checkpoint-sync-url=' + consensus_checkpoint_url)
     if ports['eth2_bn'] != DEFAULT_TEKU_BN_PORT:
         teku_arguments.append('--p2p-port=' + str(ports['eth2_bn']))
 
