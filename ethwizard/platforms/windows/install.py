@@ -4253,7 +4253,7 @@ validator(s) are activated.
             teku_found = True
 
             process_output = process_result.stdout
-            result = re.search(r'teku/(?P<version>[^/]+)', process_output)
+            result = re.search(r'teku/v?(?P<version>\d+\.\d+(\.\d+)?[^/]*)/', process_output)
             if result:
                 teku_version = result.group('version').strip()
 
@@ -4474,7 +4474,7 @@ is no network issue when we try to connect to the Internet.
                 teku_found = True
 
                 process_output = process_result.stdout
-                result = re.search(r'teku/(?P<version>[^/]+)', process_output)
+                result = re.search(r'teku/v?(?P<version>\d+\.\d+(\.\d+)?[^/]*)/', process_output)
                 if result:
                     teku_version = result.group('version').strip()
 
