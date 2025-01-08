@@ -1117,7 +1117,7 @@ def get_teku_installed_version(base_directory):
             teku_found = True
 
             process_output = process_result.stdout
-            result = re.search(r'teku/v?(?P<version>\d+\.\d+(\.\d+)?[^/]*)/', process_output)
+            result = re.search(r'(?m)^teku/v?(?P<version>\d+\.\d+(\.\d+)?[^/]*)/', process_output)
             if result:
                 teku_version = result.group('version').strip()
             else:
@@ -1350,7 +1350,7 @@ def get_teku_running_version():
     version_agent = response_json['data']['version']
 
     # Version agent should look like: teku/v22.8.1/windows-x86_64/-eclipseadoptium-openjdk64bitservervm-java-17
-    result = re.search(r'teku/v?(?P<version>\d+\.\d+(\.\d+)?[^/]*)/',
+    result = re.search(r'(?m)^teku/v?(?P<version>\d+\.\d+(\.\d+)?[^/]*)/',
         version_agent)
     if not result:
         log.error(f'Cannot parse {version_agent} for Teku version.')
@@ -2760,7 +2760,7 @@ is no network issue when we try to connect to the Internet.
             teku_found = True
 
             process_output = process_result.stdout
-            result = re.search(r'teku/v?(?P<version>\d+\.\d+(\.\d+)?[^/]*)/', process_output)
+            result = re.search(r'(?m)^teku/v?(?P<version>\d+\.\d+(\.\d+)?[^/]*)/', process_output)
             if result:
                 teku_version = result.group('version').strip()
 
