@@ -263,8 +263,8 @@ ExecuteParameters="-m ethwizard"
             zip_file.extractall(archive_dir_path)
         
         # Download LZMA SDK for SFX modules for installers
-        lzma_sdk_url = 'https://www.7-zip.org/a/lzma1900.7z'
-        lzma_sdk_name = 'lzma1900.7z'
+        lzma_sdk_url = 'https://www.7-zip.org/a/lzma2409.7z'
+        lzma_sdk_name = 'lzma2409.7z'
 
         lzma_sdk_archive = download_path.joinpath(lzma_sdk_name)
         try:
