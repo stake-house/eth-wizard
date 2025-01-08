@@ -27,16 +27,16 @@ Eth-wizard should be stable enough to be used by everyone. It was never audited 
 You can use something like this in a terminal, to start the wizard:
 
 ```
-wget https://github.com/stake-house/eth-wizard/releases/download/v0.9.16/ethwizard-0.9.16.pyz && sudo python3 ethwizard-0.9.16.pyz
+wget https://github.com/stake-house/eth-wizard/releases/download/v0.9.17/ethwizard-0.9.17.pyz && sudo python3 ethwizard-0.9.17.pyz
 ```
 
 ### On Windows 10 on 11
 
 Please note that some antivirus software might detect the wizard binary as a threat and delete it or prevent its execution.
 
-Download and run [the ethwizard-0.9.16.exe binary](https://github.com/stake-house/eth-wizard/releases/download/v0.9.16/ethwizard-0.9.16.exe)
+Download and run [the ethwizard-0.9.17.exe binary](https://github.com/stake-house/eth-wizard/releases/download/v0.9.17/ethwizard-0.9.17.exe)
 
-As an alternative, you can download and install [a recent version of Python](https://www.python.org/downloads/), make sure to install py launcher (it should be part of the default options), download [the ethwizard-0.9.16-win.pyz bundle](https://github.com/stake-house/eth-wizard/releases/download/v0.9.16/ethwizard-0.9.16-win.pyz) and double-click on it. This alternative is less likely to trigger your antivirus software.
+As an alternative, you can download and install [a recent version of Python](https://www.python.org/downloads/), make sure to install py launcher (it should be part of the default options), download [the ethwizard-0.9.17-win.pyz bundle](https://github.com/stake-house/eth-wizard/releases/download/v0.9.17/ethwizard-0.9.17-win.pyz) and double-click on it. This alternative is less likely to trigger your antivirus software.
 
 ### Maintenance
 
