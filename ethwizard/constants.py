@@ -14,12 +14,12 @@ WINDOWS_EXPORTER_LATEST_RELEASE = '/repos/prometheus-community/windows_exporter/
 SDC_LATEST_RELEASE = '/repos/ethereum/staking-deposit-cli/releases/latest'
 
 NETWORK_MAINNET = 'mainnet'
-NETWORK_HOLESKY = 'holesky'
+NETWORK_HOODI = 'hoodi'
 NETWORK_GOERLI = 'goerli'
 
 NETWORK_LABEL = {
   NETWORK_MAINNET: 'Mainnet',
-  NETWORK_HOLESKY: 'Holesky'
+  NETWORK_HOODI: 'Hoodi'
 }
 
 EPOCHS_PER_DAY = 225
@@ -34,7 +34,7 @@ COREINFO_DOWNLOAD_URL = 'https://download.sysinternals.com/files/Coreinfo.zip'
 
 MIN_AVAILABLE_DISK_SPACE_GB = {
     NETWORK_MAINNET: 1700.0,
-    NETWORK_HOLESKY: 200.0
+    NETWORK_HOODI: 200.0
 }
 
 MIN_SUSTAINED_K_READ_IOPS = 3.0
@@ -183,17 +183,17 @@ CHOCOLATEY_DEFAULT_BIN_PATH = r'C:\ProgramData\chocolatey\bin'
 
 LAUNCHPAD_URLS = {
     NETWORK_MAINNET: 'https://launchpad.ethereum.org',
-    NETWORK_HOLESKY: 'https://holesky.launchpad.ethereum.org/'
+    NETWORK_HOODI: 'https://hoodi.launchpad.ethereum.org/'
 }
 
 BEACONCHA_IN_URLS = {
     NETWORK_MAINNET: 'https://beaconcha.in',
-    NETWORK_HOLESKY: 'https://holesky.beaconcha.in/'
+    NETWORK_HOODI: 'https://hoodi.beaconcha.in/'
 }
 
 COMMUNITY_CHECKPOINT_SYNC_YAML = {
     NETWORK_MAINNET: 'https://raw.githubusercontent.com/eth-clients/checkpoint-sync-endpoints/main/endpoints/mainnet.yaml',
-    NETWORK_HOLESKY: 'https://raw.githubusercontent.com/eth-clients/checkpoint-sync-endpoints/main/endpoints/holesky.yaml'
+    NETWORK_HOODI: 'https://raw.githubusercontent.com/eth-clients/checkpoint-sync-endpoints/main/endpoints/hoodi.yaml'
 }
 
 VERY_LARGE_VERSION_NUMBER = '500.0.0'
@@ -206,7 +206,7 @@ MIN_CLIENT_VERSION_FOR_MERGE = {
     CONSENSUS_CLIENT_TEKU: '22.8.1',
     CONSENSUS_CLIENT_NIMBUS: '22.9.0',
   },
-  NETWORK_HOLESKY: {
+  NETWORK_HOODI: {
     EXECUTION_CLIENT_GETH: '1.10.22',
     EXECUTION_CLIENT_NETHERMIND: '1.14.1',
     CONSENSUS_CLIENT_LIGHTHOUSE: '3.0.0',
@@ -233,27 +233,27 @@ BN_SYNCING_EP = '/eth/v1/node/syncing'
 
 BN_CHAIN_IDS = {
     NETWORK_MAINNET: 1,
-    NETWORK_HOLESKY: 17000
+    NETWORK_HOODI: 17000
 }
 
 BN_DEPOSIT_CONTRACTS = {
     NETWORK_MAINNET: '0x00000000219ab540356cbb839cbe05303d7705fa',
-    NETWORK_HOLESKY: '0x4242424242424242424242424242424242424242'
+    NETWORK_HOODI: '0x4242424242424242424242424242424242424242'
 }
 
 NETWORK_CURRENCY = {
     NETWORK_MAINNET: 'ETH',
-    NETWORK_HOLESKY: 'HoETH'
+    NETWORK_HOODI: 'HoETH'
 }
 
 ETH1_NETWORK_NAME = {
     NETWORK_MAINNET: 'Mainnet',
-    NETWORK_HOLESKY: 'Holešky'
+    NETWORK_HOODI: 'Hoodi'
 }
 
 ETH1_NETWORK_CHAINID = {
     NETWORK_MAINNET: 1,
-    NETWORK_HOLESKY: 17000
+    NETWORK_HOODI: 17000
 }
 
 BEACONCHA_VALIDATOR_DEPOSITS_API_URL = '/api/v1/validator/{indexOrPubkey}/deposits'
@@ -264,12 +264,12 @@ NETHERMIND_APT_SOURCE_URL = 'https://ppa.launchpadcontent.net/nethermindeth/neth
 
 GETH_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Go Ethereum Client - Geth (Mainnet)',
-    NETWORK_HOLESKY: 'Go Ethereum Client - Geth (Holešky)'
+    NETWORK_HOODI: 'Go Ethereum Client - Geth (Hoodi)'
 }
 
 NETHERMIND_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Nethermind Ethereum Client (Mainnet)',
-    NETWORK_HOLESKY: 'Nethermind Ethereum Client (Holešky)'
+    NETWORK_HOODI: 'Nethermind Ethereum Client (Hoodi)'
 }
 
 GNUPG_DOWNLOAD_URL = 'https://www.gnupg.org/download/'
@@ -289,7 +289,7 @@ GETH_BUILDS_BASE_URL = 'https://gethstore.blob.core.windows.net/builds/'
 GETH_WINDOWS_PGP_KEY_ID = '9417309ED2A67EAC'
 GETH_ARGUMENTS = {
     NETWORK_MAINNET: ['--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof'],
-    NETWORK_HOLESKY: ['--holesky', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof']
+    NETWORK_HOODI: ['--hoodi', '--syncmode=snap', '--http', '--metrics', '--metrics.expensive', '--pprof']
 }
 
 GETH_SYSTEMD_SERVICE_NAME = 'geth.service'
@@ -297,7 +297,7 @@ GETH_SYSTEMD_SERVICE_NAME = 'geth.service'
 NETHERMIND_ARGUMENTS = {
     NETWORK_MAINNET: ['--config', 'mainnet', '--Metrics.Enabled', 'true', '--Metrics.ExposePort',
       '6061', '--Sync.SnapSync', 'true', '--HealthChecks.Enabled', 'true', '--JsonRpc.Enabled', 'true'],
-    NETWORK_HOLESKY: ['--config', 'holesky', '--Metrics.Enabled', 'true', '--Metrics.ExposePort',
+    NETWORK_HOODI: ['--config', 'hoodi', '--Metrics.Enabled', 'true', '--Metrics.ExposePort',
       '6061', '--Sync.SnapSync', 'true', '--HealthChecks.Enabled', 'true', '--JsonRpc.Enabled', 'true']
 }
 
@@ -308,12 +308,12 @@ MEVBOOST_INSTALLED_DIRECTORY = '/usr/local/bin'
 
 MEVBOOST_ARGUMENTS = {
     NETWORK_MAINNET: ['-mainnet', '-relay-check'],
-    NETWORK_HOLESKY: ['-holesky', '-relay-check']
+    NETWORK_HOODI: ['-hoodi', '-relay-check']
 }
 
 MEVBOOST_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'MEV-Boost (Mainnet)',
-    NETWORK_HOLESKY: 'MEV-Boost (Holesky)'
+    NETWORK_HOODI: 'MEV-Boost (Hoodi)'
 }
 
 ETHSTAKER_RELAY_LIST_URL = 'https://raw.githubusercontent.com/eth-educators/ethstaker-guides/main/MEV-relay-list.md'
@@ -330,11 +330,11 @@ RELAY_BUNDLES = {
       'https://0xb0b07cd0abef743db4260b0ed50619cf6ad4d82064cb4fbec9d3ec530f7c5e6793d9f286c4e082c0244ffb9f2658fe88@bloxroute.regulated.blxrbdn.com'
     ]
   },
-  NETWORK_HOLESKY: {
+  NETWORK_HOODI: {
     'Some': [
-      'https://0xafa4c6985aa049fb79dd37010438cfebeb0f2bd42b115b89dd678dab0670c1de38da0c4e9138c9290a398ecd9a0b3110@boost-relay-holesky.flashbots.net',
-      'https://0xab78bf8c781c58078c3beb5710c57940874dd96aef2835e7742c866b4c7c0406754376c2c8285a36c630346aa5c5f833@holesky.aestus.live',
-      'https://0xaa58208899c6105603b74396734a6263cc7d947f444f396a90f7b7d3e65d102aec7e5e5291b27e08d02c50a050825c2f@holesky.titanrelay.xyz'
+      'https://0xafa4c6985aa049fb79dd37010438cfebeb0f2bd42b115b89dd678dab0670c1de38da0c4e9138c9290a398ecd9a0b3110@boost-relay-hoodi.flashbots.net',
+      'https://0x98f0ef62f00780cf8eb06701a7d22725b9437d4768bb19b363e882ae87129945ec206ec2dc16933f31d983f8225772b6@hoodi.aestus.live',
+      'https://0xaa58208899c6105603b74396734a6263cc7d947f444f396a90f7b7d3e65d102aec7e5e5291b27e08d02c50a050825c2f@hoodi.titanrelay.xyz'
     ]
   }
 }
@@ -351,32 +351,32 @@ NIMBUS_VC_INSTALLED_PATH = f'{NIMBUS_INSTALLED_DIRECTORY}/nimbus_validator_clien
 
 NIMBUS_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Nimbus Ethereum Client (Mainnet)',
-    NETWORK_HOLESKY: 'Nimbus Ethereum Client (Holešky)'
+    NETWORK_HOODI: 'Nimbus Ethereum Client (Hoodi)'
 }
 
 NIMBUS_ARGUMENTS = {
     NETWORK_MAINNET: ['--network=mainnet', '--rest=true', '--metrics=true', '--enr-auto-update=true'],
-    NETWORK_HOLESKY: ['--network=holesky', '--rest=true', '--metrics=true', '--enr-auto-update=true']
+    NETWORK_HOODI: ['--network=hoodi', '--rest=true', '--metrics=true', '--enr-auto-update=true']
 }
 
 LIGHTHOUSE_BN_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Lighthouse Ethereum Client - Beacon Node (Mainnet)',
-    NETWORK_HOLESKY: 'Lighthouse Ethereum Client - Beacon Node (Holešky)'
+    NETWORK_HOODI: 'Lighthouse Ethereum Client - Beacon Node (Hoodi)'
 }
 
 LIGHTHOUSE_BN_ARGUMENTS = {
     NETWORK_MAINNET: ['bn', '--network', 'mainnet', '--staking', '--validator-monitor-auto', '--metrics'],
-    NETWORK_HOLESKY: ['bn', '--network', 'holesky', '--staking', '--validator-monitor-auto', '--metrics']
+    NETWORK_HOODI: ['bn', '--network', 'hoodi', '--staking', '--validator-monitor-auto', '--metrics']
 }
 
 LIGHTHOUSE_VC_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Lighthouse Ethereum Client - Validator Client (Mainnet)',
-    NETWORK_HOLESKY: 'Lighthouse Ethereum Client - Validator Client (Holešky)'
+    NETWORK_HOODI: 'Lighthouse Ethereum Client - Validator Client (Hoodi)'
 }
 
 LIGHTHOUSE_VC_ARGUMENTS = {
     NETWORK_MAINNET: ['vc', '--network', 'mainnet', '--metrics'],
-    NETWORK_HOLESKY: ['vc', '--network', 'holesky', '--metrics']
+    NETWORK_HOODI: ['vc', '--network', 'hoodi', '--metrics']
 }
 
 WINDOWS_SERVICE_RUNNING = 'SERVICE_RUNNING'
@@ -392,12 +392,12 @@ ADOPTIUM_21_API_PARAMS = {
 
 TEKU_SERVICE_DISPLAY_NAME = {
     NETWORK_MAINNET: 'Teku Ethereum Client (Mainnet)',
-    NETWORK_HOLESKY: 'Teku Ethereum Client (Holešky)'
+    NETWORK_HOODI: 'Teku Ethereum Client (Hoodi)'
 }
 
 TEKU_ARGUMENTS = {
     NETWORK_MAINNET: ['--network=mainnet', '--metrics-enabled', '--rest-api-enabled', '--log-color-enabled=false'],
-    NETWORK_HOLESKY: ['--network=holesky', '--metrics-enabled', '--rest-api-enabled', '--log-color-enabled=false']
+    NETWORK_HOODI: ['--network=hoodi', '--metrics-enabled', '--rest-api-enabled', '--log-color-enabled=false']
 }
 
 PROMETHEUS_CONFIG_WINDOWS = (
@@ -60959,10 +60959,10 @@ ExecStart=mev-boost \\
 [Install]
 WantedBy=multi-user.target
 '''),
-    NETWORK_HOLESKY: (
+    NETWORK_HOODI: (
 '''
 [Unit]
-Description=MEV-Boost (Holesky)
+Description=MEV-Boost (Hoodi)
 Wants=network-online.target
 After=network-online.target
 
@@ -60973,7 +60973,7 @@ Group=mevboost
 Restart=always
 RestartSec=5
 ExecStart=mev-boost \\
-    -holesky \\
+    -hoodi \\
     -relay-check{addparams}
 
 [Install]
@@ -61002,10 +61002,10 @@ ExecStart=geth --syncmode=snap --http --datadir /var/lib/goethereum --metrics --
 [Install]
 WantedBy=default.target
 '''),
-    NETWORK_HOLESKY: (
+    NETWORK_HOODI: (
 '''
 [Unit]
-Description=Go Ethereum Client - Geth (Holešky)
+Description=Go Ethereum Client - Geth (Hoodi)
 After=network.target
 Wants=network.target
 
@@ -61016,7 +61016,7 @@ Type=simple
 Restart=always
 RestartSec=5
 TimeoutStopSec=180
-ExecStart=geth --holesky --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof{addparams}
+ExecStart=geth --hoodi --syncmode=snap --http --datadir /var/lib/goethereum --metrics --metrics.expensive --pprof{addparams}
 
 [Install]
 WantedBy=default.target
@@ -61052,10 +61052,10 @@ ExecStart=/usr/share/nethermind/nethermind \\
 [Install]
 WantedBy=multi-user.target
 '''),
-    NETWORK_HOLESKY: (
+    NETWORK_HOODI: (
 f'''
 [Unit]
-Description=Nethermind Ethereum Client (Holešky)
+Description=Nethermind Ethereum Client (Hoodi)
 Wants=network-online.target
 After=network-online.target
 
@@ -61069,7 +61069,7 @@ TimeoutStopSec=180
 WorkingDirectory=/var/lib/nethermind
 Environment="DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/nethermind"
 ExecStart=/usr/share/nethermind/nethermind \\
-    --config holesky \\
+    --config hoodi \\
     --datadir /var/lib/nethermind \\
     --Metrics.Enabled true \\
     --Metrics.ExposePort 6061 \\
@@ -61106,10 +61106,10 @@ ExecStart={NIMBUS_INSTALLED_PATH} \\
 [Install]
 WantedBy=multi-user.target
 '''),
-    NETWORK_HOLESKY: (
+    NETWORK_HOODI: (
 f'''
 [Unit]
-Description=Nimbus Ethereum Client (Holešky)
+Description=Nimbus Ethereum Client (Hoodi)
 Wants=network-online.target
 After=network-online.target
 
@@ -61120,7 +61120,7 @@ Group=nimbus
 Restart=always
 RestartSec=5
 ExecStart={NIMBUS_INSTALLED_PATH} \\
-    --network=holesky \\
+    --network=hoodi \\
     --data-dir=/var/lib/nimbus \\
     --rest=true \\
     --metrics=true \\
@@ -61150,10 +61150,10 @@ ExecStart={LIGHTHOUSE_INSTALLED_PATH} bn --network mainnet --datadir /var/lib/li
 [Install]
 WantedBy=multi-user.target
 '''),
-    NETWORK_HOLESKY: (
+    NETWORK_HOODI: (
 f'''
 [Unit]
-Description=Lighthouse Ethereum Client Beacon Node (Holešky)
+Description=Lighthouse Ethereum Client Beacon Node (Hoodi)
 Wants=network-online.target
 After=network-online.target
 
@@ -61163,7 +61163,7 @@ User=lighthousebeacon
 Group=lighthousebeacon
 Restart=always
 RestartSec=5
-ExecStart={LIGHTHOUSE_INSTALLED_PATH} bn --network holesky --datadir /var/lib/lighthouse --staking --validator-monitor-auto --metrics{{addparams}}
+ExecStart={LIGHTHOUSE_INSTALLED_PATH} bn --network hoodi --datadir /var/lib/lighthouse --staking --validator-monitor-auto --metrics{{addparams}}
 
 [Install]
 WantedBy=multi-user.target
@@ -61189,10 +61189,10 @@ ExecStart={LIGHTHOUSE_INSTALLED_PATH} vc --network mainnet --datadir /var/lib/li
 [Install]
 WantedBy=multi-user.target
 '''),
-    NETWORK_HOLESKY: (
+    NETWORK_HOODI: (
 f'''
 [Unit]
-Description=Lighthouse Ethereum Client Validator Client (Holešky)
+Description=Lighthouse Ethereum Client Validator Client (Hoodi)
 Wants=network-online.target
 After=network-online.target
 
@@ -61202,7 +61202,7 @@ Group=lighthousevalidator
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart={LIGHTHOUSE_INSTALLED_PATH} vc --network holesky --datadir /var/lib/lighthouse --metrics{{addparams}}
+ExecStart={LIGHTHOUSE_INSTALLED_PATH} vc --network hoodi --datadir /var/lib/lighthouse --metrics{{addparams}}
 
 [Install]
 WantedBy=multi-user.target
