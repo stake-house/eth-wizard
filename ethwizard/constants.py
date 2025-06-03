@@ -316,7 +316,7 @@ MEVBOOST_SERVICE_DISPLAY_NAME = {
     NETWORK_HOODI: 'MEV-Boost (Hoodi)'
 }
 
-ETHSTAKER_RELAY_LIST_URL = 'https://raw.githubusercontent.com/eth-educators/ethstaker-guides/main/MEV-relay-list.md'
+ETHSTAKER_RELAY_LIST_URL = 'https://raw.githubusercontent.com/eth-educators/ethstaker-knowledgebase/refs/heads/main/docs/en/guides/MEV-relay-list.md'
 
 RELAY_BUNDLES = {
   NETWORK_MAINNET: {
