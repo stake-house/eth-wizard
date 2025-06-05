@@ -9488,7 +9488,7 @@ Viewer for Application with source windows_exporter.
     # Let's find the number of running processes as a test
 
     response_text = response.text
-    match = re.search(r'windows_os_processes (?P<processes>\d+)', response_text)
+    match = re.search(r'windows_system_processes (?P<processes>\d+)', response_text)
 
     retry_index = 0
     retry_count = 5
@@ -9505,7 +9505,7 @@ are some details for this last test we tried to perform:
 
 URL: {local_we_query_url}
 Method: GET
-Missing line: windows_os_processes
+Missing line: windows_system_processes
 
 We cannot proceed if the windows exporter server is not responding
 properly. Make sure to check the logs and fix any issue found there. You
