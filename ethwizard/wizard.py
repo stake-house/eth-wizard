@@ -171,14 +171,14 @@ def explain_overview():
 Here is an overview of the different steps required to become an active
 validator on an Ethereum network.
 
-* Consolidate 32 ETH for each active validator you want (You can have
+* Consolidate ETH for each active validator you want (You can have
 a large amount of active validators using a single machine and this setup)
+* Install an Ethereum beacon node and let it synchronize
 * Install an Ethereum execution client and let it synchronize
 * Generate your validator(s) keys
-* Install an Ethereum beacon node and let it synchronize
 * Install an Ethereum validator client and import your key(s)
-* Perform the 32 ETH deposit for each validator
-* Wait for your validator(s) to become active (can take a few hours/days)
+* Perform the deposit for each validator
+* Wait for your validator(s) to become active (can take a few minutes/hours)
 '''     ),
         buttons=[
             ('Keep going', True),

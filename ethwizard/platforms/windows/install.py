@@ -8162,7 +8162,7 @@ Connected Peers: {syncing_status['bn_connected_peers']}
         title='Deposit on the launchpad',
         text=(
 f'''
-This next step is to perform the 32 {currency} deposit(s) on the launchpad. In
+This next step is to perform the deposit(s) on the launchpad. In
 order to do this deposit, you will need your deposit file which was created
 during the key generation step. Your deposit file can be found in
 
@@ -8219,7 +8219,7 @@ When you are done with the deposit(s), click the "I'm done" button below.
 f'''
 No deposit has been found on the beaconcha.in website for the validator
 keys that you generated. In order to become an active validator, you need
-to do a 32 {currency} deposit for each validator you created. In order to do
+to do a deposit for each validator you created. In order to do
 this deposit, you will need your deposit file which was created during the
 key generation step. Your deposit file can be found in
 
@@ -8262,7 +8262,7 @@ deposit(s).
 f'''
 Only {len(validator_deposits)} deposit(s) has been found for your {len(public_keys)} validators on the
 beaconcha.in website. In order to become an active validator, you need
-to do a 32 {currency} deposit for each validator you created. In order to do
+to do a deposit for each validator you created. In order to do
 this deposit, you will need your deposit file which was created during the
 key generation step. Your deposit file can be found in
 
