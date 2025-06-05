@@ -8090,7 +8090,7 @@ Connected Peers: {bn_connected_peers}
 f'''
 It is a good idea to wait for your beacon node to be in sync before doing
 the deposit so you do not miss any reward. Activating a validator after the
-deposit takes around 15 hours unless the join queue is longer. There is
+deposit takes a few minutes unless the join queue is longer. There is
 currently {network_queue_info} for the <b>{NETWORK_LABEL[network]}</b>
 Ethereum network.
 '''         )),
