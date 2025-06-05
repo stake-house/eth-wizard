@@ -5021,11 +5021,6 @@ def install_lighthouse(base_directory, network, eth1_fallbacks, consensus_checkp
     mevboost_installed):
     # Install Lighthouse for the selected network
 
-    # Install Microsoft Visual C++ 2015-2022 Redistributable (x64) as a requirement for Lighthouse
-    if not install_msvc14x64():
-        log.error('Could not install Microsoft Visual C++ 2015-2022 Redistributable (x64).')
-        return False
-
     base_directory = Path(base_directory)
 
     nssm_binary = get_nssm_binary()
@@ -5101,6 +5096,11 @@ sync endpoint.
 
     if not result:
         return result
+
+    # Install Microsoft Visual C++ 2015-2022 Redistributable (x64) as a requirement for Lighthouse
+    if not install_msvc14x64():
+        log.error('Could not install Microsoft Visual C++ 2015-2022 Redistributable (x64).')
+        return False
 
     # Check if Lighthouse is already installed
     lighthouse_path = base_directory.joinpath('bin', 'lighthouse.exe')
