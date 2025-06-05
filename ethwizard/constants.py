@@ -11,7 +11,7 @@ TEKU_LATEST_RELEASE = '/repos/ConsenSys/teku/releases/latest'
 PROMETHEUS_LATEST_RELEASE = '/repos/prometheus/prometheus/releases/latest'
 WINDOWS_EXPORTER_LATEST_RELEASE = '/repos/prometheus-community/windows_exporter/releases/latest'
 
-SDC_LATEST_RELEASE = '/repos/ethereum/staking-deposit-cli/releases/latest'
+EDC_LATEST_RELEASE = '/repos/eth-educators/ethstaker-deposit-cli/releases/latest'
 
 NETWORK_MAINNET = 'mainnet'
 NETWORK_HOODI = 'hoodi'

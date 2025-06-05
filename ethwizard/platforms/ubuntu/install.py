@@ -32,7 +32,6 @@ from ethwizard.platforms.common import (
     select_execution_client,
     select_keys_directory,
     select_fee_recipient_address,
-    select_withdrawal_address,
     get_bc_validator_deposits,
     test_open_ports,
     show_whats_next,
@@ -4656,8 +4655,8 @@ Connected Peers: {result['bn_connected_peers']}
 def obtain_keys(network, consensus_client):
     # Obtain validator keys for the selected network
 
-    staking_deposit_cli_path = Path(Path.home(), 'ethwizard', 'staking-deposit-cli')
-    validator_keys_path = Path(staking_deposit_cli_path, 'validator_keys')
+    ethstaker_deposit_cli_path = Path(Path.home(), 'ethwizard', 'ethstaker-deposit-cli')
+    validator_keys_path = Path(ethstaker_deposit_cli_path, 'validator_keys')
 
     # Check if there are keys already imported in our consensus client
 
@@ -4796,10 +4795,10 @@ This next step will import your keys if you already generated them
 elsewhere or help you generate the keys needed to be a validator.
 
 It is recommended to generate your keys offline using the official
-staking-deposit-cli tool or Wagyu Key Gen. You can download these tools
+ethstaker-deposit-cli tool or Wagyu Key Gen. You can download these tools
 from:
 
-- https://github.com/ethereum/staking-deposit-cli
+- https://github.com/eth-educators/ethstaker-deposit-cli
 - https://github.com/stake-house/wagyu-key-gen
 
 You can put that binary on a USB drive, generate your keys on a different
@@ -4874,17 +4873,17 @@ f'''
 This next step will generate the keys needed to be a validator on this
 machine.
 
-It will download the official staking-deposit-cli binary from GitHub,
+It will download the official ethstaker-deposit-cli binary from GitHub,
 verify its SHA256 checksum, extract it and start it.
 
-The staking-deposit-cli tool is executed in an interactive way where you
+The ethstaker-deposit-cli tool is executed in an interactive way where you
 have to answer a few questions. It will help you create a mnemonic from
 which all your keys will be derived from. The mnemonic is the ultimate key.
 It is <style bg="red" fg="black"><b>VERY IMPORTANT</b></style> to securely and privately store your mnemonic. It can
 be used to recreate your validator keys and eventually withdraw your funds.
 
 When asked how many validators you wish to run, remember that you will have
-to do a 32 {currency} deposit for each validator.
+to do a deposit for each validator you want to activate.
 '''         )),
             buttons=[
                 ('Keep going', True),
@@ -4895,17 +4894,17 @@ to do a 32 {currency} deposit for each validator.
         if not result:
             return result
     
-        # Check if staking-deposit-cli is already installed
-        staking_deposit_cli_binary = Path(staking_deposit_cli_path, 'deposit')
+        # Check if ethstaker-deposit-cli is already installed
+        ethstaker_deposit_cli_binary = Path(ethstaker_deposit_cli_path, 'deposit')
 
-        staking_deposit_cli_found = False
+        ethstaker_deposit_cli_found = False
 
-        if staking_deposit_cli_binary.exists() and staking_deposit_cli_binary.is_file():
+        if ethstaker_deposit_cli_binary.exists() and ethstaker_deposit_cli_binary.is_file():
             try:
                 process_result = subprocess.run([
-                    staking_deposit_cli_binary, '--help'
+                    ethstaker_deposit_cli_binary, '--help'
                     ], capture_output=True, text=True)
-                staking_deposit_cli_found = True
+                ethstaker_deposit_cli_found = True
 
                 # TODO: Validate the output of deposit --help to make sure it's fine? Maybe?
                 # process_output = process_result.stdout
@@ -4913,19 +4912,19 @@ to do a 32 {currency} deposit for each validator.
             except FileNotFoundError:
                 pass
         
-        install_staking_deposit_binary = True
+        install_ethstaker_deposit_binary = True
 
-        if staking_deposit_cli_found:
+        if ethstaker_deposit_cli_found:
             result = button_dialog(
-                title='staking-deposit-cli binary found',
+                title='ethstaker-deposit-cli binary found',
                 text=(
 f'''
-The staking-deposit-cli binary seems to have already been installed. Here
+The ethstaker-deposit-cli binary seems to have already been installed. Here
 are some details found:
 
-Location: {staking_deposit_cli_binary}
+Location: {ethstaker_deposit_cli_binary}
 
-Do you want to skip installing the staking-deposit-cli binary?
+Do you want to skip installing the ethstaker-deposit-cli binary?
 '''             ),
                 buttons=[
                     ('Skip', 1),
@@ -4937,29 +4936,29 @@ Do you want to skip installing the staking-deposit-cli binary?
             if not result:
                 return result
         
-            install_staking_deposit_binary = (result == 2)
+            install_ethstaker_deposit_binary = (result == 2)
 
-        if install_staking_deposit_binary:
-            # Getting latest staking-deposit-cli release files
-            sdc_gh_release_url = GITHUB_REST_API_URL + SDC_LATEST_RELEASE
+        if install_ethstaker_deposit_binary:
+            # Getting latest ethstaker-deposit-cli release files
+            edc_gh_release_url = GITHUB_REST_API_URL + EDC_LATEST_RELEASE
             headers = {'Accept': GITHUB_API_VERSION}
             try:
-                response = httpx.get(sdc_gh_release_url, headers=headers,
+                response = httpx.get(edc_gh_release_url, headers=headers,
                     follow_redirects=True)
             except httpx.RequestError as exception:
-                log.error(f'Cannot get latest staking-deposit-cli release from Github. '
+                log.error(f'Cannot get latest ethstaker-deposit-cli release from Github. '
                     f'Exception {exception}')
                 return False
 
             if response.status_code != 200:
-                log.error(f'Cannot get latest staking-deposit-cli release from Github. '
+                log.error(f'Cannot get latest ethstaker-deposit-cli release from Github. '
                     f'Status code {response.status_code}')
                 return False
             
             release_json = response.json()
 
             if 'assets' not in release_json:
-                log.error('No assets in Github release for staking-deposit-cli.')
+                log.error('No assets in Github release for ethstaker-deposit-cli.')
                 return False
             
             binary_asset = None
@@ -4986,15 +4985,15 @@ Do you want to skip installing the staking-deposit-cli binary?
                     }
             
             if binary_asset is None:
-                log.error('No staking-deposit-cli binary found in Github release')
+                log.error('No ethstaker-deposit-cli binary found in Github release')
                 return False
             
             checksum_path = None
 
             if checksum_asset is None:
-                log.warning('No staking-deposit-cli checksum found in Github release')
+                log.warning('No ethstaker-deposit-cli checksum found in Github release')
             
-            # Downloading latest staking-deposit-cli release files
+            # Downloading latest ethstaker-deposit-cli release files
             download_path = Path(Path.home(), 'ethwizard', 'downloads')
             download_path.mkdir(parents=True, exist_ok=True)
 
@@ -5006,7 +5005,7 @@ Do you want to skip installing the staking-deposit-cli binary?
                     with httpx.stream('GET', binary_asset['file_url'],
                         follow_redirects=True) as http_stream:
                         if http_stream.status_code != 200:
-                            log.error(f'HTTP error while downloading staking-deposit-cli binary '
+                            log.error(f'HTTP error while downloading ethstaker-deposit-cli binary '
                                 f'from Github. Status code {http_stream.status_code}')
                             return False
                         for data in http_stream.iter_bytes():
@@ -5014,7 +5013,7 @@ Do you want to skip installing the staking-deposit-cli binary?
                             if checksum_asset is not None:
                                 binary_hash.update(data)
             except httpx.RequestError as exception:
-                log.error(f'Exception while downloading staking-deposit-cli binary from '
+                log.error(f'Exception while downloading ethstaker-deposit-cli binary from '
                     f'Github. {exception}')
                 return False
 
@@ -5028,13 +5027,13 @@ Do you want to skip installing the staking-deposit-cli binary?
                         with httpx.stream('GET', checksum_asset['file_url'],
                             follow_redirects=True) as http_stream:
                             if http_stream.status_code != 200:
-                                log.error(f'HTTP error while downloading staking-deposit-cli '
+                                log.error(f'HTTP error while downloading ethstaker-deposit-cli '
                                     f'checksum from Github. Status code {http_stream.status_code}')
                                 return False
                             for data in http_stream.iter_bytes():
                                 signature_file.write(data)
                 except httpx.RequestError as exception:
-                    log.error(f'Exception while downloading staking-deposit-cli checksum from '
+                    log.error(f'Exception while downloading ethstaker-deposit-cli checksum from '
                     f'Github. {exception}')
                     return False
 
@@ -5043,18 +5042,18 @@ Do you want to skip installing the staking-deposit-cli binary?
                     checksum = checksum_file.read(1024).strip().lower()
                     if binary_hexdigest != checksum:
                         # SHA256 checksum failed
-                        log.error(f'SHA256 checksum failed on staking-deposit-cli binary from '
+                        log.error(f'SHA256 checksum failed on ethstaker-deposit-cli binary from '
                             f'Github. Expected {checksum} but we got {binary_hexdigest}. We will '
                             f'stop here to protect you.')
                         return False
                     
-                    log.info('Good SHA256 checksum for staking-deposit-cli binary.')
+                    log.info('Good SHA256 checksum for ethstaker-deposit-cli binary.')
             
-            # Extracting the staking-deposit-cli binary archive
-            staking_deposit_cli_path.mkdir(parents=True, exist_ok=True)
+            # Extracting the ethstaker-deposit-cli binary archive
+            ethstaker_deposit_cli_path.mkdir(parents=True, exist_ok=True)
             subprocess.run([
                 'tar', 'xvf', binary_path, '--strip-components', '2', '--directory',
-                staking_deposit_cli_path])
+                ethstaker_deposit_cli_path])
             
             # Remove download leftovers
             binary_path.unlink()
@@ -5065,22 +5064,14 @@ Do you want to skip installing the staking-deposit-cli binary?
         if validator_keys_path.is_dir():
             shutil.rmtree(validator_keys_path)
 
-        command = [staking_deposit_cli_binary, 'new-mnemonic', '--chain', network]
+        command = [ethstaker_deposit_cli_binary, 'new-mnemonic', '--chain', network]
 
-        # Ask for withdrawal address
-        withdrawal_address = select_withdrawal_address(log)
-        if withdrawal_address is None or withdrawal_address is False:
-            return False
-        
-        if withdrawal_address != '':
-            command.extend(['--execution_address', withdrawal_address])
+        # Launch ethstaker-deposit-cli
+        log.info('Generating keys with ethstaker-deposit-cli binary...')
+        subprocess.run(command, cwd=ethstaker_deposit_cli_path)
 
-        # Launch staking-deposit-cli
-        log.info('Generating keys with staking-deposit-cli binary...')
-        subprocess.run(command, cwd=staking_deposit_cli_path)
-
-        # Clean up staking-deposit-cli binary
-        staking_deposit_cli_binary.unlink()
+        # Clean up ethstaker-deposit-cli binary
+        ethstaker_deposit_cli_binary.unlink()
 
         # Verify the generated keys
         generated_keys = search_for_generated_keys(validator_keys_path)
@@ -5088,7 +5079,7 @@ Do you want to skip installing the staking-deposit-cli binary?
         if (
             generated_keys['deposit_data_path'] is None or
             len(generated_keys['keystore_paths']) == 0):
-            log.warning('No key has been generated with the staking-deposit-cli tool.')
+            log.warning('No key has been generated with the ethstaker-deposit-cli tool.')
         else:
             actual_keys = generated_keys
             obtained_keys = True
