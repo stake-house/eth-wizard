@@ -6682,7 +6682,7 @@ Removing this directory will also remove any key imported previously.
         if len(keys['keystore_paths']) > 0:
             subprocess.run([
                 str(lighthouse_path), '--network', network, 'account', 'validator', 'import',
-                '--directory', keys['validator_keys_path'], '--datadir', lighthouse_datadir])
+                '--directory', keys['validator_keys_path'], '--datadir', lighthouse_datadir, '--reuse-password'])
         else:
             log.warning('No keystore files found to import. We\'ll guess they were already imported '
                 'for now.')
