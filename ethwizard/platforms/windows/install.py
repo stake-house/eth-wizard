@@ -7410,7 +7410,7 @@ Do you want to skip installing the ethstaker-deposit-cli binary?
                 # Verify SHA256 signature
                 log.info('Verifying ethstaker-deposit-cli checksum...')
                 checksum_value = ''
-                with open(checksum_path, 'r', encoding='utf_16_le') as signature_file:
+                with open(checksum_path, 'r', encoding='utf-8') as signature_file:
                     checksum_value = signature_file.read(1024).strip()
                 
                 # Remove download leftovers
