@@ -7323,7 +7323,7 @@ Do you want to skip installing the ethstaker-deposit-cli binary?
                         'file_name': file_name,
                         'file_url': file_url
                     }
-                elif file_name.endswith('windows-amd64.sha256'):
+                elif file_name.endswith('windows-amd64.zip.sha256'):
                     checksum_asset = {
                         'file_name': file_name,
                         'file_url': file_url
