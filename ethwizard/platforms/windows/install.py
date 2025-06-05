@@ -5009,9 +5009,22 @@ Connected Peers: {result['bn_connected_peers']}
 
     return True
 
+def install_msvc14x64():
+    # Install Microsoft Visual C++ 2015-2022 Redistributable (x64)
+    command_line = ['winget', 'install', '--id=Microsoft.VCRedist.2015+.x64', '-e', '--accept-source-agreements']
+    process_result = subprocess.run(command_line)
+    installed_msvc14x64 = process_result.returncode == 0
+
+    return installed_msvc14x64
+
 def install_lighthouse(base_directory, network, eth1_fallbacks, consensus_checkpoint_url, ports,
     mevboost_installed):
     # Install Lighthouse for the selected network
+
+    # Install Microsoft Visual C++ 2015-2022 Redistributable (x64) as a requirement for Lighthouse
+    if not install_msvc14x64():
+        log.error('Could not install Microsoft Visual C++ 2015-2022 Redistributable (x64).')
+        return False
 
     base_directory = Path(base_directory)
 
