@@ -7157,7 +7157,7 @@ It is recommended to generate your keys offline using the official
 ethstaker-deposit-cli tool or Wagyu Key Gen. You can download these tools
 from:
 
-- https://github.com/eth-educators/ethstaker-deposit-cli
+- https://github.com/ethstaker/ethstaker-deposit-cli
 - https://github.com/stake-house/wagyu-key-gen
 
 You can put that binary on a USB drive, generate your keys on a different
