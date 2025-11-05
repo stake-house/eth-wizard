@@ -1,5 +1,9 @@
 # eth-wizard
 
+## Archived
+
+This repository is now archived and the project is deprecated. [Support](#support) can still be obtained with the EthStaker community. Users of eth-wizard might want to check [Eth Docker](https://ethdocker.com/) or [EthPillar](https://docs.coincashew.com/ethpillar) as an alternative.
+
 [![GitPOAP Badge](https://public-api.gitpoap.io/v1/repo/stake-house/eth-wizard/badge)](https://www.gitpoap.io/gh/stake-house/eth-wizard)
 
 An Ethereum validator installation wizard meant to guide anyone through the different steps to become a fully functional validator on the Ethereum network. It will install and configure all the software needed to become a validator. It will test your installation. It will help you avoid the common pitfalls. It will help you maintain and keep your setup updated.
